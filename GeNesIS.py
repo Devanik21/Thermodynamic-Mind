@@ -6,6 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from genesis_world import GenesisWorld, Resource
 from genesis_brain import GenesisAgent
+import random
 
 # ============================================================
 # ⚙️ CONFIG & STATE
@@ -247,3 +248,4 @@ with col_log:
 if st.session_state.running:
     time.sleep(0.01) # Small throttle
     st.rerun()
+
