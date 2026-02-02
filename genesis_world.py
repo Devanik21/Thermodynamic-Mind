@@ -1,137 +1,145 @@
 import numpy as np
 import torch
 import random
+import math
 
 # ============================================================
-# 🌌 ZERO POINT PHYSICS CONSTANTS
+# 🌌 DYNAMIC PHYSICS CONSTANTS
 # ============================================================
-GRID_SIZE = 64
-SIGNAL_DIM = 16  # The "Spectrum" of reality (Abstract Vectors)
+GRID_SIZE = 40
+SIGNAL_DIM = 16
 MAX_ENERGY = 100.0
-METABOLIC_COST = 0.5  # Cost of just existing per tick
+METABOLIC_COST = 0.5 
+
+# QUANTUM SEASONS (The Chaos Factor)
+SEASON_LENGTH = 50  # Rules flip every 50 ticks (Fast fluctuation)
 
 # ============================================================
-# ⚛️ ENTITIES (The Objects of Reality)
+# ⚛️ ENTITIES
 # ============================================================
 class Entity:
-    """Base class for anything that exists in the grid."""
     def __init__(self, x, y, entity_type):
         self.x = x
         self.y = y
-        self.type = entity_type  # 'agent', 'food', 'hazard'
+        self.type = entity_type
         self.exists = True
 
 class Resource(Entity):
-    """Energy packets (Food/Hazards) emitted as Abstract Vectors."""
-    def __init__(self, x, y, nutrition):
+    """
+    Polymorphic Resource. 
+    Its 'Truth' (Nutrition) depends on the current Quantum Season,
+    but its 'Signal' remains constant. This forces the agent to context-switch.
+    """
+    def __init__(self, x, y, is_type_a=True):
         super().__init__(x, y, 'resource')
-        self.nutrition = nutrition
+        self.is_type_a = is_type_a # Type A vs Type B
         
-        # 🧬 THE SIGNAL: Agents see this, not "Apple"
-        # Food = High frequency in first half, Hazard = High in second half
-        # But we add Noise so they MUST learn general features.
         self.signal = torch.zeros(SIGNAL_DIM)
-        
-        if nutrition > 0:
-            # "Edible" Signal Pattern (Positive High)
-            self.signal[:8] = torch.rand(8) * 0.8 + 0.2 
+        # Signal is intrinsic to the object (Red vs Blue)
+        if is_type_a:
+            # "Red" Signal
+            self.signal[:8] = torch.rand(8) * 0.8 + 0.2
             self.signal[8:] = torch.rand(8) * 0.1
         else:
-            # "Toxic" Signal Pattern (Negative/Warning High)
+            # "Blue" Signal
             self.signal[:8] = torch.rand(8) * 0.1
             self.signal[8:] = torch.rand(8) * 0.8 + 0.2
             
-        # Normalize signal (Physically conserved)
         self.signal = torch.nn.functional.normalize(self.signal, dim=0)
 
+    def get_nutrition(self, current_season):
+        """
+        The Schrödinger Evaluation:
+        Season 0: Red=Food, Blue=Poison
+        Season 1: Red=Poison, Blue=Food
+        """
+        base_val = 20.0
+        
+        if current_season % 2 == 0:
+            return base_val if self.is_type_a else -base_val * 2.0
+        else:
+            return -base_val * 2.0 if self.is_type_a else base_val
+
 # ============================================================
-# 🌍 THE WORLD (The Simulation Container)
+# 🌍 THE QUANTUM WORLD
 # ============================================================
 class GenesisWorld:
-    """The Grid Container. Handles physics, collision, and sensory projection."""
     def __init__(self, size=GRID_SIZE):
         self.size = size
-        self.grid = {} # {(x,y): Entity} - Sparse storage
-        self.agents = {} # {id: AgentObj} - External reference
+        self.grid = {} 
+        self.agents = {} 
         self.time_step = 0
         self.total_energy_consumed = 0.0
         
+        self.current_season = 0
+        self.season_timer = 0
+        
     def spawn_resource(self):
-        """Randomly places a resource (Food or Poison)."""
+        """Places a localized potential."""
         x, y = random.randint(0, self.size-1), random.randint(0, self.size-1)
         if (x, y) not in self.grid:
-            # 80% Food, 20% Poison (To force learning discrimination)
-            if random.random() < 0.8:
-                res = Resource(x, y, nutrition=20.0) # Calories
-            else:
-                res = Resource(x, y, nutrition=-50.0) # Poison
+            # Randomly Type A (Red) or Type B (Blue)
+            # 50/50 chance, unlike static world
+            is_type_a = random.random() < 0.5
+            res = Resource(x, y, is_type_a)
             self.grid[(x, y)] = res
 
     def get_sensory_input(self, agent):
-        """
-        Project the local reality into the Agent's sensors.
-        Returns: Tensor [Signal_Dim]
-        Current Logic: The agent actively 'scans' the cell it is standing on.
-        """
-        # 1. Proprioception (Internal State) - handled by Agent Class
-        
-        # 2. Exteroception (External World)
-        # Check current cell
+        """Projects reality to agent + Social Signals."""
+        # 1. Local Signal (What am I standing on?)
         loc = (agent.x, agent.y)
-        if loc in self.grid:
-            entity = self.grid[loc]
-            if isinstance(entity, Resource):
-                # Agents see the object they are standing on
-                return entity.signal
+        local_signal = torch.zeros(SIGNAL_DIM)
         
-        # If nothing, return "Void" signal (Gaussian Noise)
-        return torch.randn(SIGNAL_DIM) * 0.05
+        if loc in self.grid:
+            local_signal = self.grid[loc].signal
+        else:
+            local_signal = torch.randn(SIGNAL_DIM) * 0.05
+            
+        return local_signal
 
     def move_agent(self, agent, action_idx):
-        """
-        Physics of movement.
-        0: Stay, 1: Up, 2: Down, 3: Left, 4: Right
-        """
         dx, dy = 0, 0
         if action_idx == 1: dy = -1
         elif action_idx == 2: dy = 1
         elif action_idx == 3: dx = -1
         elif action_idx == 4: dx = 1
         
-        # Toroidal Geometry (World wraps around like Pac-Man)
         new_x = (agent.x + dx) % self.size
         new_y = (agent.y + dy) % self.size
-        
         agent.x, agent.y = new_x, new_y
 
     def attempt_eat(self, agent):
-        """Interacts with the object at current location."""
         loc = (agent.x, agent.y)
-        reward = 0.0
-        
         if loc in self.grid:
             entity = self.grid[loc]
             if isinstance(entity, Resource):
-                # Consume it
-                energy_gain = entity.nutrition
+                # Critical: Evaluate based on CURRENT SEASON
+                energy_gain = entity.get_nutrition(self.current_season)
+                
                 agent.energy += energy_gain
                 agent.energy = min(agent.energy, MAX_ENERGY)
                 
-                # Update World Stats
                 if energy_gain > 0:
                     self.total_energy_consumed += energy_gain
                 
-                # Remove resource
                 del self.grid[loc]
-                return energy_gain # Real Physical Reward (Calories)
-                
-        return -1.0 # Wasted effort penalty
+                return energy_gain 
+        return -1.0 
 
     def step(self):
-        """Advances the laws of physics by one tick."""
+        """Advances time and Quantum Seasons."""
         self.time_step += 1
+        self.season_timer += 1
         
-        # Resource Regeneration (Entropy reverses locally)
+        # QUANTUM FLIP
+        if self.season_timer >= SEASON_LENGTH:
+            self.current_season += 1
+            self.season_timer = 0
+            # Entropy injection: massive resource respawn to confuse agents
+            for _ in range(20):
+                self.spawn_resource()
+        
+        # Standard Regen
         if self.time_step % 2 == 0:
             for _ in range(5):
                 self.spawn_resource()

@@ -14,14 +14,13 @@ st.set_page_config(layout="wide", page_title="Zero Point Genesis", page_icon="�
 
 if "world" not in st.session_state:
     st.session_state.world = GenesisWorld(size=40)
-    # Spawn Adam & Eves (50 Agents)
-    for _ in range(50):
+    # Spawn Adam & Eves (64 Agents for 8x8 blocks)
+    for _ in range(64):
         x, y = np.random.randint(0, 40), np.random.randint(0, 40)
         agent = GenesisAgent(x, y)
         st.session_state.world.agents[agent.id] = agent
         
-    # Spawn Initial Resources
-    for _ in range(100):
+    for _ in range(150):
         st.session_state.world.spawn_resource()
 
 if "stats_history" not in st.session_state:
@@ -31,26 +30,29 @@ if "running" not in st.session_state:
     st.session_state.running = False
 
 # ============================================================
-# 🖥️ UI HEADER
+# 🖥️ UI HEADER: THE CHAOS MONITOR
 # ============================================================
-st.title("⚛️ Zero Point Genesis")
-st.markdown("""
-**The Hypothesis:** Intelligence is not about thinking; it's about *not* thinking.
-Agents burn **5.0 Energy** to Learn (Backprop) but only **0.1 Energy** to Act (Reflex).
-Watch the **Red Line** (Thinking) drop as they evolve habits to survive.
-""")
+st.title("⚛️ Zero Point Genesis: Causal Adaptation")
 
-col1, col2, col3 = st.columns([1, 1, 2])
-with col1:
-    if st.button("▶️ Start / Pause"):
+# Dynamic Season Indicator
+season_mode = "SUMMER 🌞" if st.session_state.world.current_season % 2 == 0 else "WINTER ❄️"
+season_color = "#ffbd45" if st.session_state.world.current_season % 2 == 0 else "#45b6fe"
+next_flip = 50 - st.session_state.world.season_timer
+
+col_head1, col_head2, col_head3 = st.columns([2, 1, 1])
+with col_head1:
+    st.markdown(f"""
+    ### Current Epoch: <span style='color:{season_color}'>{season_mode}</span>
+    **Next Quantum Flip in:** `{next_flip}` ticks
+    
+    *Rules are shifting. Static agents will die. Watch the Green Line dip and recover.*
+    """, unsafe_allow_html=True)
+with col_head2:
+    if st.button("▶️ SYSTEM TOGGLE", use_container_width=True):
         st.session_state.running = not st.session_state.running
-with col2:
-    if st.button("💀 Extinction Event (Reset)"):
+with col_head3:
+    if st.button("♻️ BIG BANG (Reset)", use_container_width=True):
         st.session_state.world = GenesisWorld(size=40)
-        for _ in range(50):
-            x, y = np.random.randint(0, 40), np.random.randint(0, 40)
-            agent = GenesisAgent(x, y)
-            st.session_state.world.agents[agent.id] = agent
         st.session_state.stats_history = []
         st.rerun()
 
@@ -69,8 +71,9 @@ if st.session_state.running:
     deaths = []
     
     agents = list(world.agents.values())
+    np.random.shuffle(agents) # Randomize order to prevent bias
+    
     for agent in agents:
-        # Check Existence
         if agent.energy <= 0:
             deaths.append(agent.id)
             continue
@@ -78,142 +81,138 @@ if st.session_state.running:
         # Sensory Input
         signal = world.get_sensory_input(agent)
         
-        # Decision (Thought or Reflex?)
+        # Causal Decision
         action = agent.decide(signal)
         
-        # Execute Action
-        # 0: Stay, 1: Up, 2: Down, 3: Left, 4: Right, 5: Eat
+        # Interaction
         reward = 0.0
-        if action == 5:
+        if action == 5: # EAT
             r = world.attempt_eat(agent)
-            if r > 0: reward = 10.0 # Big dopamine for food
-            elif r < 0: reward = -5.0 # Pain for bad action
+            if r > 0: reward = 5.0  # Food
+            elif r < 0: reward = -10.0 # Poison (Punish hard to force unlearning)
+            else: reward = -0.1 # Wasted bite
         elif action == 0:
-            reward = 0.1 # Tiny reward for conserving energy?
+            reward = 0.05 # Exist
         else:
             world.move_agent(agent, action)
-            reward = -0.1 # Small cost for moving
+            reward = -0.05 # Move cost
             
-        # Metabolic Outcome
+        # Neural Metamorphosis
         learned = agent.metabolize_outcome(reward)
-        
-        if learned:
-            current_thoughts += 1
-        else:
-            current_reflexes += 1
+        if learned: current_thoughts += 1
+        else: current_reflexes += 1
             
-        # Existence Tax
-        agent.energy -= 0.5
+        agent.energy -= 0.5 # Living Tax
         
-    # Process Deaths
     for dead_id in deaths:
         del world.agents[dead_id]
         
-        
-    # Auto-Repopulate (If too few)
-    # This prevents the simulation from ending too quickly during the initial "Stupid Phase"
-    if len(world.agents) < 10:
+    # Auto-Genesis (Keep the experiment alive)
+    if len(world.agents) < 15:
         x, y = np.random.randint(0, 40), np.random.randint(0, 40)
         new_agent = GenesisAgent(x, y)
         world.agents[new_agent.id] = new_agent
         
-    # Record Stats
+    # Stats
     stats = {
         "tick": world.time_step,
         "population": len(world.agents),
-        "total_thoughts": current_thoughts,
-        "total_reflexes": current_reflexes,
-        "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0
+        "thoughts": current_thoughts,
+        "reflexes": current_reflexes,
+        "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
+        "season_flip": 1 if world.season_timer == 1 else 0 # Marker for graph
     }
     st.session_state.stats_history.append(stats)
-    
-    # Keep history bounded
-    if len(st.session_state.stats_history) > 100:
+    if len(st.session_state.stats_history) > 200:
         st.session_state.stats_history.pop(0)
     
-    time.sleep(0.05) # Rate limit
+    time.sleep(0.01) # Max speed
     st.rerun()
 
 # ============================================================
-# 📊 VISUALIZATION
+# 📊 THE ADAPTATION MONITOR
 # ============================================================
 if st.session_state.stats_history:
     df = pd.DataFrame(st.session_state.stats_history)
     
-    # 1. The Nobel Graph
-    # We use secondary Y axis for Thoughts to see the contrast better
+    # 1. The Adaptation Graph
     fig = go.Figure()
     
-    # Trace 1: Conscious Thoughts (Red)
-    fig.add_trace(go.Scatter(
-        x=df['tick'], y=df['total_thoughts'], 
-        name="Conscious Thoughts (Backprop)", 
-        line=dict(color='#ff4b4b', width=3),
-        mode='lines'
-    ))
+    # Season Markers (Vertical Lines) - Conceptual
+    # We plot dots where season changed
+    flips = df[df['season_flip'] == 1]
     
-    # Trace 2: Survivors (Green)
     fig.add_trace(go.Scatter(
         x=df['tick'], y=df['population'], 
         name="Survivors", 
         line=dict(color='#00ffa3', width=2),
-        yaxis='y2'
+        fill='tozeroy', 
+        fillcolor='rgba(0, 255, 163, 0.1)'
     ))
     
-    # Layout
+    fig.add_trace(go.Scatter(
+        x=df['tick'], y=df['thoughts'], 
+        name="Neuro-Plasticity Events", 
+        line=dict(color='#ff4b4b', width=1),
+        mode='lines'
+    ))
+    
+    # Markers for Season Change
+    fig.add_trace(go.Scatter(
+        x=flips['tick'], y=flips['population'],
+        mode='markers', name="QUANTUM FLIP",
+        marker=dict(symbol='star', size=12, color='yellow')
+    ))
+
     fig.update_layout(
-        title="Thermodynamics of Mind: Learning Cost Analysis",
+        title="Survival vs Adaptation Lag",
+        font=dict(color='#e0e4de'),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#e0e4de'),
-        xaxis=dict(title="Time Ticks", gridcolor='#333'),
-        yaxis=dict(title="Calculation Events", gridcolor='#333'),
-        yaxis2=dict(
-            title="Population Count",
-            overlaying='y',
-            side='right'
-        ),
-        legend=dict(orientation="h", y=1.1)
+        height=300,
+        margin=dict(l=0, r=0, t=30, b=0),
+        xaxis=dict(showgrid=False),
+        yaxis=dict(gridcolor='#333')
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# 2. The Grid View
-st.subheader("🌍 The Simulation Grid")
-col_map, col_metrics = st.columns([3, 1])
+# 2. Grid & Brains
+col_grid, col_info = st.columns([3, 1])
 
-with col_map:
-    # Create a matrix for heatmap
+with col_grid:
+    # Heatmap
     grid_map = np.zeros((40, 40))
-    
-    # Fill with Resources
     for (rx, ry), res in st.session_state.world.grid.items():
-        if res.nutrition > 0:
-            grid_map[ry, rx] = 50 # Food (Yellowish)
-        else:
-            grid_map[ry, rx] = -50 # Poison (Purpleish)
+        # Visualize "Truth" relative to Season
+        val = res.get_nutrition(st.session_state.world.current_season)
+        grid_map[ry, rx] = val # +20 or -40
             
-    # Fill with Agents (Overwrites resources visually)
     for agent in st.session_state.world.agents.values():
-        grid_map[agent.y, agent.x] = 100 # Bright spot (Agent)
+        grid_map[agent.y, agent.x] = 100 
 
     fig_map = px.imshow(
         grid_map, 
-        color_continuous_scale='Viridis', 
-        zmin=-50, zmax=100
+        color_continuous_scale='RdBu', 
+        zmin=-50, zmax=50,
+        title=f"Environment Truth Map ({season_mode})"
     )
     fig_map.update_traces(showscale=False)
-    fig_map.update_layout(
-        margin=dict(l=0, r=0, t=0, b=0),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(showticklabels=False, showgrid=False),
-        yaxis=dict(showticklabels=False, showgrid=False)
-    )
+    fig_map.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+    # Remove axis logic handled by Streamlit theme usually
     st.plotly_chart(fig_map, use_container_width=True)
 
-with col_metrics:
+with col_info:
     if st.session_state.stats_history:
         curr = st.session_state.stats_history[-1]
-        st.metric("Population", curr["population"])
-        st.metric("Thoughts/Tick", curr["total_thoughts"], delta_color="inverse")
-        st.metric("Avg Energy", f"{curr['avg_energy']:.1f}")
+        st.metric("Agents", curr["population"])
+        st.metric("Neuro-Updates", curr["thoughts"], delta_color="inverse")
+        st.metric("Chaos Level", f"{curr['season_flip'] * 100}%")
+        
+    st.info("""
+    **Legend:**
+    🔴 Red Pixels = POISON (Death)
+    🔵 Blue Pixels = FOOD (Life)
+    ✨ Bright Spots = AGENTS
+    
+    Watch colors FLIP when seasons change!
+    """)

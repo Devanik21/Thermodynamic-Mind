@@ -7,133 +7,132 @@ import uuid
 # ============================================================
 # 🧠 THERMODYNAMIC CONSTANTS
 # ============================================================
-COST_REFLEX = 0.1      # Cheap: Just reacting
-COST_THOUGHT = 5.0     # Expensive: Rewiring the synapses (Backprop)
-LEARNING_THRESHOLD = 0.6 # Confidence needed to trigger Neuroplasticity
+COST_REFLEX = 0.1      
+COST_THOUGHT = 5.0     
+LEARNING_THRESHOLD = 0.6 
 
 # ============================================================
-# 🕸️ THE NEURAL SUBSTRATE (InstinctNet)
+# 🕸️ THE CAUSAL SUBSTRATE (Recurrent Neural Network)
 # ============================================================
-class InstinctNet(nn.Module):
+class CausalBrain(nn.Module):
     """
-    A tiny, efficient brain.
+    A Recurrent Brain (GRU).
     Input: Sensory Vector (16) + Energy State (1) = 17
-    Output: Action Logits (6) + Plasticity Request (1)
+    Hidden: 32 (Short-term Memory / Context)
+    Output: Action (6) + Plasticity (1)
     """
     def __init__(self, input_dim=16, hidden_dim=32, output_dim=6):
         super().__init__()
-        self.layer1 = nn.Linear(input_dim + 1, hidden_dim)
-        self.layer2 = nn.Linear(hidden_dim, hidden_dim)
+        self.hidden_dim = hidden_dim
         
-        # Head 1: The Motor Cortex (Actions)
-        self.actor = nn.Linear(hidden_dim, output_dim)
+        # Feature Extraction
+        self.encoder = nn.Linear(input_dim + 1, hidden_dim)
         
-        # Head 2: The Metacognition (Should I Learn?)
-        # 0 = Habitual Mode, 1 = Learning Mode
-        self.critic = nn.Linear(hidden_dim, 1)
+        # The Core (GRU Cell) - Explicit Time Awareness
+        self.gru = nn.GRUCell(hidden_dim, hidden_dim)
+        
+        # Decoders
+        self.actor = nn.Linear(hidden_dim, output_dim) # Action
+        self.critic = nn.Linear(hidden_dim, 1) # Plasticity Gate
         
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
         
-    def forward(self, x, energy_level):
-        # Concatenate Signal with Internal State (Proprioception)
-        # Normalize energy (0-100 -> 0-1)
+    def forward(self, x, energy_level, hidden_state):
+        # 1. Preprocess
         e = torch.tensor([energy_level / 100.0]).float()
         if x.dim() == 1:
-            x = torch.cat([x, e], dim=0)
+            x = torch.cat([x, e], dim=0).unsqueeze(0) # [1, 17]
         else:
             e = e.unsqueeze(0).expand(x.size(0), -1)
             x = torch.cat([x, e], dim=1)
+        
+        if hidden_state is None:
+            hidden_state = torch.zeros(x.size(0), self.hidden_dim)
             
-        h = self.relu(self.layer1(x))
-        h = self.relu(self.layer2(h))
+        # 2. Encode
+        features = self.relu(self.encoder(x))
         
-        action_logits = self.actor(h)
-        plasticity_gate = self.sigmoid(self.critic(h))
+        # 3. Time Step (Recurrence)
+        new_hidden = self.gru(features, hidden_state)
         
-        return action_logits, plasticity_gate
+        # 4. Decode
+        action_logits = self.actor(new_hidden)
+        plasticity_gate = self.sigmoid(self.critic(new_hidden))
+        
+        return action_logits, plasticity_gate, new_hidden
 
 # ============================================================
-# 🧬 THE AGENT (The Thermodynamic Being)
+# 🧬 THE ADAPTIVE AGENT
 # ============================================================
 class GenesisAgent:
     def __init__(self, x, y, uid=None):
         self.id = uid if uid else str(uuid.uuid4())[:8]
         self.x = x
         self.y = y
-        self.energy = 50.0 # Start half-full
+        self.energy = 50.0 
         self.age = 0
-        self.generation = 0
         
-        # The Brain
-        self.brain = InstinctNet()
-        self.optimizer = optim.Adam(self.brain.parameters(), lr=0.01)
+        # The Causal Brain
+        self.brain = CausalBrain()
+        self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005) # Lower LR for RNN stability
         
-        # Short-term Memory for RL
-        self.saved_log_probs = []
-        self.rewards = []
+        # Memory State (The "Mind")
+        self.hidden_state = None
+        
+        # RL Buffer
+        self.current_log_prob = None
         self.decided_to_learn = False
         
         # Stats
-        self.thoughts_had = 0      # Times it chose backprop
-        self.reflexes_used = 0     # Times it acted cheaply
+        self.thoughts_had = 0      
+        self.reflexes_used = 0    
     
     def decide(self, signal_vector):
         """
-        The Moment of Choice: Habit or Thought?
+        The Choice with Context.
         """
-        # 1. Forward Pass (Reflex) - Cheap
         self.energy -= COST_REFLEX 
         self.reflexes_used += 1
         
-        with torch.no_grad(): # Default to cheap inference
-             # We temporarily re-enable grad later if we decide to learn
+        # Detach hidden state to prevent infinite backprop through time (Truncated BPTT)
+        if self.hidden_state is not None:
+            self.hidden_state = self.hidden_state.detach()
+
+        with torch.no_grad():
              pass
 
-        logits, plasticity_score = self.brain(signal_vector, self.energy)
+        logits, plasticity_score, new_hidden = self.brain(signal_vector, self.energy, self.hidden_state)
+        self.hidden_state = new_hidden # Update memory
         
         # Sample Action
-        probs = torch.nn.functional.softmax(logits, dim=0)
+        probs = torch.nn.functional.softmax(logits, dim=1) # [1, 6]
         distribution = torch.distributions.Categorical(probs)
         action = distribution.sample()
         
-        # Store for potential learning
         self.current_log_prob = distribution.log_prob(action)
         self.decided_to_learn = False
         
-        # 2. Metacognition: Do we spend energy to learn this interaction?
-        # Only learn if:
-        # A) The brain 'wants' to (Plasticity Score high)
-        # B) We have surplus energy (Can afford the proteins)
-        if plasticity_score.item() > LEARNING_THRESHOLD and self.energy > 20.0:
+        # Intelligent Gating: Harder threshold for RNNs to prevent overfitting noise
+        if plasticity_score.item() > 0.7 and self.energy > 30.0:
             self.decided_to_learn = True
         
         return action.item()
 
     def metabolize_outcome(self, reward):
-        """
-        The consequences of action.
-        If we decided to learn, we now pay the price and rewire.
-        """
         # Physical Reward
-        # reward is from Physics (Calories)
-        
-        # 3. Neuroplasticity (Thought) - Expensive
         if self.decided_to_learn:
             self.energy -= COST_THOUGHT
             self.thoughts_had += 1
             
-            # REINFORCE Update (Simple Policy Gradient)
-            # We want to maximize Reward
             loss = -self.current_log_prob * reward
             
-            # We need to re-run forward pass with gradients enabled to backprop
-            # Since we didn't save the graph (to save memory/energy normally)
-            # This is the "Re-thinking" cost
+            # RNN Backprop needs careful handling
             self.optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0) # Clip gradients
             self.optimizer.step()
             
-            return True # Learned
+            return True 
             
-        return False # Just lived
+        return False
