@@ -14,7 +14,7 @@ st.set_page_config(layout="wide", page_title="Zero Point Genesis", page_icon="�
 
 if "world" not in st.session_state:
     st.session_state.world = GenesisWorld(size=40)
-    # Spawn Adam & Eves (64 Agents for 8x8 blocks)
+    # Spawn Adam & Eves (64 Agents)
     for _ in range(64):
         x, y = np.random.randint(0, 40), np.random.randint(0, 40)
         agent = GenesisAgent(x, y)
@@ -25,7 +25,14 @@ if "world" not in st.session_state:
 
 if "stats_history" not in st.session_state:
     st.session_state.stats_history = []
+
+# 🧬 GENE POOL: The Hall of Ancestors
+if "gene_pool" not in st.session_state:
+    st.session_state.gene_pool = [] # List of genomes (dicts)
     
+if "max_generation" not in st.session_state:
+    st.session_state.max_generation = 0
+
 if "running" not in st.session_state:
     st.session_state.running = False
 
@@ -45,7 +52,8 @@ with col_head1:
     ### Current Epoch: <span style='color:{season_color}'>{season_mode}</span>
     **Next Quantum Flip in:** `{next_flip}` ticks
     
-    *Rules are shifting. Static agents will die. Watch the Green Line dip and recover.*
+    *Evolution is Active. Successful agents pass genes to the next generation.*
+    **Gene Pool Size:** `{len(st.session_state.gene_pool)}` | **Max Generation:** `{st.session_state.max_generation}`
     """, unsafe_allow_html=True)
 with col_head2:
     if st.button("▶️ SYSTEM TOGGLE", use_container_width=True):
@@ -54,6 +62,8 @@ with col_head3:
     if st.button("♻️ BIG BANG (Reset)", use_container_width=True):
         st.session_state.world = GenesisWorld(size=40)
         st.session_state.stats_history = []
+        st.session_state.gene_pool = []
+        st.session_state.max_generation = 0
         st.rerun()
 
 # ============================================================
@@ -71,7 +81,7 @@ if st.session_state.running:
     deaths = []
     
     agents = list(world.agents.values())
-    np.random.shuffle(agents) # Randomize order to prevent bias
+    np.random.shuffle(agents) 
     
     for agent in agents:
         if agent.energy <= 0:
@@ -88,29 +98,48 @@ if st.session_state.running:
         reward = 0.0
         if action == 5: # EAT
             r = world.attempt_eat(agent)
-            if r > 0: reward = 5.0  # Food
-            elif r < 0: reward = -10.0 # Poison (Punish hard to force unlearning)
-            else: reward = -0.1 # Wasted bite
+            if r > 0: reward = 5.0  
+            elif r < 0: reward = -10.0 
+            else: reward = -0.1 
         elif action == 0:
-            reward = 0.05 # Exist
+            reward = 0.05 
         else:
             world.move_agent(agent, action)
-            reward = -0.05 # Move cost
+            reward = -0.05 
             
         # Neural Metamorphosis
         learned = agent.metabolize_outcome(reward)
         if learned: current_thoughts += 1
         else: current_reflexes += 1
             
-        agent.energy -= 0.5 # Living Tax
+        agent.energy -= 0.5 
         
     for dead_id in deaths:
+        # ⚰️ FUNERAL RITE: Save Genes if worthy
+        dead_agent = world.agents[dead_id]
+        if dead_agent.age > 20: # Only adults contribute
+            st.session_state.gene_pool.append(dead_agent.get_genome())
+            # Keep pool fresh (drift)
+            if len(st.session_state.gene_pool) > 50:
+                st.session_state.gene_pool.pop(0)
+                
         del world.agents[dead_id]
         
-    # Auto-Genesis (Keep the experiment alive)
-    if len(world.agents) < 15:
+    # 🌱 REBIRTH: Evolutionary Spawning
+    if len(world.agents) < 40:
         x, y = np.random.randint(0, 40), np.random.randint(0, 40)
-        new_agent = GenesisAgent(x, y)
+        
+        # Inheritance Logic
+        genome = None
+        generation = 0
+        if st.session_state.gene_pool and np.random.random() < 0.8: # 80% chance to inherit
+            genome = random.choice(st.session_state.gene_pool)
+            # We don't strictly track generation in the dict, but we can infer progress
+            # For simplicity, we just increment global counter if inheritance happens
+            st.session_state.max_generation += 1 
+            generation = st.session_state.max_generation
+        
+        new_agent = GenesisAgent(x, y, genome=genome, generation=generation)
         world.agents[new_agent.id] = new_agent
         
     # Stats
@@ -120,13 +149,13 @@ if st.session_state.running:
         "thoughts": current_thoughts,
         "reflexes": current_reflexes,
         "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
-        "season_flip": 1 if world.season_timer == 1 else 0 # Marker for graph
+        "season_flip": 1 if world.season_timer == 1 else 0
     }
     st.session_state.stats_history.append(stats)
     if len(st.session_state.stats_history) > 200:
         st.session_state.stats_history.pop(0)
     
-    time.sleep(0.01) # Max speed
+    time.sleep(0.01) 
     st.rerun()
 
 # ============================================================
@@ -138,8 +167,6 @@ if st.session_state.stats_history:
     # 1. The Adaptation Graph
     fig = go.Figure()
     
-    # Season Markers (Vertical Lines) - Conceptual
-    # We plot dots where season changed
     flips = df[df['season_flip'] == 1]
     
     fig.add_trace(go.Scatter(
@@ -183,36 +210,42 @@ with col_grid:
     # Heatmap
     grid_map = np.zeros((40, 40))
     for (rx, ry), res in st.session_state.world.grid.items():
-        # Visualize "Truth" relative to Season
         val = res.get_nutrition(st.session_state.world.current_season)
-        grid_map[ry, rx] = val # +20 or -40
+        grid_map[ry, rx] = val 
             
     for agent in st.session_state.world.agents.values():
-        grid_map[agent.y, agent.x] = 100 
+        # High Energy = Brighter
+        intensity = 50 + (agent.energy * 1.5) 
+        grid_map[agent.y, agent.x] = intensity 
 
     fig_map = px.imshow(
         grid_map, 
         color_continuous_scale='RdBu', 
-        zmin=-50, zmax=50,
+        zmin=-50, zmax=150, # Expanded range for super-charged agents
         title=f"Environment Truth Map ({season_mode})"
     )
     fig_map.update_traces(showscale=False)
     fig_map.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-    # Remove axis logic handled by Streamlit theme usually
     st.plotly_chart(fig_map, use_container_width=True)
 
 with col_info:
     if st.session_state.stats_history:
         curr = st.session_state.stats_history[-1]
         st.metric("Agents", curr["population"])
-        st.metric("Neuro-Updates", curr["thoughts"], delta_color="inverse")
-        st.metric("Chaos Level", f"{curr['season_flip'] * 100}%")
+        st.metric("Avg Energy", f"{curr['avg_energy']:.1f}")
+        
+        # Max Age
+        max_age = 0
+        if st.session_state.world.agents:
+            max_age = max([a.age for a in st.session_state.world.agents.values()])
+        st.metric("Oldest Agent (Ticks)", max_age)
         
     st.info("""
     **Legend:**
-    🔴 Red Pixels = POISON (Death)
-    🔵 Blue Pixels = FOOD (Life)
-    ✨ Bright Spots = AGENTS
+    🔴 Red Pixels = POISON
+    🔵 Blue Pixels = FOOD
+    ✨ White/Bright = HIGH ENERGY AGENT
+    🌑 Dim = DYING AGENT
     
-    Watch colors FLIP when seasons change!
+    *Resources now move (Drift).*
     """)

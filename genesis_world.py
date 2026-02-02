@@ -12,7 +12,7 @@ MAX_ENERGY = 100.0
 METABOLIC_COST = 0.5 
 
 # QUANTUM SEASONS (The Chaos Factor)
-SEASON_LENGTH = 50  # Rules flip every 50 ticks (Fast fluctuation)
+SEASON_LENGTH = 50 
 
 # ============================================================
 # ⚛️ ENTITIES
@@ -25,36 +25,22 @@ class Entity:
         self.exists = True
 
 class Resource(Entity):
-    """
-    Polymorphic Resource. 
-    Its 'Truth' (Nutrition) depends on the current Quantum Season,
-    but its 'Signal' remains constant. This forces the agent to context-switch.
-    """
     def __init__(self, x, y, is_type_a=True):
         super().__init__(x, y, 'resource')
-        self.is_type_a = is_type_a # Type A vs Type B
+        self.is_type_a = is_type_a 
         
         self.signal = torch.zeros(SIGNAL_DIM)
-        # Signal is intrinsic to the object (Red vs Blue)
         if is_type_a:
-            # "Red" Signal
             self.signal[:8] = torch.rand(8) * 0.8 + 0.2
             self.signal[8:] = torch.rand(8) * 0.1
         else:
-            # "Blue" Signal
             self.signal[:8] = torch.rand(8) * 0.1
             self.signal[8:] = torch.rand(8) * 0.8 + 0.2
             
         self.signal = torch.nn.functional.normalize(self.signal, dim=0)
 
     def get_nutrition(self, current_season):
-        """
-        The Schrödinger Evaluation:
-        Season 0: Red=Food, Blue=Poison
-        Season 1: Red=Poison, Blue=Food
-        """
         base_val = 20.0
-        
         if current_season % 2 == 0:
             return base_val if self.is_type_a else -base_val * 2.0
         else:
@@ -78,15 +64,34 @@ class GenesisWorld:
         """Places a localized potential."""
         x, y = random.randint(0, self.size-1), random.randint(0, self.size-1)
         if (x, y) not in self.grid:
-            # Randomly Type A (Red) or Type B (Blue)
-            # 50/50 chance, unlike static world
             is_type_a = random.random() < 0.5
             res = Resource(x, y, is_type_a)
             self.grid[(x, y)] = res
 
+    def move_resources(self):
+        """
+        BROWNIAN MOTION: Resources drift!
+        This creates a dynamic, fluid-like environment.
+        """
+        # Snapshot keys to avoid runtime error
+        keys = list(self.grid.keys())
+        for loc in keys:
+            if random.random() < 0.1: # 10% chance to drift
+                res = self.grid.pop(loc)
+                dx = random.choice([-1, 0, 1])
+                dy = random.choice([-1, 0, 1])
+                new_x = (res.x + dx) % self.size
+                new_y = (res.y + dy) % self.size
+                
+                # Only move if empty
+                if (new_x, new_y) not in self.grid:
+                    res.x, res.y = new_x, new_y
+                    self.grid[(new_x, new_y)] = res
+                else:
+                    # Bounce back
+                    self.grid[loc] = res
+
     def get_sensory_input(self, agent):
-        """Projects reality to agent + Social Signals."""
-        # 1. Local Signal (What am I standing on?)
         loc = (agent.x, agent.y)
         local_signal = torch.zeros(SIGNAL_DIM)
         
@@ -113,7 +118,6 @@ class GenesisWorld:
         if loc in self.grid:
             entity = self.grid[loc]
             if isinstance(entity, Resource):
-                # Critical: Evaluate based on CURRENT SEASON
                 energy_gain = entity.get_nutrition(self.current_season)
                 
                 agent.energy += energy_gain
@@ -135,7 +139,7 @@ class GenesisWorld:
         if self.season_timer >= SEASON_LENGTH:
             self.current_season += 1
             self.season_timer = 0
-            # Entropy injection: massive resource respawn to confuse agents
+            # Entropy injection
             for _ in range(20):
                 self.spawn_resource()
         
@@ -143,3 +147,6 @@ class GenesisWorld:
         if self.time_step % 2 == 0:
             for _ in range(5):
                 self.spawn_resource()
+                
+        # DYNAMIC DRIFT
+        self.move_resources()

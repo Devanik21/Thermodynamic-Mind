@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 import uuid
+import copy
 
 # ============================================================
 # 🧠 THERMODYNAMIC CONSTANTS
@@ -66,16 +67,23 @@ class CausalBrain(nn.Module):
 # 🧬 THE ADAPTIVE AGENT
 # ============================================================
 class GenesisAgent:
-    def __init__(self, x, y, uid=None):
+    def __init__(self, x, y, uid=None, genome=None, generation=0):
         self.id = uid if uid else str(uuid.uuid4())[:8]
         self.x = x
         self.y = y
         self.energy = 50.0 
         self.age = 0
+        self.generation = generation
         
         # The Causal Brain
         self.brain = CausalBrain()
-        self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005) # Lower LR for RNN stability
+        
+        # GENETIC INHERITANCE
+        if genome:
+            self.brain.load_state_dict(genome)
+            self._mutate() # Evolution requires variation
+            
+        self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005)
         
         # Memory State (The "Mind")
         self.hidden_state = None
@@ -88,14 +96,22 @@ class GenesisAgent:
         self.thoughts_had = 0      
         self.reflexes_used = 0    
     
+    def _mutate(self, rate=0.02):
+        """Randomly alters synaptic weights (Darwinian Drift)"""
+        with torch.no_grad():
+            for param in self.brain.parameters():
+                noise = torch.randn_like(param) * rate
+                param.add_(noise)
+
     def decide(self, signal_vector):
         """
         The Choice with Context.
         """
         self.energy -= COST_REFLEX 
         self.reflexes_used += 1
+        self.age += 1 # Every decision is a moment lived
         
-        # Detach hidden state to prevent infinite backprop through time (Truncated BPTT)
+        # Detach hidden state 
         if self.hidden_state is not None:
             self.hidden_state = self.hidden_state.detach()
 
@@ -103,17 +119,17 @@ class GenesisAgent:
              pass
 
         logits, plasticity_score, new_hidden = self.brain(signal_vector, self.energy, self.hidden_state)
-        self.hidden_state = new_hidden # Update memory
+        self.hidden_state = new_hidden 
         
         # Sample Action
-        probs = torch.nn.functional.softmax(logits, dim=1) # [1, 6]
+        probs = torch.nn.functional.softmax(logits, dim=1) 
         distribution = torch.distributions.Categorical(probs)
         action = distribution.sample()
         
         self.current_log_prob = distribution.log_prob(action)
         self.decided_to_learn = False
         
-        # Intelligent Gating: Harder threshold for RNNs to prevent overfitting noise
+        # Intelligent Gating: Only learn if confused AND have energy
         if plasticity_score.item() > 0.7 and self.energy > 30.0:
             self.decided_to_learn = True
         
@@ -127,12 +143,16 @@ class GenesisAgent:
             
             loss = -self.current_log_prob * reward
             
-            # RNN Backprop needs careful handling
+            # RNN Backprop 
             self.optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0) # Clip gradients
+            torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0) 
             self.optimizer.step()
             
             return True 
             
         return False
+
+    def get_genome(self):
+        """Returns the crystallized weight matrix for reproduction."""
+        return copy.deepcopy(self.brain.state_dict())
