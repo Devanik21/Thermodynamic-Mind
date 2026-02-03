@@ -34,10 +34,18 @@ class PhysicsOracle(nn.Module):
             nn.Linear(64, 5) # Output Effects
         )
         
-        # Bias the "Energy" output (Index 0) to be positive
-        # This creates the "60.999% Positive" environment
+        # Balanced Initialization for maximum Chaos
+        for m in self.layers.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=1.5)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0)
+
+        # Bias the "Energy" output (Index 0) SLIGHTLY positive
+        # Was 0.5 (Too safe). Now 0.1 (Survival requires finding the peaks)
         with torch.no_grad():
-            self.layers[-1].bias[0] = 0.5 # Positive Energy Bias
+            self.layers[-1].bias[0] = 0.1 
+            self.layers[-1].bias[4] = -0.1 # Interaction Flavor bias towards "Drain" (Survival of fittest)
             
     def forward(self, vector_21, matter_signal_16):
         x = torch.cat([vector_21, matter_signal_16], dim=1)
