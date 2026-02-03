@@ -532,8 +532,9 @@ with tab_omega:
             target_n = st.session_state.world.agents[selected_id]
             st.markdown(f"#### 📜 Patent Portfolio: `{target_n.id[:8]}`")
             
-            if target_n.inventions:
-                for inv in target_n.inventions:
+            inventions = getattr(target_n, 'inventions', [])
+            if inventions:
+                for inv in inventions:
                     st.success(f"**{inv['name']}** (Energy Yield: `{inv['value']:.1f}`)")
                     # Expandable details for the "Infinite" parameters
                     with st.expander(f"See {inv['name']} Blueprints"):
