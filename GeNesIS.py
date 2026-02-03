@@ -116,8 +116,8 @@ def update_simulation():
         malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 10.0)
         agent.energy -= malthusian_cost 
         
-        # 🧬 MITOSIS (Hard Cap: 5000)
-        if agent.energy > 100.0 and len(world.agents) < 5000:
+        # 🧬 MITOSIS (Hard Cap: 1500)
+        if agent.energy > 100.0 and len(world.agents) < 1500:
             agent.energy -= 50.0 
             off_x = (agent.x + np.random.randint(-1, 2)) % 40
             off_y = (agent.y + np.random.randint(-1, 2)) % 40
