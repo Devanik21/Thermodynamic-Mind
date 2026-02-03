@@ -164,12 +164,14 @@ def update_simulation():
         world.agents[new_agent.id] = new_agent
         
     # Update Stats
+    stats = {
         "tick": world.time_step,
         "population": len(world.agents),
         "thoughts": current_thoughts,
         "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
         "pos_flux": total_pos_flux,
         "neg_flux": total_neg_flux
+    }
     
     st.session_state.stats_history.append(stats)
     if len(st.session_state.stats_history) > 200:
