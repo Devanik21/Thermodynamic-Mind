@@ -9,8 +9,8 @@ import copy
 # 🧠 THERMODYNAMIC CONSTANTS
 # ============================================================
 COST_REFLEX = 0.1      
-COST_THOUGHT = 5.0     
-LEARNING_THRESHOLD = 0.6 
+COST_THOUGHT = 2.0  # Cheaper to think (was 5.0)
+LEARNING_THRESHOLD = 0.4 # Easier to learn (was 0.7) 
 
 # ============================================================
 # 🕸️ THE CAUSAL SUBSTRATE (Recurrent Neural Network)
@@ -96,7 +96,7 @@ class GenesisAgent:
         self.thoughts_had = 0      
         self.reflexes_used = 0    
     
-    def _mutate(self, rate=0.02):
+    def _mutate(self, rate=0.1):
         """Randomly alters synaptic weights (Darwinian Drift)"""
         with torch.no_grad():
             for param in self.brain.parameters():
