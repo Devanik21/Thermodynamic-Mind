@@ -196,8 +196,7 @@ def update_simulation():
             # 💡 INVENTION DISCOVERY
             if flux > 50.0:
                 inv_name = classify_invention(agent.last_vector.tolist()[0])
-                inventions = getattr(agent, 'inventions', [])
-                if not any(inv['name'] == inv_name for inv in inventions):
+                if not any(inv['name'] == inv_name for inv in agent.inventions):
                     agent.inventions.append({
                         "name": inv_name,
                         "value": flux,
@@ -208,37 +207,17 @@ def update_simulation():
                         "Tick": world.time_step,
                         "Agent": agent.id,
                         "Event": f"🏆 INVENTED: {inv_name}",
-                        "Vector": agent.last_vector.tolist()[0],
-                        "Params": {"Flux": f"{flux:.1f}", "Type": "Discovery"}
+                        "Vector": agent.last_vector.tolist()[0]
                     })
         
-        # 📜 SOPHISTICATED EVENT LOGGING
-        if outcome_data["type"] != "IDLE":
-             # Ensure vector exists or fallback
-             vec_list = agent.last_vector.tolist()[0] if agent.last_vector is not None else [0]*21
-             
-             # Format detailed parameters for the logs
-             params = {"Flux": f"{flux:.2f} J"}
-             params.update(outcome_data.get("details", {}))
-             
-             event_str = f"{outcome_data['name']}"
-             if outcome_data["type"] == "MOVE":
-                 event_str = f"🌀 {outcome_data['name']}"
-             elif outcome_data["type"] == "FEED":
-                 event_str = f"⚡ {outcome_data['name']}"
-             elif outcome_data["type"] == "CREATE":
-                 event_str = f"💠 {outcome_data['name']}"
-             elif outcome_data["type"] == "DESTROY":
-                 event_str = f"⚫ {outcome_data['name']}"
-             
+        if "IDLE" not in log_text and "MOVE" not in log_text:
              events_this_tick.append({
                 "Tick": world.time_step,
                 "Agent": agent.id,
                 "Gen": agent.generation,
-                "Event": event_str,
-                "Vector": vec_list,
-                "Params": params 
-             })
+                "Event": f"{log_text} ({flux:.1f}E)",
+                "Vector": reality_vector_tensor.tolist()[0]
+            })
             
         # 📉 Malthusian Decay (Crowding Penalty)
         # As population grows, it becomes harder to sustain individual existence.
@@ -434,16 +413,9 @@ with tab_micro:
             
     with col_log:
         st.markdown("### ⚡ Event Stream")
-    with col_log:
-        st.markdown("### ⚡ Event Stream")
         if st.session_state.event_log:
-             # Reverse to show newest first
-             for event in reversed(st.session_state.event_log):
-                 with st.expander(f"{event['Event']} ({event['Agent'][:4]})"):
-                     if 'Params' in event:
-                         st.json(event['Params'])
-                     st.write(f"**Tick**: {event['Tick']}")
-                     st.code(f"Vector: {[round(x, 2) for x in event['Vector'][:5]]}...", language="json")
+             log_df = pd.DataFrame(st.session_state.event_log)
+             st.dataframe(log_df[["Agent", "Event"]], width="stretch", height=400)
 
 with tab_omega:
     col_civ, col_agent = st.columns([1, 2])
@@ -587,4 +559,3 @@ with tab_omega:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
