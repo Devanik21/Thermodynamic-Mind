@@ -100,6 +100,7 @@ def update_simulation():
         elif flux < 0: total_neg_flux += abs(flux)
             
         learned = agent.metabolize_outcome(flux)
+        if learned: current_thoughts += 1
         
         if "IDLE" not in log_text and "MOVE" not in log_text:
              events_this_tick.append({
