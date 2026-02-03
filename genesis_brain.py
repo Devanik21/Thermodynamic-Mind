@@ -241,7 +241,7 @@ class GenesisAgent:
             loss_actor = nn.MSELoss()(self.last_vector, target) * abs(effective_reward)
             
             target_pred = torch.tensor([reward], dtype=torch.float32)
-            loss_predictor = nn.MSELoss()(self.last_prediction.squeeze(), target_pred)
+            loss_predictor = nn.MSELoss()(self.last_prediction.view(-1), target_pred)
             
             total_loss = loss_actor + loss_predictor
             
