@@ -114,18 +114,15 @@ class GenesisAgent:
         self.reflexes_used += 1
         self.age += 1 
         
+        # 🛡️ GRAPH ISOLATION: Detach memory from previous ticks
         if self.hidden_state is not None:
-            self.hidden_state = self.hidden_state.detach()
-
-        with torch.no_grad():
-             pass
+            self.hidden_state = self.hidden_state.detach().clone()
 
         # Forward Pass
         action_vector, plasticity_score, new_hidden = self.brain(signal_vector, self.energy, self.hidden_state)
         self.hidden_state = new_hidden 
         
         # Store for learning (No distribution sampling anymore, deterministic output from stochastic weights)
-        # We add some exploration noise manually if needed, but for "Science" precision is key.
         # USER REQUEST: "Give all agents 100% Entropy" -> Increasing noise significantly
         # Was 0.05, now 0.3 (High Temperature Mode)
         exploration_noise = torch.randn_like(action_vector) * 0.3
@@ -138,7 +135,7 @@ class GenesisAgent:
         if plasticity_score.item() > LEARNING_THRESHOLD and self.energy > 30.0:
             self.decided_to_learn = True
         
-        return final_vector # Returns Tensor [1, 21]
+        return final_vector 
 
     def metabolize_outcome(self, reward):
         # Physical Reward
@@ -146,19 +143,9 @@ class GenesisAgent:
             self.energy -= COST_THOUGHT
             self.thoughts_had += 1
             
-            # Simple PG Loss: We want to maximize reward
-            # Since we don't have a categorical distribution, we treat the direction as the policy
-            # loss = -reward * (vector • gradient) ? 
-            # Simplified: We just reinforce the vector if reward is high.
-            # But standard PPO/A2C needs a probability.
-            # Regression approach: If reward > 0, Move closer to this vector. If < 0, move away.
-            
             # Create a "Target" vector
-            # If reward is positive, target is CURRENT vector.
-            # If reward is negative, target is OPPOSITE vector.
-            # This allows the MSE loss to effectively implement RL.
-            
-            target = self.last_vector.detach()
+            # We must isolate the target from the graph
+            target = self.last_vector.detach().clone()
             if reward < 0:
                 target = -target # Flee from this spell
                 
@@ -170,6 +157,8 @@ class GenesisAgent:
             torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0) 
             self.optimizer.step()
             
+            # 🛡️ CLEANUP: Clear the vector to prevent graph reuse
+            self.last_vector = None
             return True 
             
         return False
