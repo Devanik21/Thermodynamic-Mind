@@ -98,6 +98,7 @@ class GenesisAgent:
         # Stats
         self.thoughts_had = 0      
         self.reflexes_used = 0    
+        self.inventions = [] # List of high-reward 21D vectors (Discoveries)
     
     def _mutate(self, rate=0.1):
         """Randomly alters synaptic weights."""
