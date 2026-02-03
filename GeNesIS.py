@@ -77,7 +77,7 @@ def update_simulation():
     world.step()
     
     current_thoughts = 0
-    deaths = []
+    deaths = set() # Use a set to avoid KeyError on duplicate IDs
     events_this_tick = []
     
     agents = list(world.agents.values())
@@ -88,7 +88,7 @@ def update_simulation():
     
     for agent in agents:
         if agent.energy <= 0:
-            deaths.append(agent.id)
+            deaths.add(agent.id)
             continue
             
         signal = world.get_local_signal(agent.x, agent.y)
@@ -138,19 +138,20 @@ def update_simulation():
             })
         
     for dead_id in deaths:
-        dead_agent = world.agents[dead_id]
-        if dead_agent.age > 20: 
-            st.session_state.gene_pool.append(dead_agent.get_genome())
-            if len(st.session_state.gene_pool) > 50:
-                st.session_state.gene_pool.pop(0)
-            events_this_tick.append({
-                "Tick": world.time_step,
-                "Agent": dead_agent.id,
-                "Gen": dead_agent.generation,
-                "Event": "💀 DIED",
-                "Vector": [0.0]*21
-            })
-        del world.agents[dead_id]
+        if dead_id in world.agents: # Safety check
+            dead_agent = world.agents[dead_id]
+            if dead_agent.age > 20: 
+                st.session_state.gene_pool.append(dead_agent.get_genome())
+                if len(st.session_state.gene_pool) > 50:
+                    st.session_state.gene_pool.pop(0)
+                events_this_tick.append({
+                    "Tick": world.time_step,
+                    "Agent": dead_agent.id,
+                    "Gen": dead_agent.generation,
+                    "Event": "💀 DIED",
+                    "Vector": [0.0]*21
+                })
+            del world.agents[dead_id]
         
     # Failsafe: only restart if TRULY extinct
     if len(world.agents) < 4:
@@ -199,10 +200,10 @@ with st.container():
         st.markdown(f"### Orbit: <span style='color:{season_color}'>{season_mode}</span>", unsafe_allow_html=True)
         st.caption(f"Gene Pool: {len(st.session_state.gene_pool)} | Max Gen: {st.session_state.max_generation}")
     with col_h2:
-        if st.button("▶️ TOGGLE SIMULATION", use_container_width=True, type="primary" if not st.session_state.running else "secondary"):
+        if st.button("▶️ TOGGLE SIMULATION", width="stretch", type="primary" if not st.session_state.running else "secondary"):
             st.session_state.running = not st.session_state.running
     with col_h3:
-        if st.button("♻️ RESET WORLD", use_container_width=True):
+        if st.button("♻️ RESET WORLD", width="stretch"):
             st.session_state.world = GenesisWorld(size=40)
             st.session_state.stats_history = []
             st.session_state.gene_pool = []
@@ -233,7 +234,7 @@ with st.container():
             generate_report_cached(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log), 
             "genesis_data.zip", 
             "application/zip", 
-            use_container_width=True
+            width="stretch"
         )
 
 # --- MAIN TABS FRAGMENT ---
@@ -250,14 +251,14 @@ with tab_macro:
             fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Survivors", line=dict(color='#00ffa3')))
             fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Plasticity Events", line=dict(color='#ff4b4b')))
             fig.update_layout(title="Evolutionary Trajectory", height=250, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             
         with col_g2:
             fig2 = go.Figure()
             fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Positive Inventions", line=dict(color='yellow'), fill='tozeroy'))
             fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Negative Disasters", line=dict(color='red'), fill='tozeroy'))
             fig2.update_layout(title="The Moral Compass (Efficiency vs Chaos)", height=250, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, width="stretch")
             
         # Row 2: Map
         grid_map = np.zeros((40, 40))
@@ -272,7 +273,7 @@ with tab_macro:
         fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Environment Truth: {season_mode}")
         fig_map.update_traces(showscale=False)
         fig_map.update_layout(height=500, margin=dict(l=0,r=0,t=30,b=0))
-        st.plotly_chart(fig_map, use_container_width=True)
+        st.plotly_chart(fig_map, width="stretch")
     else:
         st.info("System Initializing...")
 
@@ -299,7 +300,7 @@ with tab_micro:
                     title=f"Real-Time Thought Spectrum (n={len(vectors)})"
                 )
                 fig_spec.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_spec, use_container_width=True)
+                st.plotly_chart(fig_spec, width="stretch")
         else:
             st.warning("Extinction Event. No Minds Detected.")
             
@@ -307,7 +308,7 @@ with tab_micro:
         st.markdown("### ⚡ Event Stream")
         if st.session_state.event_log:
              log_df = pd.DataFrame(st.session_state.event_log)
-             st.dataframe(log_df[["Agent", "Event"]], use_container_width=True, height=400)
+             st.dataframe(log_df[["Agent", "Event"]], width="stretch", height=400)
 
 with tab_omega:
     col_civ, col_agent = st.columns([1, 2])
@@ -363,7 +364,7 @@ with tab_omega:
             
         if agent_data:
             df_agents = pd.DataFrame(agent_data)
-            st.dataframe(df_agents, use_container_width=True, height=400)
+            st.dataframe(df_agents, width="stretch", height=400)
 
 # ============================================================
 # 🔄 ANIMATION LOOP
