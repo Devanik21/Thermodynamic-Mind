@@ -47,14 +47,10 @@ if "event_log" not in st.session_state:
 # ============================================================
 # 🔄 1. LOGIC STEP (UPDATE WORLD)
 # ============================================================
-# We run the logic FIRST, then render.
 if st.session_state.running:
     world = st.session_state.world
-    
-    # Physics
     world.step()
     
-    # Agent Loop
     current_thoughts = 0
     current_reflexes = 0
     deaths = []
@@ -63,53 +59,42 @@ if st.session_state.running:
     agents = list(world.agents.values())
     np.random.shuffle(agents) 
     
+    total_pos_flux = 0.0
+    total_neg_flux = 0.0
+    
     for agent in agents:
         if agent.energy <= 0:
             deaths.append(agent.id)
             continue
             
         # Sensory Input
-        signal = world.get_sensory_input(agent)
+        signal = world.get_local_signal(agent.x, agent.y)
         
-        # Causal Decision
-        action = agent.decide(signal)
+        # 🧠 21D Reality Vector Decision
+        reality_vector_tensor = agent.decide(signal) 
         
-        # Interaction
-        reward = 0.0
-        interaction_text = ""
+        # 🔮 Quantum Resolution
+        flux, log_text = world.resolve_quantum_state(agent, reality_vector_tensor)
         
-        if action == 5: # EAT
-            r = world.attempt_eat(agent)
-            if r > 0: 
-                reward = 5.0
-                interaction_text = "😋 ATE FOOD"
-            elif r < 0: 
-                reward = -10.0 
-                interaction_text = "🤮 ATE POISON"
-            else: 
-                reward = -0.1 
-        elif action == 0:
-            reward = 0.05 
-        else:
-            world.move_agent(agent, action)
-            reward = -0.05 
+        # Tracking Moral Compass
+        if flux > 0: total_pos_flux += flux
+        elif flux < 0: total_neg_flux += abs(flux)
             
         # Neural Metamorphosis
-        learned = agent.metabolize_outcome(reward)
+        learned = agent.metabolize_outcome(flux)
         
-        if learned: 
-            current_thoughts += 1
-            # Log Significant Learning Events
-            if abs(reward) > 1.0: # Only significant moments
-                events_this_tick.append({
-                    "Tick": world.time_step,
-                    "Agent": agent.id,
-                    "Gen": agent.generation,
-                    "Event": f"{interaction_text} -> REWIRING BRAIN",
-                    "Energy": f"{agent.energy:.1f}"
-                })
-        else: 
-            current_reflexes += 1
+        # Log Interesting Events
+        if "IDLE" not in log_text and "MOVE" not in log_text:
+             events_this_tick.append({
+                "Tick": world.time_step,
+                "Agent": agent.id,
+                "Gen": agent.generation,
+                "Event": f"{log_text} ({flux:.1f}E)",
+                "Vector": reality_vector_tensor.tolist()[0] # Capture the spell
+            })
+            
+        if learned: current_thoughts += 1
+        else: current_reflexes += 1
             
         agent.energy -= 0.5 
         
@@ -123,8 +108,8 @@ if st.session_state.running:
                 "Tick": world.time_step,
                 "Agent": dead_agent.id,
                 "Gen": dead_agent.generation,
-                "Event": "💀 DIED (GENES SAVED)",
-                "Energy": "0.0"
+                "Event": "💀 DIED",
+                "Vector": [0.0]*21
             })
         del world.agents[dead_id]
         
@@ -140,23 +125,16 @@ if st.session_state.running:
         
         new_agent = GenesisAgent(x, y, genome=genome, generation=gen)
         world.agents[new_agent.id] = new_agent
-        if gen > 0:
-             events_this_tick.append({
-                "Tick": world.time_step,
-                "Agent": new_agent.id,
-                "Gen": gen,
-                "Event": "👶 BORN (INHERITED)",
-                "Energy": "50.0"
-            })
-            
+
     # Update Stats
     stats = {
         "tick": world.time_step,
         "population": len(world.agents),
         "thoughts": current_thoughts,
-        "reflexes": current_reflexes,
         "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
-        "season_flip": 1 if world.season_timer == 1 else 0
+        "season_flip": 1 if world.season_timer == 1 else 0,
+        "pos_flux": total_pos_flux,
+        "neg_flux": total_neg_flux
     }
     st.session_state.stats_history.append(stats)
     if len(st.session_state.stats_history) > 200:
@@ -164,13 +142,13 @@ if st.session_state.running:
         
     # Update Event Log (Keep last 20)
     for e in events_this_tick:
-        st.session_state.event_log.insert(0, e) # Prepend
+        st.session_state.event_log.insert(0, e) 
     st.session_state.event_log = st.session_state.event_log[:20]
 
 # ============================================================
-# 🖥️ 2. VISUALIZATION (RENDER ALWAYS)
+# 🖥️ 2. VISUALIZATION
 # ============================================================
-st.title("⚛️ Zero Point Genesis: Causal Adaptation")
+st.title("⚛️ Zero Point Genesis: 21-Dimensional Sandbox")
 
 # Header
 curr_season_idx = st.session_state.world.current_season
@@ -181,9 +159,9 @@ next_flip = 50 - st.session_state.world.season_timer
 col_head1, col_head2, col_head3 = st.columns([2, 1, 1])
 with col_head1:
     st.markdown(f"""
-    ### Current Epoch: <span style='color:{season_color}'>{season_mode}</span>
-    **Next Quantum Flip in:** `{next_flip}` ticks
+    ### Orbit: <span style='color:{season_color}'>{season_mode}</span>
     **Gene Pool:** `{len(st.session_state.gene_pool)}` | **Max Gen:** `{st.session_state.max_generation}`
+    *Watch the Spectrogram below to see the Agents' "Spells"*
     """, unsafe_allow_html=True)
 with col_head2:
     if st.button("▶️ SYSTEM TOGGLE", use_container_width=True):
@@ -196,22 +174,14 @@ with col_head3:
         st.session_state.max_generation = 0
         st.rerun()
 
-    # Report Generator
     def generate_report():
-        # 1. Stats
         stats_json = json.dumps(st.session_state.stats_history, indent=2)
-        
-        # 2. Gene Pool (Convert Tensors to Lists)
         encoded_pool = []
         for genome in st.session_state.gene_pool:
             clean_genome = {k: v.cpu().tolist() for k, v in genome.items()}
             encoded_pool.append(clean_genome)
         gene_json = json.dumps(encoded_pool)
-        
-        # 3. Events
         events_json = json.dumps(st.session_state.event_log, indent=2)
-        
-        # Zip
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("stats.json", stats_json)
@@ -219,35 +189,34 @@ with col_head3:
             zf.writestr("events.json", events_json)
         return zip_buffer.getvalue()
 
-    st.download_button(
-        label="💾 SAVE DATA",
-        data=generate_report(),
-        file_name="genesis_data.zip",
-        mime="application/zip",
-        use_container_width=True
-    )
+    st.download_button("💾 SAVE DATA", generate_report(), "genesis_data.zip", "application/zip", use_container_width=True)
 
-# --- MAIN GRAPH: The Nobel Metric ---
+# --- GRAPHS ---
 if st.session_state.stats_history:
     df = pd.DataFrame(st.session_state.stats_history)
-    fig = go.Figure()
-    flips = df[df['season_flip'] == 1]
+    col_g1, col_g2 = st.columns(2)
     
-    fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Survivors", line=dict(color='#00ffa3', width=2), fill='tozeroy', fillcolor='rgba(0, 255, 163, 0.1)'))
-    fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Brain Plasticity (Backprop)", line=dict(color='#ff4b4b', width=1)))
-    fig.add_trace(go.Scatter(x=flips['tick'], y=flips['population'], mode='markers', name="QUANTUM FLIP", marker=dict(symbol='star', size=12, color='yellow')))
+    with col_g1:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Survivors", line=dict(color='#00ffa3')))
+        fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Brain Rewiring", line=dict(color='#ff4b4b')))
+        fig.update_layout(title="Evolutionary Trajectory", height=200, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig, use_container_width=True)
+        
+    with col_g2:
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Positive Inventions", line=dict(color='yellow'), fill='tozeroy'))
+        fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Negative Disasters", line=dict(color='red'), fill='tozeroy'))
+        fig2.update_layout(title="The Moral Compass (Good vs Evil)", height=200, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig2, use_container_width=True)
 
-    fig.update_layout(title="Evolutionary Trajectory", font=dict(color='#e0e4de'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=250, margin=dict(l=0, r=0, t=30, b=0), xaxis=dict(showgrid=False), yaxis=dict(gridcolor='#333'))
-    st.plotly_chart(fig, use_container_width=True)
-
-# --- LOWER SECTION: MAP & SYNAPTIC LOG ---
+# --- LOWER SECTION: MAP & SPECTROGRAM ---
 col_grid, col_log = st.columns([2, 1])
 
 with col_grid:
-    # 🌍 Environment Truth Map
+    # 🌍 Truth Map
     grid_map = np.zeros((40, 40))
     for (rx, ry), res in st.session_state.world.grid.items():
-        # VISUALIZE TRUTH based on CURRENT SEASON variable used in HEADER
         val = res.get_nutrition(curr_season_idx)
         grid_map[ry, rx] = val 
             
@@ -255,50 +224,36 @@ with col_grid:
         intensity = 50 + (agent.energy * 2.0) 
         grid_map[agent.y, agent.x] = intensity 
 
-    # Custom Logic: Red=Poison, Black=Empty, Green=Food, White=Agents
-    # Range is roughly -50 to 150
-    # -50 = Red
-    # 0 = Black
-    # 20 = Green
-    # 100+ = White
-    
-    custom_colors = [
-        [0.0, "red"],       # -50 (Poison)
-        [0.25, "black"],    # 0 (Empty)
-        [0.35, "green"],    # +20 (Food)
-        [1.0, "white"]      # +150 (High Energy Agent)
-    ]
-
-    fig_map = px.imshow(
-        grid_map, 
-        color_continuous_scale=custom_colors, 
-        zmin=-50, zmax=150, 
-        title=f"Environment Truth: {season_mode} (Green=Food, Red=Poison)"
-    )
+    custom_colors = [[0.0, "red"], [0.25, "black"], [0.35, "green"], [1.0, "white"]]
+    fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Environment Truth: {season_mode}")
     fig_map.update_traces(showscale=False)
     fig_map.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
     st.plotly_chart(fig_map, use_container_width=True)
 
 with col_log:
-    st.subheader("Synaptic Stream ⚡")
+    st.subheader("Quantum Event Stream ⚡")
     if st.session_state.event_log:
+        # Visualize the "Spells"
+        # We take the vector from the log and make a mini heatmap
+        latest_event = st.session_state.event_log[0]
+        if "Vector" in latest_event:
+            vec = np.array(latest_event["Vector"]).reshape(1, 21)
+            fig_spec = px.imshow(vec, color_continuous_scale='Plasma', title=f"Latest Spell ({latest_event['Agent']})")
+            fig_spec.update_layout(height=100, margin=dict(l=0,r=0,t=20,b=0), xaxis=dict(visible=False), yaxis=dict(visible=False))
+            st.plotly_chart(fig_spec, use_container_width=True)
+            
         log_df = pd.DataFrame(st.session_state.event_log)
         st.dataframe(
-            log_df[["Agent", "Gen", "Event"]], 
+            log_df[["Agent", "Event"]], 
             use_container_width=True, 
-            height=400,
-            column_config={
-                "Agent": st.column_config.TextColumn("ID", width="small"),
-                "Gen": st.column_config.NumberColumn("G", width="small"),
-                "Event": st.column_config.TextColumn("Synaptic Event", width="large")
-            }
+            height=300
         )
     else:
-        st.info("Waiting for neural events...")
+        st.info("Waiting for quantum collapse...")
 
 # ============================================================
 # 🔄 3. LOOP RESTART
 # ============================================================
 if st.session_state.running:
-    time.sleep(0.01) # Small throttle
+    time.sleep(0.01) 
     st.rerun()

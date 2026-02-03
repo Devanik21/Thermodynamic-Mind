@@ -9,20 +9,20 @@ import copy
 # 🧠 THERMODYNAMIC CONSTANTS
 # ============================================================
 COST_REFLEX = 0.1      
-COST_THOUGHT = 2.0  # Cheaper to think (was 5.0)
-LEARNING_THRESHOLD = 0.4 # Easier to learn (was 0.7) 
+COST_THOUGHT = 2.0  
+LEARNING_THRESHOLD = 0.4 
 
 # ============================================================
 # 🕸️ THE CAUSAL SUBSTRATE (Recurrent Neural Network)
 # ============================================================
 class CausalBrain(nn.Module):
     """
-    A Recurrent Brain (GRU).
+    A Recurrent Brain (GRU) adapted for Quantum Physics.
     Input: Sensory Vector (16) + Energy State (1) = 17
     Hidden: 32 (Short-term Memory / Context)
-    Output: Action (6) + Plasticity (1)
+    Output: Reality Vector (21) + Plasticity (1)
     """
-    def __init__(self, input_dim=16, hidden_dim=32, output_dim=6):
+    def __init__(self, input_dim=16, hidden_dim=32, output_dim=21):
         super().__init__()
         self.hidden_dim = hidden_dim
         
@@ -33,17 +33,18 @@ class CausalBrain(nn.Module):
         self.gru = nn.GRUCell(hidden_dim, hidden_dim)
         
         # Decoders
-        self.actor = nn.Linear(hidden_dim, output_dim) # Action
+        self.actor = nn.Linear(hidden_dim, output_dim) # The Will (21D)
         self.critic = nn.Linear(hidden_dim, 1) # Plasticity Gate
         
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
+        self.tanh = nn.Tanh() # For Reality Vector (-1 to 1)
         
     def forward(self, x, energy_level, hidden_state):
         # 1. Preprocess
         e = torch.tensor([energy_level / 100.0]).float()
         if x.dim() == 1:
-            x = torch.cat([x, e], dim=0).unsqueeze(0) # [1, 17]
+            x = torch.cat([x, e], dim=0).unsqueeze(0) 
         else:
             e = e.unsqueeze(0).expand(x.size(0), -1)
             x = torch.cat([x, e], dim=1)
@@ -58,10 +59,12 @@ class CausalBrain(nn.Module):
         new_hidden = self.gru(features, hidden_state)
         
         # 4. Decode
-        action_logits = self.actor(new_hidden)
+        # The "Spell" - Continuous 21D Vector
+        action_vector = self.tanh(self.actor(new_hidden)) 
+        
         plasticity_gate = self.sigmoid(self.critic(new_hidden))
         
-        return action_logits, plasticity_gate, new_hidden
+        return action_vector, plasticity_gate, new_hidden
 
 # ============================================================
 # 🧬 THE ADAPTIVE AGENT
@@ -81,7 +84,7 @@ class GenesisAgent:
         # GENETIC INHERITANCE
         if genome:
             self.brain.load_state_dict(genome)
-            self._mutate() # Evolution requires variation
+            self._mutate() 
             
         self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005)
         
@@ -89,7 +92,7 @@ class GenesisAgent:
         self.hidden_state = None
         
         # RL Buffer
-        self.current_log_prob = None
+        self.last_vector = None
         self.decided_to_learn = False
         
         # Stats
@@ -97,7 +100,7 @@ class GenesisAgent:
         self.reflexes_used = 0    
     
     def _mutate(self, rate=0.1):
-        """Randomly alters synaptic weights (Darwinian Drift)"""
+        """Randomly alters synaptic weights."""
         with torch.no_grad():
             for param in self.brain.parameters():
                 noise = torch.randn_like(param) * rate
@@ -105,45 +108,62 @@ class GenesisAgent:
 
     def decide(self, signal_vector):
         """
-        The Choice with Context.
+        The Choice: Outputting the Reality Vector.
         """
         self.energy -= COST_REFLEX 
         self.reflexes_used += 1
-        self.age += 1 # Every decision is a moment lived
+        self.age += 1 
         
-        # Detach hidden state 
         if self.hidden_state is not None:
             self.hidden_state = self.hidden_state.detach()
 
         with torch.no_grad():
              pass
 
-        logits, plasticity_score, new_hidden = self.brain(signal_vector, self.energy, self.hidden_state)
+        # Forward Pass
+        action_vector, plasticity_score, new_hidden = self.brain(signal_vector, self.energy, self.hidden_state)
         self.hidden_state = new_hidden 
         
-        # Sample Action
-        probs = torch.nn.functional.softmax(logits, dim=1) 
-        distribution = torch.distributions.Categorical(probs)
-        action = distribution.sample()
+        # Store for learning (No distribution sampling anymore, deterministic output from stochastic weights)
+        # We add some exploration noise manually if needed, but for "Science" precision is key.
+        # Let's add slight jitter for exploration early on.
+        exploration_noise = torch.randn_like(action_vector) * 0.05
+        final_vector = torch.clamp(action_vector + exploration_noise, -1.0, 1.0)
         
-        self.current_log_prob = distribution.log_prob(action)
+        self.last_vector = final_vector
         self.decided_to_learn = False
         
-        # Intelligent Gating: Only learn if confused AND have energy
-        if plasticity_score.item() > 0.7 and self.energy > 30.0:
+        # Intelligent Gating
+        if plasticity_score.item() > LEARNING_THRESHOLD and self.energy > 30.0:
             self.decided_to_learn = True
         
-        return action.item()
+        return final_vector # Returns Tensor [1, 21]
 
     def metabolize_outcome(self, reward):
         # Physical Reward
-        if self.decided_to_learn:
+        if self.decided_to_learn and self.last_vector is not None:
             self.energy -= COST_THOUGHT
             self.thoughts_had += 1
             
-            loss = -self.current_log_prob * reward
+            # Simple PG Loss: We want to maximize reward
+            # Since we don't have a categorical distribution, we treat the direction as the policy
+            # loss = -reward * (vector • gradient) ? 
+            # Simplified: We just reinforce the vector if reward is high.
+            # But standard PPO/A2C needs a probability.
+            # Regression approach: If reward > 0, Move closer to this vector. If < 0, move away.
             
-            # RNN Backprop 
+            # Create a "Target" vector
+            # If reward is positive, target is CURRENT vector.
+            # If reward is negative, target is OPPOSITE vector.
+            # This allows the MSE loss to effectively implement RL.
+            
+            target = self.last_vector.detach()
+            if reward < 0:
+                target = -target # Flee from this spell
+                
+            # Weight the loss by the magnitude of the reward
+            loss = nn.MSELoss()(self.last_vector, target) * abs(reward)
+            
             self.optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0) 
@@ -154,5 +174,4 @@ class GenesisAgent:
         return False
 
     def get_genome(self):
-        """Returns the crystallized weight matrix for reproduction."""
         return copy.deepcopy(self.brain.state_dict())
