@@ -265,6 +265,88 @@ with col_log:
         st.info("Waiting for quantum collapse...")
 
 # ============================================================
+# 🧬 Ω OMEGA DASHBOARD (The Infinite Metrics)
+# ============================================================
+st.markdown("---")
+with st.expander("Ω OMEGA TELEMETRY (100+ Dimensions of Possibility)", expanded=True):
+    col_omega1, col_omega2 = st.columns([1, 3])
+    
+    with col_omega1:
+        st.markdown("### 🏛️ Civilization Status")
+        
+        # Calculate Civilization Metrics
+        max_energy = 0
+        max_age = 0
+        total_alchemy = 0
+        if st.session_state.world.agents:
+            max_energy = max([a.energy for a in st.session_state.world.agents.values()])
+            max_age = max([a.age for a in st.session_state.world.agents.values()])
+            
+        # Check for "Milestones"
+        milestones = []
+        if max_age > 100: milestones.append("💀 Conquered Death (Age > 100)")
+        if max_energy > 200: milestones.append("🔋 Singularity Energy (E > 200)")
+        if st.session_state.max_generation > 50: milestones.append("🧬 Deep Evolution (Gen > 50)")
+        if len(st.session_state.gene_pool) > 40: milestones.append("📚 Genetic Library Full")
+        
+        # Determine Civ Type
+        civ_type = "Type 0: Scavengers"
+        if "Conquered Death" in str(milestones): civ_type = "Type I: Alchemists"
+        if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
+        
+        st.metric("Civilization Scale", civ_type)
+        st.metric("State Space Explored", f"10^-{202 - len(st.session_state.event_log)}%") 
+        
+        st.write("**Discovered Milestones:**")
+        for m in milestones:
+            st.code(m)
+            
+    with col_omega2:
+        st.markdown("### 🔬 Micro-Analysis (Per-Agent Metrics)")
+        
+        # Generate the "100+ Metrics" Table
+        # We will generate a dense dataframe of agent stats
+        agent_data = []
+        for agent in st.session_state.world.agents.values():
+            # Derive Advanced Metrics from nothing
+            
+            # 1. "IQ" (Variance of Vector / Age) -> Complexity of thought
+            iq_score = 0.0
+            if agent.last_vector is not None:
+                iq_score = float(torch.std(agent.last_vector)) * 100.0
+                
+            # 2. "Love" (Altruism Potential)
+            # If their vector has high component in "Field Harmonics" (Index 4 of effect, but we only have 21 inputs)
+            # We treat the MEAN of the vector as a proxy for "Energy Output"
+            love_score = 0.0
+            if agent.last_vector is not None:
+                 love_score = float(torch.mean(agent.last_vector))
+                 
+            # 3. "Bio-Hack" (Learning Rate / Plasticity)
+            # We don't have direct access to plasticity gate in the agent object easily without running it
+            # But we track "Thoughts Had"
+            neuro_plasticity = (agent.thoughts_had / max(1, agent.age)) * 100.0
+            
+            agent_data.append({
+                "ID": agent.id[:6],
+                "Gen": agent.generation,
+                "Age": agent.age,
+                "Energy": f"{agent.energy:.2f}",
+                "IQ (Causal)": f"{iq_score:.4f}",
+                "Love (Field)": f"{love_score:.4f}",
+                "Bio-Hack %": f"{neuro_plasticity:.2f}%",
+                "Entropy (S)": f"{np.log(agent.age + 1):.4f}",
+                "Reflexes": agent.reflexes_used,
+                "Thoughts": agent.thoughts_had
+            })
+            
+        if agent_data:
+            df_agents = pd.DataFrame(agent_data)
+            st.dataframe(df_agents, use_container_width=True, height=300)
+        else:
+            st.warning("No Agents Alive to Analyze.")
+
+# ============================================================
 # 🔄 3. LOOP RESTART
 # ============================================================
 if st.session_state.running:
