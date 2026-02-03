@@ -1,590 +1,260 @@
-import streamlit as st
-import numpy as np
-import pandas as pd
-import time
-import plotly.express as px
-import plotly.graph_objects as go
-import json
-import zipfile
-import io
 import torch
+import torch.nn as nn
+import torch.optim as optim
 import random
-from genesis_world import GenesisWorld, Resource
-from genesis_brain import GenesisAgent
+import uuid
+import copy
+import math
 
 # ============================================================
-# 🔮 THE NAMING ORACLE (Procedural Tech Tree)
+# 🧠 THERMODYNAMIC CONSTANTS
 # ============================================================
-def classify_invention(vector_21):
-    """Maps a 21D Quantum Vector to a Sci-Fi Technology Name."""
-    # Split dimensions into fields
-    thermo = np.mean(vector_21[0:4])
-    electro = np.mean(vector_21[4:8])
-    gravity = np.mean(vector_21[8:12])
-    quantum = np.mean(vector_21[12:16])
-    exotic = np.mean(vector_21[16:21])
-    
-    # Identify dominant field
-    fields = {"Thermodynamic": thermo, "Electromagnetic": electro, "Gravitational": gravity, "Quantum": quantum, "Exotic": exotic}
-    dominant = max(fields, key=fields.get)
-    val = fields[dominant]
-    
-    # PREFIX
-    prefix = "Experimental"
-    if val > 0.3: prefix = "Resonant"
-    if val > 0.6: prefix = "Hyper"
-    if val > 0.8: prefix = "Omni"
-    
-    # SUFFIX
-    suffix = "Drive"
-    if dominant == "Thermodynamic": suffix = "Furnace" if val > 0 else "Entropy Sink"
-    if dominant == "Electromagnetic": suffix = "Field Coil" if val > 0 else "Nullifier"
-    if dominant == "Gravitational": suffix = "Singularity" if val > 0 else "Metric Shield"
-    if dominant == "Quantum": suffix = "Entangler" if val > 0 else "Collapser"
-    if dominant == "Exotic": suffix = "Void Bore" if val > 0 else "Tachyon Lance"
-    
-    return f"{prefix} {dominant} {suffix}"
+COST_REFLEX = 0.1      
+COST_THOUGHT = 2.0  
+LEARNING_THRESHOLD = 0.4 
 
 # ============================================================
-# ⚙️ SYSTEM CONFIG
+# 🕸️ THE CAUSAL SUBSTRATE (Recurrent Neural Network)
 # ============================================================
-st.set_page_config(layout="wide", page_title="Zero Point Genesis", page_icon="⚛️")
-
-# Custom CSS for "Comfortable UI"
-st.markdown("""
-<style>
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        white-space: pre-wrap;
-        background-color: #0e1117;
-        border-radius: 4px 4px 0px 0px;
-        gap: 1px;
-        padding-top: 10px;
-        padding-bottom: 10px;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #262730;
-        border-bottom: 2px solid #4CAF50;
-    }
-    .metric-card {
-        background-color: #262730;
-        padding: 10px;
-        border-radius: 5px;
-        border: 1px solid #444;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ============================================================
-# 🛠️ INITIALIZATION HOOKS
-# ============================================================
-def init_system():
-    if "world" not in st.session_state:
-        st.session_state.world = GenesisWorld(size=40)
-        for _ in range(64):
-            x, y = np.random.randint(0, 40), np.random.randint(0, 40)
-            agent = GenesisAgent(x, y)
-            st.session_state.world.agents[agent.id] = agent
-        for _ in range(150):
-            st.session_state.world.spawn_resource()
-
-    if "stats_history" not in st.session_state: st.session_state.stats_history = []
-    if "gene_pool" not in st.session_state: st.session_state.gene_pool = [] 
-    if "max_generation" not in st.session_state: st.session_state.max_generation = 0
-    if "running" not in st.session_state: st.session_state.running = False
-    if "event_log" not in st.session_state: st.session_state.event_log = []
-    if "total_events_count" not in st.session_state: st.session_state.total_events_count = 0
-
-init_system()
-
-# ============================================================
-# 🔄 SIMULATION LOGIC LOOP
-# ============================================================
-def update_simulation():
-    if not st.session_state.running:
-        return
-
-    world = st.session_state.world
-    world.step()
-    
-    current_thoughts = 0
-    deaths = set() # Use a set to avoid KeyError on duplicate IDs
-    events_this_tick = []
-    
-    agents = list(world.agents.values())
-    np.random.shuffle(agents) 
-    
-    total_pos_flux = 0.0
-    total_neg_flux = 0.0
-    
-    for agent in agents:
-        if agent.energy <= 0:
-            deaths.add(agent.id)
-            continue
-            
-        signal = world.get_local_signal(agent.x, agent.y)
-        # 🌐 PHASE 13: "TURING" UPGRADE (Chemical Signaling)
-        smell = world.get_pheromone(agent.x, agent.y)
+class CausalBrain(nn.Module):
+    """
+    A Recurrent Brain (GRU) adapted for Quantum Physics.
+    Input: Sensory(16) + Energy(1) + Grid(4) + Smell(1) = 22
+    Hidden: 32 (Context)
+    Output: Reality(21) + Emit(1) + Mate(1) = 23 (+ Plasticity Gate)
+    """
+    def __init__(self, input_dim=16, hidden_dim=32, output_dim=21):
+        super().__init__()
+        self.hidden_dim = hidden_dim
         
-        # Decide now returns (Vector, Emit, Mate)
-        reality_vector_tensor, emit_val, mate_desire = agent.decide(signal, smell_intensity=smell) 
+        # Feature Extraction
+        # Input dim is 16. +1 Energy + 4 Spatial + 1 Smell = +6 total additional inputs
+        self.encoder = nn.Linear(input_dim + 6, hidden_dim)
         
-        flux, log_text = world.resolve_quantum_state(agent, reality_vector_tensor, emit_strength=emit_val)
+        # The Core (GRU Cell)
+        self.gru = nn.GRUCell(hidden_dim, hidden_dim)
         
-        # ❤️ PHASE 14: "GOD-REMOVER" UPGRADE (Autopoietic Reproduction)
-        # Agents reproduce themselves without system intervention.
-        if mate_desire > 0.5 and agent.energy > 80.0:
-            # Look for partner
-            # Simple implementation: Scan neighbours
-            # Optimization: could use a spatial hash, but for <50 agents handled here is fine?
-            # Actually, agents list is shuffled, so we can just grab candidates.
-            partners = [
-                other for other in agents 
-                if other.id != agent.id 
-                and other.energy > 80.0 
-                and abs(other.x - agent.x) <= 1 
-                and abs(other.y - agent.y) <= 1
-            ]
-            
-            if partners:
-                # Mate with the first willing partner (or just first capable one)
-                # In future, partner also needs to consent (mate_desire > 0.5).
-                # But we don't know partner's decision yet if they are later in the loop.
-                # Simplified: Rape/Force is not allowed. Mutual desire required?
-                # For now: Just proximity + energy is enough trigger, assuming pheromones led them there.
-                
-                partner = partners[0]
-                
-                # Crossover
-                child_genome = {}
-                p1_genome = agent.get_genome()
-                p2_genome = partner.get_genome()
-                
-                for k in p1_genome:
-                    if random.random() < 0.5:
-                        child_genome[k] = p1_genome[k]
-                    else:
-                        child_genome[k] = p2_genome[k]
-                        
-                # Spawn Child
-                new_x = (agent.x + random.randint(-1, 1)) % world.size
-                new_y = (agent.y + random.randint(-1, 1)) % world.size
-                
-                child = GenesisAgent(new_x, new_y, genome=child_genome, generation=max(agent.generation, partner.generation) + 1)
-                world.agents[child.id] = child
-                
-                # Cost
-                agent.energy -= 40.0
-                partner.energy -= 40.0
-                
-                events_this_tick.append({
-                    "Tick": world.time_step,
-                    "Agent": agent.id,
-                    "Event": f"❤️ BORN: {child.id} (Gen {child.generation})",
-                    "Vector": [0]*21
-                })
+        # Decoders
+        # Output is 21 (Reality) + 1 (Emit Strength) + 1 (Mate Desire) = 23
+        self.actor = nn.Linear(hidden_dim, output_dim + 2) 
+        self.critic = nn.Linear(hidden_dim, 1) 
         
-        if flux > 0: total_pos_flux += flux
-        elif flux < 0: total_neg_flux += abs(flux)
-            
-        learned = agent.metabolize_outcome(flux)
-        if learned: 
-            current_thoughts += 1
-            # 💡 INVENTION DISCOVERY
-            if flux > 50.0:
-                inv_name = classify_invention(agent.last_vector.tolist()[0])
-                inventions = getattr(agent, 'inventions', [])
-                if not any(inv['name'] == inv_name for inv in inventions):
-                    agent.inventions.append({
-                        "name": inv_name,
-                        "value": flux,
-                        "tick": world.time_step,
-                        "vector": agent.last_vector.tolist()[0]
-                    })
-                    events_this_tick.append({
-                        "Tick": world.time_step,
-                        "Agent": agent.id,
-                        "Event": f"🏆 INVENTED: {inv_name}",
-                        "Vector": agent.last_vector.tolist()[0],
-                        "Params": {"Flux": f"{flux:.1f}", "Type": "Discovery"}
-                    })
+        # Free Energy Predictor
+        self.predictor = nn.Linear(hidden_dim, 1) 
         
-        # 📜 SOPHISTICATED EVENT LOGGING
-        if outcome_data["type"] != "IDLE":
-             # Ensure vector exists or fallback
-             vec_list = agent.last_vector.tolist()[0] if agent.last_vector is not None else [0]*21
-             
-             # Format detailed parameters for the logs
-             params = {"Flux": f"{flux:.2f} J"}
-             params.update(outcome_data.get("details", {}))
-             
-             event_str = f"{outcome_data['name']}"
-             if outcome_data["type"] == "MOVE":
-                 event_str = f"🌀 {outcome_data['name']}"
-             elif outcome_data["type"] == "FEED":
-                 event_str = f"⚡ {outcome_data['name']}"
-             elif outcome_data["type"] == "CREATE":
-                 event_str = f"💠 {outcome_data['name']}"
-             elif outcome_data["type"] == "DESTROY":
-                 event_str = f"⚫ {outcome_data['name']}"
-             
-             events_this_tick.append({
-                "Tick": world.time_step,
-                "Agent": agent.id,
-                "Gen": agent.generation,
-                "Event": event_str,
-                "Vector": vec_list,
-                "Params": params 
-             })
-            
-        # 📉 Malthusian Decay (Crowding Penalty)
-        # As population grows, it becomes harder to sustain individual existence.
-        # Base cost 0.5 + scaling factor (log base 10 of population / 2)
-        malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 10.0)
-        agent.energy -= malthusian_cost 
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+        self.tanh = nn.Tanh() 
         
-        # 🧬 MITOSIS (Hard Cap: 1500)
-        if agent.energy > 100.0 and len(world.agents) < 1500:
-            agent.energy -= 50.0 
-            off_x = (agent.x + np.random.randint(-1, 2)) % 40
-            off_y = (agent.y + np.random.randint(-1, 2)) % 40
-            
-            child_genome = agent.get_genome()
-            child = GenesisAgent(off_x, off_y, genome=child_genome, generation=agent.generation + 1)
-            child._mutate(rate=0.2) 
-            
-            world.agents[child.id] = child
-            events_this_tick.append({
-                "Tick": world.time_step,
-                "Agent": agent.id,
-                "Event": "🐣 MITOSIS",
-                "Vector": reality_vector_tensor.tolist()[0]
-            })
+    def forward(self, x, energy_level, hidden_state):
+        # 1. Preprocess
+        e = torch.tensor([energy_level / 100.0]).float()
         
-    for dead_id in deaths:
-        if dead_id in world.agents: # Safety check
-            dead_agent = world.agents[dead_id]
-            if dead_agent.age > 20: 
-                st.session_state.gene_pool.append(dead_agent.get_genome())
-                if len(st.session_state.gene_pool) > 50:
-                    st.session_state.gene_pool.pop(0)
-                events_this_tick.append({
-                    "Tick": world.time_step,
-                    "Agent": dead_agent.id,
-                    "Gen": dead_agent.generation,
-                    "Event": "💀 DIED",
-                    "Vector": [0.0]*21
-                })
-            del world.agents[dead_id]
-        
-    # Failsafe: only restart if TRULY extinct
-    if len(world.agents) < 4:
-        x, y = np.random.randint(0, 40), np.random.randint(0, 40)
-        genome = None
-        gen = 0
-        if st.session_state.gene_pool:
-            genome = random.choice(st.session_state.gene_pool)
-            gen = st.session_state.max_generation
-        new_agent = GenesisAgent(x, y, genome=genome, generation=gen)
-        world.agents[new_agent.id] = new_agent
-        
-    # Update Stats
-    stats = {
-        "tick": world.time_step,
-        "population": len(world.agents),
-        "thoughts": current_thoughts,
-        "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
-        "pos_flux": total_pos_flux,
-        "neg_flux": total_neg_flux
-    }
-    
-    st.session_state.stats_history.append(stats)
-    if len(st.session_state.stats_history) > 200:
-        st.session_state.stats_history.pop(0)
-        
-    for e in events_this_tick:
-        st.session_state.event_log.insert(0, e) 
-        st.session_state.total_events_count += 1 # Global discovery counter
-    st.session_state.event_log = st.session_state.event_log[:20]
-
-update_simulation()
-
-# ============================================================
-# 🖥️ UI RENDERER
-# ============================================================
-st.title("⚛️ Zero Point Genesis: 21-Dimensional Sandbox")
-
-# --- HEADER FRAGMENT ---
-with st.container():
-    curr_season_idx = st.session_state.world.current_season
-    season_mode = "SUMMER 🌞" if curr_season_idx % 2 == 0 else "WINTER ❄️"
-    season_color = "#ffbd45" if curr_season_idx % 2 == 0 else "#45b6fe"
-
-    col_h1, col_h2, col_h3, col_h4 = st.columns([1.5, 1, 1, 1])
-    with col_h1:
-        st.markdown(f"### Orbit: <span style='color:{season_color}'>{season_mode}</span>", unsafe_allow_html=True)
-        st.caption(f"Gene Pool: {len(st.session_state.gene_pool)} | Max Gen: {st.session_state.max_generation}")
-    with col_h2:
-        if st.button("▶️ TOGGLE SIMULATION", width="stretch", type="primary" if not st.session_state.running else "secondary"):
-            st.session_state.running = not st.session_state.running
-    with col_h3:
-        if st.button("♻️ RESET WORLD", width="stretch"):
-            st.session_state.world = GenesisWorld(size=40)
-            st.session_state.stats_history = []
-            st.session_state.gene_pool = []
-            st.session_state.max_generation = 0
-            st.rerun()
-    with col_h4:
-        # Optimized Report Generator
-        @st.cache_data
-        def generate_report_cached(stats, genes, events):
-            stats_json = json.dumps(stats, indent=2)
-            gene_json = json.dumps(genes)
-            events_json = json.dumps(events, indent=2)
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr("stats.json", stats_json)
-                zf.writestr("genes.json", gene_json)
-                zf.writestr("events.json", events_json)
-            return zip_buffer.getvalue()
-
-        # We convert complex objects to simpler ones for caching if needed, but for now passing session state contents directly
-        # To avoid caching issues with mutable objects, we clone them or just run generate_report on click.
-        # Streamlit's new button callback pattern is cleaner.
-        
-        encoded_pool_clean = [{k: v.cpu().tolist() for k, v in g.items()} for g in st.session_state.gene_pool]
-        
-        st.download_button(
-            "💾 EXPORT DATA", 
-            generate_report_cached(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log), 
-            "genesis_data.zip", 
-            "application/zip", 
-            width="stretch"
-        )
-
-# --- MAIN TABS FRAGMENT ---
-tab_macro, tab_micro, tab_omega = st.tabs(["🔭 OBSERVATION DECK", "🧬 QUANTUM SPECTROGRAM", "Ω OMEGA TELEMETRY"])
-
-with tab_macro:
-    if st.session_state.stats_history:
-        df = pd.DataFrame(st.session_state.stats_history)
-        
-        # Row 1: Graphs
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Survivors", line=dict(color='#00ffa3')))
-            fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Plasticity Events", line=dict(color='#ff4b4b')))
-            fig.update_layout(title="Evolutionary Trajectory", height=250, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, width="stretch")
-            
-        with col_g2:
-            fig2 = go.Figure()
-            fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Positive Inventions", line=dict(color='yellow'), fill='tozeroy'))
-            fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Negative Disasters", line=dict(color='red'), fill='tozeroy'))
-            fig2.update_layout(title="The Moral Compass (Efficiency vs Chaos)", height=250, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig2, width="stretch")
-            
-        # Row 2: Map
-        grid_map = np.zeros((40, 40))
-        for (rx, ry), res in st.session_state.world.grid.items():
-            val = res.get_nutrition(curr_season_idx)
-            grid_map[ry, rx] = val 
-        for agent in st.session_state.world.agents.values():
-            intensity = 50 + (agent.energy * 2.0) 
-            grid_map[agent.y, agent.x] = intensity 
-
-        custom_colors = [[0.0, "red"], [0.25, "black"], [0.35, "green"], [1.0, "white"]]
-        fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Environment Truth: {season_mode}")
-        fig_map.update_traces(showscale=False)
-        fig_map.update_layout(height=500, margin=dict(l=0,r=0,t=30,b=0))
-        st.plotly_chart(fig_map, width="stretch")
-    else:
-        st.info("System Initializing...")
-
-with tab_micro:
-    col_vis, col_log = st.columns([2, 1])
-    with col_vis:
-        st.markdown("### 🧠 The Mind Cloud")
-        if st.session_state.world.agents:
-            sample_agents = random.sample(list(st.session_state.world.agents.values()), min(len(st.session_state.world.agents), 15))
-            vectors = []
-            labels = []
-            for a in sample_agents:
-                if a.last_vector is not None:
-                    vectors.append(a.last_vector.tolist()[0])
-                    labels.append(f"{a.id[:4]}")
-            
-            if vectors:
-                vec_arr = np.array(vectors)
-                fig_spec = px.imshow(
-                    vec_arr, 
-                    color_continuous_scale='Plasma', 
-                    aspect='auto',
-                    labels=dict(x="Dimension (0-20)", y="Agent Sample", color="Activation"),
-                    title=f"Real-Time Thought Spectrum (n={len(vectors)})"
-                )
-                fig_spec.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_spec, width="stretch")
+        # If x is 1D:
+        if x.dim() == 1:
+            # x is [21] (16 Sig + 4 Grid + 1 Smell)
+            features_in = torch.cat([x, e], dim=0).unsqueeze(0)
         else:
-            st.warning("Extinction Event. No Minds Detected.")
-            
-    with col_log:
-        st.markdown("### ⚡ Event Stream")
-    with col_log:
-        st.markdown("### ⚡ Event Stream")
-        if st.session_state.event_log:
-             # Reverse to show newest first
-             for event in reversed(st.session_state.event_log):
-                 with st.expander(f"{event['Event']} ({event['Agent'][:4]})"):
-                     if 'Params' in event:
-                         st.json(event['Params'])
-                     st.write(f"**Tick**: {event['Tick']}")
-                     st.code(f"Vector: {[round(x, 2) for x in event['Vector'][:5]]}...", language="json")
-
-with tab_omega:
-    col_civ, col_agent = st.columns([1, 2])
-    
-    with col_civ:
-        st.markdown("### 🏛️ Civilization Status")
-        max_energy = 0
-        max_age = 0
-        if st.session_state.world.agents:
-            max_energy = max([a.energy for a in st.session_state.world.agents.values()])
-            max_age = max([a.age for a in st.session_state.world.agents.values()])
-            
-        milestones = []
-        if max_age > 100: milestones.append("💀 Conquered Death")
-        if max_energy > 200: milestones.append("🔋 Singularity Energy")
-        if st.session_state.max_generation > 50: milestones.append("🧬 Deep Evolution")
-        if len(st.session_state.gene_pool) > 40: milestones.append("📚 Genetic Library Full")
+            # x is [B, 21]
+            e = e.unsqueeze(0).expand(x.size(0), -1)
+            features_in = torch.cat([x, e], dim=1)
         
-        civ_type = "Type 0: Scavengers"
-        if "Conquered Death" in str(milestones): civ_type = "Type I: Alchemists"
-        if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
-        if len(st.session_state.world.agents) > 500: civ_type = "Type III: Galactic Swarm"
-        if len(st.session_state.world.agents) > 2000: civ_type = "Type IV: Universal Mind"
-        
-        st.metric("Civilization Scale", civ_type)
-        
-        # Logarithmic Exploration: 10^- (202 - log10(discoveries))
-        # Total discoveries is 21D space, very vast. 
-        if st.session_state.total_events_count > 0:
-            explorer_val = max(0, 202 - int(np.log10(st.session_state.total_events_count) * 10))
-        else:
-            explorer_val = 202
+        if hidden_state is None:
+            hidden_state = torch.zeros(features_in.size(0), self.hidden_dim)
             
-        st.metric("State Space Explored", f"10^-{explorer_val}%") 
+        # 2. Encode
+        linear_out = self.encoder(features_in)
+        features = self.relu(linear_out)
         
-        st.write(f"**Discoveries:** `{st.session_state.total_events_count}`")
-
-    with col_agent:
-        st.markdown("### 🔬 100+ Metric Grid")
-        agent_data = []
-        for agent in st.session_state.world.agents.values():
-            iq_score = 0.0
-            love_score = 0.0
-            if agent.last_vector is not None:
-                iq_score = float(torch.std(agent.last_vector)) * 100.0
-                love_score = float(torch.mean(agent.last_vector))
-            
-            neuro_plasticity = (agent.thoughts_had / max(1, agent.age)) * 100.0
-            
-            agent_data.append({
-                "ID": agent.id[:6],
-                "Gen": agent.generation,
-                "Age": agent.age,
-                "Energy": f"{agent.energy:.2f}",
-                "IQ": f"{iq_score:.4f}",
-                "Love": f"{love_score:.4f}",
-                "Bio-Hack %": f"{neuro_plasticity:.2f}%",
-                "Entropy": f"{np.log(agent.age + 1):.4f}",
-                "Reflexes": agent.reflexes_used,
-                "Thoughts": agent.thoughts_had
-            })
-            
-        if agent_data:
-            df_agents = pd.DataFrame(agent_data)
-            st.dataframe(df_agents, width="stretch", height=400)
-
-    # --- NEW: NEURAL BLUEPRINT SECTION ---
-    st.markdown("---")
-    st.markdown("### 🕸️ Neural Blueprint (Real-Time Brain State)")
-    if st.session_state.world.agents:
-        agent_list = list(st.session_state.world.agents.keys())
-        selected_id = st.selectbox("Select Agent to Inspect", agent_list, index=0)
-        
-        target = st.session_state.world.agents[selected_id]
-        
-        col_spec_a, col_spec_b = st.columns([1, 2])
-        
-        with col_spec_a:
-            st.markdown(f"**Agent Specs: `{selected_id[:8]}`**")
-            st.write(f"- **Architecture**: [17] -> GRU[32] -> [21]")
-            st.write(f"- **Optimizer**: Adam (lr=0.005)")
-            st.write(f"- **Layers**: Encoder, GRUCell, Actor, Critic")
-            
-            # Weight Stats
+        # Lifetime Plasticity (Oja's Rule)
+        if self.training: 
             with torch.no_grad():
-                w_encoder = target.brain.encoder.weight.mean().item()
-                w_std = target.brain.encoder.weight.std().item()
-                st.write(f"- **Synaptic Density**: `{w_encoder:.4f}`")
-                st.write(f"- **Synaptic Variance**: `{w_std:.4f}`")
+                eta = 0.001
+                y = features.unsqueeze(2) 
+                _x = features_in.unsqueeze(1) 
+                w = self.encoder.weight
+                hebbian = torch.bmm(y, _x)
+                decay = (y ** 2) * w.unsqueeze(0)
+                delta_w = torch.mean(hebbian - decay, dim=0)
+                self.encoder.weight += eta * delta_w
+
+        # 3. Time Step
+        new_hidden = self.gru(features, hidden_state)
         
-        with col_spec_b:
-            # Visualize Hidden State (The "Mind State")
-            if target.hidden_state is not None:
-                h_state = target.hidden_state.detach().cpu().numpy()
-                fig_h = px.imshow(
-                    h_state, 
-                    color_continuous_scale='Viridis',
-                    labels=dict(x="Memory Dim (0-31)", color="Charge"),
-                    title="Short-Term Memory (GRU Hidden State)"
-                )
-                fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
-                st.plotly_chart(fig_h, width="stretch")
-            else:
-                st.info("Agent is in Reflex-Only mode (Brain idle).")
-    else:
-        st.warning("No Neural Networks detected.")
+        # 4. Decode
+        raw_output = self.actor(new_hidden)
+        
+        # Split Output: 
+        # First 21: Reality Vector
+        # 21: Emit Strength
+        # 22: Mate Desire
+        action_vector = self.tanh(raw_output[:, :21]) 
+        emit_strength = self.sigmoid(raw_output[:, 21]) # 0 to 1
+        mate_desire = self.sigmoid(raw_output[:, 22]) # 0 to 1
+        
+        plasticity_gate = self.sigmoid(self.critic(new_hidden))
+        prediction = self.predictor(new_hidden)
+        
+        return action_vector, emit_strength, mate_desire, plasticity_gate, new_hidden, prediction
 
-    # --- NEW: NOBEL COMMITTEE SECTION ---
-    st.markdown("---")
-    st.markdown("### 🏆 The Nobel Committee for Artificial Minds")
-    if st.session_state.world.agents:
-        # Reuse 'selected_id' from Neural Blueprint if available
-        if 'selected_id' in locals():
-            target_n = st.session_state.world.agents[selected_id]
-            st.markdown(f"#### 📜 Patent Portfolio: `{target_n.id[:8]}`")
+# ============================================================
+# 🧬 THE ADAPTIVE AGENT
+# ============================================================
+class GenesisAgent:
+    def __init__(self, x, y, uid=None, genome=None, generation=0):
+        self.id = uid if uid else str(uuid.uuid4())[:8]
+        self.x = x
+        self.y = y
+        self.energy = 50.0 
+        self.age = 0
+        self.generation = generation
+        
+        # The Causal Brain
+        self.brain = CausalBrain()
+        
+        # GENETIC INHERITANCE
+        if genome:
+            # 🔮 MIGRATION LOGIC (Phase 14 Compatibility)
+            # Old Encoder (Phase 13): [32, 22] (Matches Phase 14 inputs)
+            # Old Actor (Phase 13): [22, 32]
+            # New Actor (Phase 14): [23, 32]
             
-            inventions = getattr(target_n, 'inventions', [])
-            if inventions:
-                for inv in inventions:
-                    st.success(f"**{inv['name']}** (Energy Yield: `{inv['value']:.1f}`)")
-                    # Expandable details for the "Infinite" parameters
-                    with st.expander(f"See {inv['name']} Blueprints"):
-                         st.write(f"**Vector DNA**: `{inv['vector'][:5]}...`")
-                         st.json(inv)
-            else:
-                st.caption("This agent has not invented anything significant yet.")
+            # 1. ACTOR MIGRATION
+            if 'actor.weight' in genome:
+                old_act = genome['actor.weight']
+                old_dim = old_act.shape[0]
                 
-            # THE INFINITE PARAMETER WIDGET
-            with st.expander("♾️ View Infinite Parameters (God Mode)"):
-                st.warning("⚠️ Warning: Direct introspection of Synaptic Weights. May cause lag.")
-                if st.checkbox("🔓 Decrypt Neural Weights"):
-                    # Flatten the entire brain logic into one massive parameter list
-                    all_params = {}
-                    for name, param in target_n.brain.named_parameters():
-                        all_params[name] = param.detach().cpu().numpy().tolist()
-                    st.json(all_params)
-        else:
-             st.info("Select an agent in the Neural Blueprint section above to view their Inventions.")
+                # If coming from Phase 13 (22 outputs)
+                if old_dim == 22:
+                    new_act = self.brain.actor.weight.clone()
+                    # Copy Reality (21) + Emit (1) = 22
+                    new_act[:22, :] = old_act
+                    # Last row (Mate) is random
+                    genome['actor.weight'] = new_act
+                    
+                    if 'actor.bias' in genome:
+                        old_bias = genome['actor.bias']
+                        new_bias = self.brain.actor.bias.clone()
+                        new_bias[:22] = old_bias
+                        genome['actor.bias'] = new_bias
+                        
+            # (Encoder is compatible from Phase 13 to 14, both use 22 inputs)
 
+            try:
+                self.brain.load_state_dict(genome, strict=False)
+            except Exception as e:
+                pass
+            
+            self._mutate() 
+            
+        self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005)
 
-if st.session_state.running:
-    time.sleep(0.02) 
-    st.rerun()
+        # 🌐 PHASE 12: "GRID CELL" UPGRADE (Spatial Resonance)
+        fx = (self.x / 40.0) * (2 * 3.14159)
+        fy = (self.y / 40.0) * (2 * 3.14159)
+        
+        self.grid_embedding = torch.tensor([
+            math.sin(fx), math.cos(fx), 
+            math.sin(fy), math.cos(fy)
+        ])
+        
+        self.hidden_state = None 
+        self.last_vector = None 
+        self.last_prediction = None 
+        self.decided_to_learn = False 
+        
+        self.reflexes_used = 0
+        self.thoughts_had = 0
+        self.inventions = [] # List of high-reward 21D vectors (Discoveries)
 
+    def _mutate(self, rate=0.05, mutation_strength=0.1):
+        for param in self.brain.parameters():
+            if len(param.shape) > 1: 
+                if random.random() < rate:
+                    with torch.no_grad():
+                        noise = torch.randn(param.shape) * mutation_strength
+                        param.add_(noise)
+
+    def decide(self, signal_vector, smell_intensity=0.0):
+        """
+        The Choice: Outputting the Reality Vector.
+        """
+        self.energy -= COST_REFLEX 
+        self.reflexes_used += 1
+        self.age += 1 
+        
+        # 🛡️ GRAPH ISOLATION
+        if self.hidden_state is not None:
+            self.hidden_state = self.hidden_state.detach().clone()
+
+        # 🌐 GRID CELL UPDATE
+        fx = (self.x / 40.0) * (2 * 3.14159)
+        fy = (self.y / 40.0) * (2 * 3.14159)
+        grid_embedding = torch.tensor([
+            math.sin(fx), math.cos(fx), math.sin(fy), math.cos(fy)
+        ])
+        
+        # 🧪 SMELL INPUT
+        smell_tensor = torch.tensor([float(smell_intensity)])
+        
+        # Concatenate: Signal(16) + Grid(4) + Smell(1) = 21 (Brain adds Energy to make 22)
+        total_input = torch.cat([signal_vector, grid_embedding, smell_tensor], dim=0)
+
+        # Forward Pass
+        action_vector, emit_tensor, mate_tensor, plasticity_score, new_hidden, prediction = self.brain(total_input, self.energy, self.hidden_state)
+        self.hidden_state = new_hidden 
+        
+        # Exploration Noise
+        exploration_noise = torch.randn_like(action_vector) * 0.3
+        final_vector = torch.clamp(action_vector + exploration_noise, -1.0, 1.0)
+        
+        self.last_vector = final_vector
+        self.last_prediction = prediction 
+        self.decided_to_learn = False 
+        
+        # Intelligent Gating
+        if plasticity_score.item() > LEARNING_THRESHOLD and self.energy > 30.0:
+            self.decided_to_learn = True
+        
+        # Convert outputs to scalar
+        emit_value = emit_tensor.item()
+        mate_value = mate_tensor.item()
+        
+        return final_vector, emit_value, mate_value
+
+    def metabolize_outcome(self, reward):
+        # Physical Reward
+        if self.decided_to_learn and self.last_vector is not None and self.last_prediction is not None:
+            self.energy -= COST_THOUGHT
+            self.thoughts_had += 1
+            
+            # 🔮 SCHRÖDINGER'S REWARD (Free Energy Principle)
+            prediction_val = self.last_prediction.item()
+            surprise = abs(prediction_val - reward)
+            effective_reward = reward - surprise
+            
+            # Target Vector Logic
+            target = self.last_vector.detach().clone()
+            if effective_reward < 0:
+                target = -target 
+                
+            loss_actor = nn.MSELoss()(self.last_vector, target) * abs(effective_reward)
+            
+            target_pred = torch.tensor([reward], dtype=torch.float32)
+            loss_predictor = nn.MSELoss()(self.last_prediction.view(-1), target_pred)
+            
+            total_loss = loss_actor + loss_predictor
+            
+            self.optimizer.zero_grad()
+            total_loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0) 
+            self.optimizer.step()
+            
+            self.last_vector = None
+            self.last_prediction = None
+            return True 
+            
+        return False
+    
+    def get_genome(self):
+        return copy.deepcopy(self.brain.state_dict())
