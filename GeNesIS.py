@@ -328,8 +328,8 @@ with tab_omega:
         civ_type = "Type 0: Scavengers"
         if "Conquered Death" in str(milestones): civ_type = "Type I: Alchemists"
         if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
-        if len(world.agents) > 500: civ_type = "Type III: Galactic Swarm"
-        if len(world.agents) > 2000: civ_type = "Type IV: Universal Mind"
+        if len(st.session_state.world.agents) > 500: civ_type = "Type III: Galactic Swarm"
+        if len(st.session_state.world.agents) > 2000: civ_type = "Type IV: Universal Mind"
         
         st.metric("Civilization Scale", civ_type)
         
