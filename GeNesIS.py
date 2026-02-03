@@ -254,7 +254,26 @@ with col_grid:
         intensity = 50 + (agent.energy * 2.0) 
         grid_map[agent.y, agent.x] = intensity 
 
-    fig_map = px.imshow(grid_map, color_continuous_scale='RdBu', zmin=-50, zmax=150, title=f"Environment Truth Map ({season_mode})")
+    # Custom Logic: Red=Poison, Black=Empty, Green=Food, White=Agents
+    # Range is roughly -50 to 150
+    # -50 = Red
+    # 0 = Black
+    # 20 = Green
+    # 100+ = White
+    
+    custom_colors = [
+        [0.0, "red"],       # -50 (Poison)
+        [0.25, "black"],    # 0 (Empty)
+        [0.35, "green"],    # +20 (Food)
+        [1.0, "white"]      # +150 (High Energy Agent)
+    ]
+
+    fig_map = px.imshow(
+        grid_map, 
+        color_continuous_scale=custom_colors, 
+        zmin=-50, zmax=150, 
+        title=f"Environment Truth: {season_mode} (Green=Food, Red=Poison)"
+    )
     fig_map.update_traces(showscale=False)
     fig_map.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
     st.plotly_chart(fig_map, use_container_width=True)
