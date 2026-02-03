@@ -167,10 +167,10 @@ class GenesisAgent:
         self.thoughts_had = 0
         self.inventions = [] # List of high-reward 21D vectors (Discoveries)
 
-    def _mutate(self, rate=0.05, mutation_strength=0.1):
+    def _mutate(self, mutation_rate=0.05, mutation_strength=0.1):
         for param in self.brain.parameters():
             if len(param.shape) > 1: 
-                if random.random() < rate:
+                if random.random() < mutation_rate:
                     with torch.no_grad():
                         noise = torch.randn(param.shape) * mutation_strength
                         param.add_(noise)
@@ -241,7 +241,7 @@ class GenesisAgent:
             loss_actor = nn.MSELoss()(self.last_vector, target) * abs(effective_reward)
             
             target_pred = torch.tensor([reward], dtype=torch.float32)
-            loss_predictor = nn.MSELoss()(self.last_prediction.view(-1), target_pred)
+            loss_predictor = nn.MSELoss()(self.last_prediction.squeeze(), target_pred)
             
             total_loss = loss_actor + loss_predictor
             
