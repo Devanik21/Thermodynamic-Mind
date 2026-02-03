@@ -110,30 +110,26 @@ def update_simulation():
                 "Vector": reality_vector_tensor.tolist()[0]
             })
             
-        if learned: current_thoughts += 1
-        agent.energy -= 0.5 
+        # 📉 Malthusian Decay (Crowding Penalty)
+        # As population grows, it becomes harder to sustain individual existence.
+        # Base cost 0.5 + scaling factor (log base 10 of population / 2)
+        malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 10.0)
+        agent.energy -= malthusian_cost 
         
-        # 🧬 MITOSIS (The unlocking of "No Limit")
-        # If they hoard energy, they MUST reproduce.
-        if agent.energy > 100.0:
-            agent.energy -= 50.0 # Cost of birth
-            # Create offspring near parent
+        # 🧬 MITOSIS (Hard Cap: 5000)
+        if agent.energy > 100.0 and len(world.agents) < 5000:
+            agent.energy -= 50.0 
             off_x = (agent.x + np.random.randint(-1, 2)) % 40
             off_y = (agent.y + np.random.randint(-1, 2)) % 40
             
-            # Inheritance
             child_genome = agent.get_genome()
             child = GenesisAgent(off_x, off_y, genome=child_genome, generation=agent.generation + 1)
+            child._mutate(rate=0.2) 
             
-            # 100% Entropy Injection for Child (Mutation)
-            child._mutate(rate=0.2) # High mutation for faster evolution
-            
-            # Add to world immediately
             world.agents[child.id] = child
             events_this_tick.append({
                 "Tick": world.time_step,
                 "Agent": agent.id,
-                "Gen": agent.generation,
                 "Event": "🐣 MITOSIS",
                 "Vector": reality_vector_tensor.tolist()[0]
             })
@@ -332,12 +328,18 @@ with tab_omega:
         civ_type = "Type 0: Scavengers"
         if "Conquered Death" in str(milestones): civ_type = "Type I: Alchemists"
         if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
+        if len(world.agents) > 500: civ_type = "Type III: Galactic Swarm"
+        if len(world.agents) > 2000: civ_type = "Type IV: Universal Mind"
         
         st.metric("Civilization Scale", civ_type)
         
-        # Make Exploration Metric dynamic based on total history
-        # Each event expands our knowledge of the 21D space
-        explorer_val = max(0, 202 - (st.session_state.total_events_count // 100))
+        # Logarithmic Exploration: 10^- (202 - log10(discoveries))
+        # Total discoveries is 21D space, very vast. 
+        if st.session_state.total_events_count > 0:
+            explorer_val = max(0, 202 - int(np.log10(st.session_state.total_events_count) * 10))
+        else:
+            explorer_val = 202
+            
         st.metric("State Space Explored", f"10^-{explorer_val}%") 
         
         st.write(f"**Discoveries:** `{st.session_state.total_events_count}`")
