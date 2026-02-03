@@ -63,6 +63,7 @@ def init_system():
     if "max_generation" not in st.session_state: st.session_state.max_generation = 0
     if "running" not in st.session_state: st.session_state.running = False
     if "event_log" not in st.session_state: st.session_state.event_log = []
+    if "total_events_count" not in st.session_state: st.session_state.total_events_count = 0
 
 init_system()
 
@@ -180,6 +181,7 @@ def update_simulation():
         
     for e in events_this_tick:
         st.session_state.event_log.insert(0, e) 
+        st.session_state.total_events_count += 1 # Global discovery counter
     st.session_state.event_log = st.session_state.event_log[:20]
 
 update_simulation()
@@ -332,10 +334,13 @@ with tab_omega:
         if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
         
         st.metric("Civilization Scale", civ_type)
-        st.metric("State Space Explored", f"10^-{202 - len(st.session_state.event_log)}%") 
         
-        for m in milestones:
-            st.success(m)
+        # Make Exploration Metric dynamic based on total history
+        # Each event expands our knowledge of the 21D space
+        explorer_val = max(0, 202 - (st.session_state.total_events_count // 100))
+        st.metric("State Space Explored", f"10^-{explorer_val}%") 
+        
+        st.write(f"**Discoveries:** `{st.session_state.total_events_count}`")
 
     with col_agent:
         st.markdown("### 🔬 100+ Metric Grid")
