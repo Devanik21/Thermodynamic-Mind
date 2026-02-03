@@ -13,6 +13,39 @@ from genesis_world import GenesisWorld, Resource
 from genesis_brain import GenesisAgent
 
 # ============================================================
+# 🔮 THE NAMING ORACLE (Procedural Tech Tree)
+# ============================================================
+def classify_invention(vector_21):
+    """Maps a 21D Quantum Vector to a Sci-Fi Technology Name."""
+    # Split dimensions into fields
+    thermo = np.mean(vector_21[0:4])
+    electro = np.mean(vector_21[4:8])
+    gravity = np.mean(vector_21[8:12])
+    quantum = np.mean(vector_21[12:16])
+    exotic = np.mean(vector_21[16:21])
+    
+    # Identify dominant field
+    fields = {"Thermodynamic": thermo, "Electromagnetic": electro, "Gravitational": gravity, "Quantum": quantum, "Exotic": exotic}
+    dominant = max(fields, key=fields.get)
+    val = fields[dominant]
+    
+    # PREFIX
+    prefix = "Experimental"
+    if val > 0.3: prefix = "Resonant"
+    if val > 0.6: prefix = "Hyper"
+    if val > 0.8: prefix = "Omni"
+    
+    # SUFFIX
+    suffix = "Drive"
+    if dominant == "Thermodynamic": suffix = "Furnace" if val > 0 else "Entropy Sink"
+    if dominant == "Electromagnetic": suffix = "Field Coil" if val > 0 else "Nullifier"
+    if dominant == "Gravitational": suffix = "Singularity" if val > 0 else "Metric Shield"
+    if dominant == "Quantum": suffix = "Entangler" if val > 0 else "Collapser"
+    if dominant == "Exotic": suffix = "Void Bore" if val > 0 else "Tachyon Lance"
+    
+    return f"{prefix} {dominant} {suffix}"
+
+# ============================================================
 # ⚙️ SYSTEM CONFIG
 # ============================================================
 st.set_page_config(layout="wide", page_title="Zero Point Genesis", page_icon="⚛️")
@@ -100,7 +133,24 @@ def update_simulation():
         elif flux < 0: total_neg_flux += abs(flux)
             
         learned = agent.metabolize_outcome(flux)
-        if learned: current_thoughts += 1
+        if learned: 
+            current_thoughts += 1
+            # 💡 INVENTION DISCOVERY
+            if flux > 50.0:
+                inv_name = classify_invention(agent.last_vector.tolist()[0])
+                if not any(inv['name'] == inv_name for inv in agent.inventions):
+                    agent.inventions.append({
+                        "name": inv_name,
+                        "value": flux,
+                        "tick": world.time_step,
+                        "vector": agent.last_vector.tolist()[0]
+                    })
+                    events_this_tick.append({
+                        "Tick": world.time_step,
+                        "Agent": agent.id,
+                        "Event": f"🏆 INVENTED: {inv_name}",
+                        "Vector": agent.last_vector.tolist()[0]
+                    })
         
         if "IDLE" not in log_text and "MOVE" not in log_text:
              events_this_tick.append({
@@ -415,9 +465,95 @@ with tab_omega:
     else:
         st.warning("No Neural Networks detected.")
 
+    # --- NEW: NOBEL COMMITTEE SECTION ---
+    st.markdown("---")
+    st.markdown("### 🏆 The Nobel Committee for Artificial Minds")
+    if st.session_state.world.agents:
+        # Reuse 'selected_id' from Neural Blueprint if available
+        if 'selected_id' in locals():
+            target_n = st.session_state.world.agents[selected_id]
+            st.markdown(f"#### 📜 Patent Portfolio: `{target_n.id[:8]}`")
+            
+            if target_n.inventions:
+                for inv in target_n.inventions:
+                    st.success(f"**{inv['name']}** (Energy Yield: `{inv['value']:.1f}`)")
+                    # Expandable details for the "Infinite" parameters
+                    with st.expander(f"See {inv['name']} Blueprints"):
+                         st.write(f"**Vector DNA**: `{inv['vector'][:5]}...`")
+                         st.json(inv)
+            else:
+                st.caption("This agent has not invented anything significant yet.")
+                
+            # THE INFINITE PARAMETER WIDGET
+            with st.expander("♾️ View Infinite Parameters (God Mode)"):
+                st.warning("⚠️ Warning: Direct introspection of Synaptic Weights")
+                # Flatten the entire brain logic into one massive parameter list
+                all_params = {}
+                for name, param in target_n.brain.named_parameters():
+                    all_params[name] = param.detach().cpu().numpy().tolist()
+                st.json(all_params)
+        else:
+             st.info("Select an agent in the Neural Blueprint section above to view their Inventions.")
+
 # ============================================================
-# 🔄 ANIMATION LOOP
+# 🔮 THE NAMING ORACLE (Procedural Tech Tree)
 # ============================================================
+
+
+# ... (Simulation Loop Logic is interleaved below)
+
+# ... inside update_simulation loop update ...
+    # 💡 INVENTION DISCOVERY
+    # If the flux (energy gain) is massive (> 50), this is a Nobel-worthy discovery.
+    if learned and flux > 50.0:
+        inv_name = classify_invention(agent.last_vector.tolist()[0])
+        # Only keep top 10 unique inventions
+        if not any(inv['name'] == inv_name for inv in agent.inventions):
+            agent.inventions.append({
+                "name": inv_name,
+                "value": flux,
+                "tick": world.time_step,
+                "vector": agent.last_vector.tolist()[0]
+            })
+            events_this_tick.append({
+                "Tick": world.time_step,
+                "Agent": agent.id,
+                "Event": f"🏆 INVENTED: {inv_name}",
+                "Vector": agent.last_vector.tolist()[0]
+            })
+            
+# ... (Continuing to UI Renderer) ...
+
+    # --- NEW: NOBEL COMMITTEE SECTION ---
+    st.markdown("---")
+    st.markdown("### 🏆 The Nobel Committee for Artificial Minds")
+    if st.session_state.world.agents:
+        # Use existing selection from Neural Blueprint if possible, else independent
+        # We can reuse 'target' from above or make a new one. Let's reuse 'target' logic for consistency.
+        if 'target' in locals():
+            st.markdown(f"#### 📜 Patent Portfolio: `{target.id[:8]}`")
+            
+            if target.inventions:
+                for inv in target.inventions:
+                    st.success(f"**{inv['name']}** (Energy Yield: `{inv['value']:.1f}`)")
+                    # Expandable details for the "Infinite" parameters
+                    with st.expander(f"See {inv['name']} Blueprints"):
+                         st.write(f"**Vector DNA**: `{inv['vector'][:5]}...`")
+                         st.json(inv)
+            else:
+                st.caption("This agent has not invented anything significant yet.")
+                
+            # THE INFINITE PARAMETER WIDGET
+            with st.expander("♾️ View Infinite Parameters (God Mode)"):
+                st.warning("⚠️ Warning: Direct introspection of Synaptic Weights")
+                # Flatten the entire brain logic into one massive parameter list
+                all_params = {}
+                for name, param in target.brain.named_parameters():
+                    all_params[name] = param.detach().cpu().numpy().tolist()
+                st.json(all_params)
+        else:
+             st.info("Select an agent in the Neural Blueprint section above to view their Inventions.")
+
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
