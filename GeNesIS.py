@@ -231,22 +231,35 @@ with col_grid:
     st.plotly_chart(fig_map, use_container_width=True)
 
 with col_log:
-    st.subheader("Quantum Event Stream ⚡")
+    st.subheader("Quantum Spell Spectrogram 🧬")
     if st.session_state.event_log:
-        # Visualize the "Spells"
-        # We take the vector from the log and make a mini heatmap
-        latest_event = st.session_state.event_log[0]
-        if "Vector" in latest_event:
-            vec = np.array(latest_event["Vector"]).reshape(1, 21)
-            fig_spec = px.imshow(vec, color_continuous_scale='Plasma', title=f"Latest Spell ({latest_event['Agent']})")
-            fig_spec.update_layout(height=100, margin=dict(l=0,r=0,t=20,b=0), xaxis=dict(visible=False), yaxis=dict(visible=False))
+        # Show the "Mind State" of 10 random agents
+        # This proves they are different
+        sample_agents = random.sample(list(st.session_state.world.agents.values()), min(len(st.session_state.world.agents), 10))
+        vectors = []
+        labels = []
+        for a in sample_agents:
+            if a.last_vector is not None:
+                vectors.append(a.last_vector.tolist()[0])
+                labels.append(f"Agent {a.id[:4]}")
+        
+        if vectors:
+            vec_arr = np.array(vectors)
+            fig_spec = px.imshow(
+                vec_arr, 
+                color_continuous_scale='Plasma', 
+                aspect='auto',
+                labels=dict(x="Dimension (0-20)", y="Agent ID", color="Activation"),
+                title=f"Population Thought Spectrum (n={len(vectors)})"
+            )
+            fig_spec.update_layout(height=200, margin=dict(l=0,r=0,t=30,b=0))
             st.plotly_chart(fig_spec, use_container_width=True)
             
         log_df = pd.DataFrame(st.session_state.event_log)
         st.dataframe(
             log_df[["Agent", "Event"]], 
             use_container_width=True, 
-            height=300
+            height=200
         )
     else:
         st.info("Waiting for quantum collapse...")
