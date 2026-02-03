@@ -126,8 +126,9 @@ class GenesisAgent:
         
         # Store for learning (No distribution sampling anymore, deterministic output from stochastic weights)
         # We add some exploration noise manually if needed, but for "Science" precision is key.
-        # Let's add slight jitter for exploration early on.
-        exploration_noise = torch.randn_like(action_vector) * 0.05
+        # USER REQUEST: "Give all agents 100% Entropy" -> Increasing noise significantly
+        # Was 0.05, now 0.3 (High Temperature Mode)
+        exploration_noise = torch.randn_like(action_vector) * 0.3
         final_vector = torch.clamp(action_vector + exploration_noise, -1.0, 1.0)
         
         self.last_vector = final_vector
