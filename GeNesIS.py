@@ -112,6 +112,31 @@ def update_simulation():
         if learned: current_thoughts += 1
         agent.energy -= 0.5 
         
+        # 🧬 MITOSIS (The unlocking of "No Limit")
+        # If they hoard energy, they MUST reproduce.
+        if agent.energy > 100.0:
+            agent.energy -= 50.0 # Cost of birth
+            # Create offspring near parent
+            off_x = (agent.x + np.random.randint(-1, 2)) % 40
+            off_y = (agent.y + np.random.randint(-1, 2)) % 40
+            
+            # Inheritance
+            child_genome = agent.get_genome()
+            child = GenesisAgent(off_x, off_y, genome=child_genome, generation=agent.generation + 1)
+            
+            # 100% Entropy Injection for Child (Mutation)
+            child._mutate(rate=0.2) # High mutation for faster evolution
+            
+            # Add to world immediately
+            world.agents[child.id] = child
+            events_this_tick.append({
+                "Tick": world.time_step,
+                "Agent": agent.id,
+                "Gen": agent.generation,
+                "Event": "🐣 MITOSIS",
+                "Vector": reality_vector_tensor.tolist()[0]
+            })
+        
     for dead_id in deaths:
         dead_agent = world.agents[dead_id]
         if dead_agent.age > 20: 
@@ -127,18 +152,18 @@ def update_simulation():
             })
         del world.agents[dead_id]
         
-    if len(world.agents) < 40:
+    # Failsafe: only restart if TRULY extinct
+    if len(world.agents) < 4:
         x, y = np.random.randint(0, 40), np.random.randint(0, 40)
         genome = None
         gen = 0
-        if st.session_state.gene_pool and np.random.random() < 0.8:
+        if st.session_state.gene_pool:
             genome = random.choice(st.session_state.gene_pool)
-            st.session_state.max_generation += 1 
             gen = st.session_state.max_generation
         new_agent = GenesisAgent(x, y, genome=genome, generation=gen)
         world.agents[new_agent.id] = new_agent
-
-    stats = {
+        
+    # Update Stats
         "tick": world.time_step,
         "population": len(world.agents),
         "thoughts": current_thoughts,
