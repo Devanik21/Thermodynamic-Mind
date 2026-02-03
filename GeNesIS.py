@@ -495,65 +495,8 @@ with tab_omega:
         else:
              st.info("Select an agent in the Neural Blueprint section above to view their Inventions.")
 
-# ============================================================
-# 🔮 THE NAMING ORACLE (Procedural Tech Tree)
-# ============================================================
-
-
-# ... (Simulation Loop Logic is interleaved below)
-
-# ... inside update_simulation loop update ...
-    # 💡 INVENTION DISCOVERY
-    # If the flux (energy gain) is massive (> 50), this is a Nobel-worthy discovery.
-    if learned and flux > 50.0:
-        inv_name = classify_invention(agent.last_vector.tolist()[0])
-        # Only keep top 10 unique inventions
-        if not any(inv['name'] == inv_name for inv in agent.inventions):
-            agent.inventions.append({
-                "name": inv_name,
-                "value": flux,
-                "tick": world.time_step,
-                "vector": agent.last_vector.tolist()[0]
-            })
-            events_this_tick.append({
-                "Tick": world.time_step,
-                "Agent": agent.id,
-                "Event": f"🏆 INVENTED: {inv_name}",
-                "Vector": agent.last_vector.tolist()[0]
-            })
-            
-# ... (Continuing to UI Renderer) ...
-
-    # --- NEW: NOBEL COMMITTEE SECTION ---
-    st.markdown("---")
-    st.markdown("### 🏆 The Nobel Committee for Artificial Minds")
-    if st.session_state.world.agents:
-        # Use existing selection from Neural Blueprint if possible, else independent
-        # We can reuse 'target' from above or make a new one. Let's reuse 'target' logic for consistency.
-        if 'target' in locals():
-            st.markdown(f"#### 📜 Patent Portfolio: `{target.id[:8]}`")
-            
-            if target.inventions:
-                for inv in target.inventions:
-                    st.success(f"**{inv['name']}** (Energy Yield: `{inv['value']:.1f}`)")
-                    # Expandable details for the "Infinite" parameters
-                    with st.expander(f"See {inv['name']} Blueprints"):
-                         st.write(f"**Vector DNA**: `{inv['vector'][:5]}...`")
-                         st.json(inv)
-            else:
-                st.caption("This agent has not invented anything significant yet.")
-                
-            # THE INFINITE PARAMETER WIDGET
-            with st.expander("♾️ View Infinite Parameters (God Mode)"):
-                st.warning("⚠️ Warning: Direct introspection of Synaptic Weights")
-                # Flatten the entire brain logic into one massive parameter list
-                all_params = {}
-                for name, param in target.brain.named_parameters():
-                    all_params[name] = param.detach().cpu().numpy().tolist()
-                st.json(all_params)
-        else:
-             st.info("Select an agent in the Neural Blueprint section above to view their Inventions.")
 
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
