@@ -93,6 +93,9 @@ class Resource(Entity):
 # ============================================================
 # 🌍 THE QUANTUM WORLD
 # ============================================================
+# ============================================================
+# 🌍 THE QUANTUM WORLD
+# ============================================================
 class GenesisWorld:
     def __init__(self, size=GRID_SIZE):
         self.size = size
@@ -101,6 +104,9 @@ class GenesisWorld:
         self.time_step = 0
         self.current_season = 0
         self.season_timer = 0
+        
+        # 🌐 PHASE 13: "TURING" UPGRADE (Pheromone Grid)
+        self.pheromone_grid = np.zeros((size, size))
         
         # The Laws of Physics
         self.oracle = PhysicsOracle()
@@ -118,7 +124,30 @@ class GenesisWorld:
             return self.grid[(x, y)].signal
         return torch.zeros(SIGNAL_DIM)
 
-    def resolve_quantum_state(self, agent, reality_vector):
+    def get_pheromone(self, x, y):
+        # Read the chemical signal at this location
+        return float(self.pheromone_grid[x, y])
+
+    def update_pheromones(self):
+        """
+        Simulates diffusion and evaporation of chemical signals.
+        Grid = Grid * Decay + Diffusion
+        """
+        grid = self.pheromone_grid
+        
+        # Diffusion (Simple average of neighbors)
+        # Shift Up, Down, Left, Right
+        up = np.roll(grid, 1, axis=0)
+        down = np.roll(grid, -1, axis=0)
+        left = np.roll(grid, 1, axis=1)
+        right = np.roll(grid, -1, axis=1)
+        
+        diffused = (grid + up + down + left + right) / 5.0
+        
+        # Evaporation (Decay)
+        self.pheromone_grid = diffused * 0.95 
+
+    def resolve_quantum_state(self, agent, reality_vector, emit_strength=0.0):
         """
         The Agent casts a spell (Vector). The Oracle decides what happens.
         """
@@ -126,18 +155,17 @@ class GenesisWorld:
         loc = (agent.x, agent.y)
         local_sig = self.get_local_signal(*loc).unsqueeze(0) # [1, 16]
         
+        # 🧪 EMIT SCENT (Action)
+        # Updates the pheromone grid at agent's location
+        if emit_strength > 0.1:
+            # Add to grid, capped at 1.0
+            self.pheromone_grid[agent.x, agent.y] = min(1.0, self.pheromone_grid[agent.x, agent.y] + emit_strength * 0.5)
+        
         # 2. Query Oracle
-        # reality_vector is [1, 21]
         with torch.no_grad():
-            effects = self.oracle(reality_vector, local_sig)[0] # [5]
+            effects = self.oracle(reality_vector, local_sig)[0] 
         
         # 3. Decode Effects
-        # [0]: Energy Flux (The "Biased" One)
-        # [1]: Delta X
-        # [2]: Delta Y
-        # [3]: Transmutation Strength
-        # [4]: Interaction Flavor (Shield/Damage)
-        
         energy_flux = effects[0].item() * 10.0 # Scale up
         dx_raw = effects[1].item()
         dy_raw = effects[2].item()
@@ -146,7 +174,7 @@ class GenesisWorld:
         
         outcome_log = "✨ IDLE"
         
-        # --- A. MOVEMENT (If flux is low, we assume it's just movement) ---
+        # --- A. MOVEMENT ---
         if abs(energy_flux) < 2.0: 
             dx = 1 if dx_raw > 0.5 else (-1 if dx_raw < -0.5 else 0)
             dy = 1 if dy_raw > 0.5 else (-1 if dy_raw < -0.5 else 0)
@@ -158,34 +186,25 @@ class GenesisWorld:
                 agent.energy -= 0.1 # Friction
                 outcome_log = "MOVE"
                 
-        # --- B. ENERGY INTERACTION (Eating / Bleeding) ---
+        # --- B. ENERGY INTERACTION ---
         else:
-            # Physical impact on Agent
             agent.energy += energy_flux
-            
-            # If positive, we might consume the resource
             if energy_flux > 0:
                 outcome_log = "⚡ POSITIVE FLUX (+)"
                 if loc in self.grid:
-                    # Consumed existing matter
                     del self.grid[loc]
                     outcome_log = "😋 CONSUMED MATTER"
             else:
                  outcome_log = "🔥 NEGATIVE FLUX (-)"
         
-        # --- C. ALCHEMY (Transmutation / Writing) ---
-        # Very rare: needs high activation
+        # --- C. ALCHEMY ---
         if abs(transmute) > 2.0:
             if transmute > 0:
-                # Creation!
                 if loc not in self.grid:
-                    # WRITING: The Resource Signal is a projection of the Agent's Will
-                    # Map 21D -> 16D
                     sig = reality_vector[0, :16].detach()
                     self.grid[loc] = Resource(agent.x, agent.y, True, signal_override=sig)
                     outcome_log = "💠 ALCHEMY: CREATION"
             else:
-                # Destruction!
                 if loc in self.grid:
                     del self.grid[loc]
                     outcome_log = "⚫ ALCHEMY: VOID"
@@ -195,6 +214,9 @@ class GenesisWorld:
     def step(self):
         self.time_step += 1
         self.season_timer += 1
+        
+        # Phase 13: Biology Update
+        self.update_pheromones()
         
         if self.season_timer >= SEASON_LENGTH:
             self.current_season += 1

@@ -126,8 +126,66 @@ def update_simulation():
             continue
             
         signal = world.get_local_signal(agent.x, agent.y)
-        reality_vector_tensor = agent.decide(signal) 
-        flux, log_text = world.resolve_quantum_state(agent, reality_vector_tensor)
+        # 🌐 PHASE 13: "TURING" UPGRADE (Chemical Signaling)
+        smell = world.get_pheromone(agent.x, agent.y)
+        
+        # Decide now returns (Vector, Emit, Mate)
+        reality_vector_tensor, emit_val, mate_desire = agent.decide(signal, smell_intensity=smell) 
+        
+        flux, log_text = world.resolve_quantum_state(agent, reality_vector_tensor, emit_strength=emit_val)
+        
+        # ❤️ PHASE 14: "GOD-REMOVER" UPGRADE (Autopoietic Reproduction)
+        # Agents reproduce themselves without system intervention.
+        if mate_desire > 0.5 and agent.energy > 80.0:
+            # Look for partner
+            # Simple implementation: Scan neighbours
+            # Optimization: could use a spatial hash, but for <50 agents handled here is fine?
+            # Actually, agents list is shuffled, so we can just grab candidates.
+            partners = [
+                other for other in agents 
+                if other.id != agent.id 
+                and other.energy > 80.0 
+                and abs(other.x - agent.x) <= 1 
+                and abs(other.y - agent.y) <= 1
+            ]
+            
+            if partners:
+                # Mate with the first willing partner (or just first capable one)
+                # In future, partner also needs to consent (mate_desire > 0.5).
+                # But we don't know partner's decision yet if they are later in the loop.
+                # Simplified: Rape/Force is not allowed. Mutual desire required?
+                # For now: Just proximity + energy is enough trigger, assuming pheromones led them there.
+                
+                partner = partners[0]
+                
+                # Crossover
+                child_genome = {}
+                p1_genome = agent.get_genome()
+                p2_genome = partner.get_genome()
+                
+                for k in p1_genome:
+                    if random.random() < 0.5:
+                        child_genome[k] = p1_genome[k]
+                    else:
+                        child_genome[k] = p2_genome[k]
+                        
+                # Spawn Child
+                new_x = (agent.x + random.randint(-1, 1)) % world.size
+                new_y = (agent.y + random.randint(-1, 1)) % world.size
+                
+                child = GenesisAgent(new_x, new_y, genome=child_genome, generation=max(agent.generation, partner.generation) + 1)
+                world.agents[child.id] = child
+                
+                # Cost
+                agent.energy -= 40.0
+                partner.energy -= 40.0
+                
+                events_this_tick.append({
+                    "Tick": world.time_step,
+                    "Agent": agent.id,
+                    "Event": f"❤️ BORN: {child.id} (Gen {child.generation})",
+                    "Vector": [0]*21
+                })
         
         if flux > 0: total_pos_flux += flux
         elif flux < 0: total_neg_flux += abs(flux)
