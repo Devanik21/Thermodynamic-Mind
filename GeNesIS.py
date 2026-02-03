@@ -486,12 +486,13 @@ with tab_omega:
                 
             # THE INFINITE PARAMETER WIDGET
             with st.expander("♾️ View Infinite Parameters (God Mode)"):
-                st.warning("⚠️ Warning: Direct introspection of Synaptic Weights")
-                # Flatten the entire brain logic into one massive parameter list
-                all_params = {}
-                for name, param in target_n.brain.named_parameters():
-                    all_params[name] = param.detach().cpu().numpy().tolist()
-                st.json(all_params)
+                st.warning("⚠️ Warning: Direct introspection of Synaptic Weights. May cause lag.")
+                if st.checkbox("🔓 Decrypt Neural Weights"):
+                    # Flatten the entire brain logic into one massive parameter list
+                    all_params = {}
+                    for name, param in target_n.brain.named_parameters():
+                        all_params[name] = param.detach().cpu().numpy().tolist()
+                    st.json(all_params)
         else:
              st.info("Select an agent in the Neural Blueprint section above to view their Inventions.")
 
