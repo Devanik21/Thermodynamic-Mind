@@ -167,10 +167,10 @@ class GenesisAgent:
         self.thoughts_had = 0
         self.inventions = [] # List of high-reward 21D vectors (Discoveries)
 
-    def _mutate(self, mutation_rate=0.05, mutation_strength=0.1):
+    def _mutate(self, rate=0.05, mutation_strength=0.1):
         for param in self.brain.parameters():
             if len(param.shape) > 1: 
-                if random.random() < mutation_rate:
+                if random.random() < rate:
                     with torch.no_grad():
                         noise = torch.randn(param.shape) * mutation_strength
                         param.add_(noise)
