@@ -8,6 +8,7 @@ import json
 import zipfile
 import io
 import torch
+import random
 from genesis_world import GenesisWorld, Resource
 from genesis_brain import GenesisAgent
 
