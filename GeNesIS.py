@@ -170,7 +170,7 @@ def update_simulation():
         "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
         "pos_flux": total_pos_flux,
         "neg_flux": total_neg_flux
-    }
+    
     st.session_state.stats_history.append(stats)
     if len(st.session_state.stats_history) > 200:
         st.session_state.stats_history.pop(0)
