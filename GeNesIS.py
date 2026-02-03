@@ -371,6 +371,47 @@ with tab_omega:
             df_agents = pd.DataFrame(agent_data)
             st.dataframe(df_agents, width="stretch", height=400)
 
+    # --- NEW: NEURAL BLUEPRINT SECTION ---
+    st.markdown("---")
+    st.markdown("### 🕸️ Neural Blueprint (Real-Time Brain State)")
+    if st.session_state.world.agents:
+        agent_list = list(st.session_state.world.agents.keys())
+        selected_id = st.selectbox("Select Agent to Inspect", agent_list, index=0)
+        
+        target = st.session_state.world.agents[selected_id]
+        
+        col_spec_a, col_spec_b = st.columns([1, 2])
+        
+        with col_spec_a:
+            st.markdown(f"**Agent Specs: `{selected_id[:8]}`**")
+            st.write(f"- **Architecture**: [17] -> GRU[32] -> [21]")
+            st.write(f"- **Optimizer**: Adam (lr=0.005)")
+            st.write(f"- **Layers**: Encoder, GRUCell, Actor, Critic")
+            
+            # Weight Stats
+            with torch.no_grad():
+                w_encoder = target.brain.encoder.weight.mean().item()
+                w_std = target.brain.encoder.weight.std().item()
+                st.write(f"- **Synaptic Density**: `{w_encoder:.4f}`")
+                st.write(f"- **Synaptic Variance**: `{w_std:.4f}`")
+        
+        with col_spec_b:
+            # Visualize Hidden State (The "Mind State")
+            if target.hidden_state is not None:
+                h_state = target.hidden_state.detach().cpu().numpy()
+                fig_h = px.imshow(
+                    h_state, 
+                    color_continuous_scale='Viridis',
+                    labels=dict(x="Memory Dim (0-31)", color="Charge"),
+                    title="Short-Term Memory (GRU Hidden State)"
+                )
+                fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
+                st.plotly_chart(fig_h, width="stretch")
+            else:
+                st.info("Agent is in Reflex-Only mode (Brain idle).")
+    else:
+        st.warning("No Neural Networks detected.")
+
 # ============================================================
 # 🔄 ANIMATION LOOP
 # ============================================================
