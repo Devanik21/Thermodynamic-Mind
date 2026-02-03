@@ -4,9 +4,12 @@ import pandas as pd
 import time
 import plotly.express as px
 import plotly.graph_objects as go
+import json
+import zipfile
+import io
+import torch
 from genesis_world import GenesisWorld, Resource
 from genesis_brain import GenesisAgent
-import random
 
 # ============================================================
 # ⚙️ CONFIG & STATE
@@ -192,6 +195,37 @@ with col_head3:
         st.session_state.max_generation = 0
         st.rerun()
 
+    # Report Generator
+    def generate_report():
+        # 1. Stats
+        stats_json = json.dumps(st.session_state.stats_history, indent=2)
+        
+        # 2. Gene Pool (Convert Tensors to Lists)
+        encoded_pool = []
+        for genome in st.session_state.gene_pool:
+            clean_genome = {k: v.cpu().tolist() for k, v in genome.items()}
+            encoded_pool.append(clean_genome)
+        gene_json = json.dumps(encoded_pool)
+        
+        # 3. Events
+        events_json = json.dumps(st.session_state.event_log, indent=2)
+        
+        # Zip
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("stats.json", stats_json)
+            zf.writestr("genes.json", gene_json)
+            zf.writestr("events.json", events_json)
+        return zip_buffer.getvalue()
+
+    st.download_button(
+        label="💾 SAVE DATA",
+        data=generate_report(),
+        file_name="genesis_data.zip",
+        mime="application/zip",
+        use_container_width=True
+    )
+
 # --- MAIN GRAPH: The Nobel Metric ---
 if st.session_state.stats_history:
     df = pd.DataFrame(st.session_state.stats_history)
@@ -248,4 +282,3 @@ with col_log:
 if st.session_state.running:
     time.sleep(0.01) # Small throttle
     st.rerun()
-
