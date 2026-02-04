@@ -44,8 +44,8 @@ class PhysicsOracle(nn.Module):
         # Bias the "Energy" output (Index 0) SLIGHTLY positive
         # Was 0.5 (Too safe). Now 0.1 (Survival requires finding the peaks)
         with torch.no_grad():
-            self.layers[-1].bias[0] = 0.1 
-            self.layers[-1].bias[4] = -0.1 # Interaction Flavor bias towards "Drain" (Survival of fittest)
+            self.layers[-1].bias[0] = 0.0 
+            self.layers[-1].bias[4] = -0.3 # Harsher drain on interaction
             
     def forward(self, vector_21, matter_signal_16):
         x = torch.cat([vector_21, matter_signal_16], dim=1)

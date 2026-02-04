@@ -231,7 +231,7 @@ def update_simulation():
         # 📉 Malthusian Decay (Crowding Penalty)
         # As population grows, it becomes harder to sustain individual existence.
         # Base cost 0.5 + scaling factor (log base 10 of population / 2)
-        malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 10.0)
+        malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 3.0)
         agent.energy -= malthusian_cost 
         
         # 🧬 MITOSIS (Hard Cap: 1500)

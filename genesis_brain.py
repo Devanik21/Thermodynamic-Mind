@@ -113,8 +113,9 @@ class GenesisAgent:
         if self.last_value is None:
             return False
 
-        # Reward Signal
-        reward = torch.tensor([[flux]], dtype=torch.float32)
+        # Reward Signal: External Flux + IQ Incentive (Neural Variance)
+        iq_reward = self.last_vector.std() * 5.0 # Punish uniform thinking
+        reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
         # Advantage Calculation
         advantage = reward - self.last_value.detach()
