@@ -97,6 +97,7 @@ def init_system():
     if "running" not in st.session_state: st.session_state.running = False
     if "event_log" not in st.session_state: st.session_state.event_log = []
     if "total_events_count" not in st.session_state: st.session_state.total_events_count = 0
+    if "global_registry" not in st.session_state: st.session_state.global_registry = []
 
 init_system()
 
@@ -209,6 +210,14 @@ def update_simulation():
                         "Event": f"🏆 INVENTED: {inv_name}",
                         "Vector": agent.last_vector.tolist()[0]
                     })
+                    # 🏛️ GLOBAL REGISTRY UPDATE
+                    if not any(inv['name'] == inv_name for inv in st.session_state.global_registry):
+                        st.session_state.global_registry.append({
+                            "name": inv_name,
+                            "value": flux,
+                            "tick": world.time_step,
+                            "agent": agent.id
+                        })
         
         if "IDLE" not in log_text and "MOVE" not in log_text:
              events_this_tick.append({
@@ -315,11 +324,12 @@ with st.container():
             st.session_state.stats_history = []
             st.session_state.gene_pool = []
             st.session_state.max_generation = 0
+            st.session_state.global_registry = []
             st.rerun()
     with col_h4:
         # Optimized Report Generator
-        @st.cache_data
-        def generate_report_cached(stats, genes, events):
+        # No cache here to avoid filling media storage with high-frequency updates
+        def generate_report(stats, genes, events):
             stats_json = json.dumps(stats, indent=2)
             gene_json = json.dumps(genes)
             events_json = json.dumps(events, indent=2)
@@ -338,7 +348,7 @@ with st.container():
         
         st.download_button(
             "💾 EXPORT DATA", 
-            generate_report_cached(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log), 
+            generate_report(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log), 
             "genesis_data.zip", 
             "application/zip", 
             width="stretch"
@@ -460,8 +470,8 @@ with tab_omega:
             iq_score = 0.0
             love_score = 0.0
             if agent.last_vector is not None:
-                iq_score = float(torch.std(agent.last_vector)) * 100.0
-                love_score = float(torch.mean(agent.last_vector))
+                iq_score = float(torch.std(agent.last_vector.detach())) * 100.0
+                love_score = float(torch.mean(agent.last_vector.detach()))
             
             neuro_plasticity = (agent.thoughts_had / max(1, agent.age)) * 100.0
             
@@ -535,13 +545,20 @@ with tab_omega:
             inventions = getattr(target_n, 'inventions', [])
             if inventions:
                 for inv in inventions:
-                    st.success(f"**{inv['name']}** (Energy Yield: `{inv['value']:.1f}`)")
-                    # Expandable details for the "Infinite" parameters
-                    with st.expander(f"See {inv['name']} Blueprints"):
+                    st.success(f"**{inv['name']}** (Yield: `{inv['value']:.1f}`)")
+                    with st.expander(f"Details on {inv['name']}"):
                          st.write(f"**Vector DNA**: `{inv['vector'][:5]}...`")
                          st.json(inv)
             else:
-                st.caption("This agent has not invented anything significant yet.")
+                st.caption("This individual agent has not patented anything yet.")
+                
+            # 🏛️ GLOBAL HALL OF FAME
+            st.markdown("#### 🏛️ Civilization Hall of Fame (Global Patents)")
+            if st.session_state.global_registry:
+                for g_inv in st.session_state.global_registry:
+                    st.info(f"🏆 **{g_inv['name']}** - Discovered by `{g_inv['agent'][:6]}` at Tick `{g_inv['tick']}` (Yield: `{g_inv['value']:.1f}`)")
+            else:
+                st.warning("The civilization is still in the dark ages. No global patents recorded.")
                 
             # THE INFINITE PARAMETER WIDGET
             with st.expander("♾️ View Infinite Parameters (God Mode)"):
