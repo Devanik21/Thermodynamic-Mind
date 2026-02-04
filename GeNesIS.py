@@ -197,7 +197,7 @@ def update_simulation():
             # 💡 INVENTION DISCOVERY
             # "Genius" is not just about raw power (flux), but about consistent positive yield.
             # Lowering the bar so that 'smart' but small optimizations count as patents.
-            if flux > 15.0 and agent.last_vector is not None:
+            if flux > 15.0:
                 inv_name = classify_invention(agent.last_vector.tolist()[0])
                 if not any(inv['name'] == inv_name for inv in agent.inventions):
                     agent.inventions.append({
