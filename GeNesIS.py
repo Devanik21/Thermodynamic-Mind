@@ -130,10 +130,10 @@ def update_simulation():
         # 🌐 PHASE 13: "TURING" UPGRADE (Chemical Signaling)
         smell = world.get_pheromone(agent.x, agent.y)
         
-        # Decide now returns (Vector, Emit, Mate)
-        reality_vector_tensor, emit_val, mate_desire = agent.decide(signal, smell_intensity=smell) 
+        # Decide now returns (Vector, Emit, Mate, Adhesion)
+        reality_vector_tensor, emit_val, mate_desire, adhesion_val = agent.decide(signal, smell_intensity=smell) 
         
-        flux, log_text = world.resolve_quantum_state(agent, reality_vector_tensor, emit_strength=emit_val)
+        flux, log_text = world.resolve_quantum_state(agent, reality_vector_tensor, emit_strength=emit_val, adhesion=adhesion_val)
         
         # ❤️ PHASE 14: "GOD-REMOVER" UPGRADE (Autopoietic Reproduction)
         # Agents reproduce themselves without system intervention.
@@ -344,15 +344,19 @@ with st.container():
         # To avoid caching issues with mutable objects, we clone them or just run generate_report on click.
         # Streamlit's new button callback pattern is cleaner.
         
-        encoded_pool_clean = [{k: v.cpu().tolist() for k, v in g.items()} for g in st.session_state.gene_pool]
-        
-        st.download_button(
-            "💾 EXPORT DATA", 
-            generate_report(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log), 
-            "genesis_data.zip", 
-            "application/zip", 
-            width="stretch"
-        )
+        if st.button("📦 PREPARE EXPORT", help="Collects simulation data and creates a download link."):
+            encoded_pool_clean = [{k: v.cpu().tolist() for k, v in g.items()} for g in st.session_state.gene_pool]
+            st.session_state.export_zip = generate_report(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log)
+            st.toast("Export ready!", icon="✅")
+
+        if "export_zip" in st.session_state:
+            st.download_button(
+                "💾 DOWNLOAD NOW", 
+                st.session_state.export_zip, 
+                "genesis_data.zip", 
+                "application/zip", 
+                width="stretch"
+            )
 
 # --- MAIN TABS FRAGMENT ---
 tab_macro, tab_micro, tab_omega = st.tabs(["🔭 OBSERVATION DECK", "🧬 QUANTUM SPECTROGRAM", "Ω OMEGA TELEMETRY"])
@@ -388,6 +392,21 @@ with tab_macro:
 
         custom_colors = [[0.0, "red"], [0.25, "black"], [0.35, "green"], [1.0, "white"]]
         fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Environment Truth: {season_mode}")
+
+        # Draw Bonds
+        if st.session_state.world.bonds:
+            for bond in st.session_state.world.bonds:
+                id_a, id_b = list(bond)
+                if id_a in st.session_state.world.agents and id_b in st.session_state.world.agents:
+                    a = st.session_state.world.agents[id_a]
+                    b = st.session_state.world.agents[id_b]
+                    fig_map.add_trace(go.Scatter(
+                        x=[a.x, b.x], y=[a.y, b.y],
+                        mode='lines',
+                        line=dict(color='rgba(0, 255, 163, 0.4)', width=1),
+                        showlegend=False
+                    ))
+
         fig_map.update_traces(showscale=False)
         fig_map.update_layout(height=500, margin=dict(l=0,r=0,t=30,b=0))
         st.plotly_chart(fig_map, width="stretch")

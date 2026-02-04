@@ -108,6 +108,9 @@ class GenesisWorld:
         # 🌐 PHASE 13: "TURING" UPGRADE (Pheromone Grid)
         self.pheromone_grid = np.zeros((size, size))
         
+        # 🔗 PHASE 15: "SYMBIOGENESIS" UPGRADE (Elastic Bonds)
+        self.bonds = set() # Set of tuples (frozenset of agent IDs)
+        
         # The Laws of Physics
         self.oracle = PhysicsOracle()
         # Freeze the laws (God does not play dice twice)
@@ -147,10 +150,45 @@ class GenesisWorld:
         # Evaporation (Decay)
         self.pheromone_grid = diffused * 0.95 
 
-    def resolve_quantum_state(self, agent, reality_vector, emit_strength=0.0):
+    def metabolic_osmosis(self):
+        """
+        Energy sharing between bonded agents (Gap Junctions).
+        """
+        for bond in list(self.bonds):
+            id_a, id_b = list(bond)
+            if id_a in self.agents and id_b in self.agents:
+                a = self.agents[id_a]
+                b = self.agents[id_b]
+                
+                # Osmotic flow (10% equalization per tick)
+                diff = a.energy - b.energy
+                flow = diff * 0.1
+                
+                a.energy -= flow
+                b.energy += flow
+            else:
+                self.bonds.remove(bond)
+
+    def resolve_quantum_state(self, agent, reality_vector, emit_strength=0.0, adhesion=0.0):
         """
         The Agent casts a spell (Vector). The Oracle decides what happens.
         """
+        # 🔗 SYMBIOGENESIS: BOND LOGIC
+        # Scan for neighbors to bond with
+        if adhesion > 0.5:
+            for other_id, other in self.agents.items():
+                if other_id != agent.id:
+                    dist = math.sqrt((agent.x - other.x)**2 + (agent.y - other.y)**2)
+                    if dist < 1.5:
+                        # Multi-cellular bond formation
+                        self.bonds.add(frozenset([agent.id, other_id]))
+        elif adhesion < 0.2:
+            # Break bonds if adhesion is low
+            to_remove = [b for b in self.bonds if agent.id in b]
+            for b in to_remove:
+                self.bonds.remove(b)
+                agent.energy -= 2.0 # Tearing pain
+        
         # 1. Get Context
         loc = (agent.x, agent.y)
         local_sig = self.get_local_signal(*loc).unsqueeze(0) # [1, 16]
@@ -217,6 +255,9 @@ class GenesisWorld:
         
         # Phase 13: Biology Update
         self.update_pheromones()
+        
+        # Phase 15: Symbiosis Update
+        self.metabolic_osmosis()
         
         if self.season_timer >= SEASON_LENGTH:
             self.current_season += 1

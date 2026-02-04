@@ -21,7 +21,7 @@ class CausalBrain(nn.Module):
     A Recurrent Brain (GRU) adapted for Quantum Physics.
     Input: Sensory(16) + Energy(1) + Grid(4) + Smell(1) = 22
     Hidden: 32 (Context)
-    Output: Reality(21) + Emit(1) + Mate(1) = 23 (+ Plasticity Gate)
+    Output: Reality(21) + Emit(1) + Mate(1) + Adhesion(1) = 24 (+ Plasticity Gate)
     """
     def __init__(self, input_dim=16, hidden_dim=32, output_dim=21):
         super().__init__()
@@ -35,8 +35,8 @@ class CausalBrain(nn.Module):
         self.gru = nn.GRUCell(hidden_dim, hidden_dim)
         
         # Decoders
-        # Output is 21 (Reality) + 1 (Emit Strength) + 1 (Mate Desire) = 23
-        self.actor = nn.Linear(hidden_dim, output_dim + 2) 
+        # Output is 21 (Reality) + 1 (Emit Strength) + 1 (Mate Desire) + 1 (Adhesion) = 24
+        self.actor = nn.Linear(hidden_dim, output_dim + 3) 
         self.critic = nn.Linear(hidden_dim, 1) 
         
         # Free Energy Predictor
@@ -88,14 +88,16 @@ class CausalBrain(nn.Module):
         # First 21: Reality Vector
         # 21: Emit Strength
         # 22: Mate Desire
+        # 23: Adhesion
         action_vector = self.tanh(raw_output[:, :21]) 
-        emit_strength = self.sigmoid(raw_output[:, 21]) # 0 to 1
-        mate_desire = self.sigmoid(raw_output[:, 22]) # 0 to 1
+        emit_strength = self.sigmoid(raw_output[:, 21]) 
+        mate_desire = self.sigmoid(raw_output[:, 22]) 
+        adhesion = self.sigmoid(raw_output[:, 23]) # 0 to 1
         
         plasticity_gate = self.sigmoid(self.critic(new_hidden))
         prediction = self.predictor(new_hidden)
         
-        return action_vector, emit_strength, mate_desire, plasticity_gate, new_hidden, prediction
+        return action_vector, emit_strength, mate_desire, adhesion, new_hidden, prediction
 
 # ============================================================
 # 🧬 THE ADAPTIVE AGENT
@@ -124,18 +126,19 @@ class GenesisAgent:
                 old_act = genome['actor.weight']
                 old_dim = old_act.shape[0]
                 
-                # If coming from Phase 13 (22 outputs)
-                if old_dim == 22:
+                # If coming from Phase 13 or 14 (22 or 23 outputs)
+                if old_dim in [22, 23]:
                     new_act = self.brain.actor.weight.clone()
-                    # Copy Reality (21) + Emit (1) = 22
-                    new_act[:22, :] = old_act
-                    # Last row (Mate) is random
+                    # Copy Reality (21) + Emit (1) + Mate (1) if it exists
+                    copy_size = min(old_dim, 23)
+                    new_act[:copy_size, :] = old_act[:copy_size, :]
+                    # Remaining rows (Mate/Adhesion) are random
                     genome['actor.weight'] = new_act
                     
                     if 'actor.bias' in genome:
                         old_bias = genome['actor.bias']
                         new_bias = self.brain.actor.bias.clone()
-                        new_bias[:22] = old_bias
+                        new_bias[:copy_size] = old_bias[:copy_size]
                         genome['actor.bias'] = new_bias
                         
             # (Encoder is compatible from Phase 13 to 14, both use 22 inputs)
@@ -201,8 +204,10 @@ class GenesisAgent:
         total_input = torch.cat([signal_vector, grid_embedding, smell_tensor], dim=0)
 
         # Forward Pass
-        action_vector, emit_tensor, mate_tensor, plasticity_score, new_hidden, prediction = self.brain(total_input, self.energy, self.hidden_state)
-        self.hidden_state = new_hidden 
+        action_vector, emit_tensor, mate_tensor, adhesion_tensor, new_hidden, prediction = self.brain(total_input, self.energy, self.hidden_state)
+        
+        # Explicit Detach to prevent "backward through graph second time" error
+        self.hidden_state = new_hidden.detach().clone() 
         
         # Exploration Noise
         exploration_noise = torch.randn_like(action_vector) * 0.3
@@ -219,8 +224,9 @@ class GenesisAgent:
         # Convert outputs to scalar
         emit_value = emit_tensor.item()
         mate_value = mate_tensor.item()
+        adhesion_value = adhesion_tensor.item()
         
-        return final_vector, emit_value, mate_value
+        return final_vector, emit_value, mate_value, adhesion_value
 
     def metabolize_outcome(self, reward):
         # Physical Reward
