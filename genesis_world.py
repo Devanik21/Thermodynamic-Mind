@@ -204,7 +204,7 @@ class GenesisWorld:
             effects = self.oracle(reality_vector, local_sig)[0] 
         
         # 3. Decode Effects
-        energy_flux = effects[0].item() * 10.0 # Scale up
+        energy_flux = effects[0].item() * 15.0 # Scale up for more dramatic effects
         dx_raw = effects[1].item()
         dy_raw = effects[2].item()
         transmute = effects[3].item()
