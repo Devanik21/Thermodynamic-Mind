@@ -107,44 +107,54 @@ class GenesisAgent:
 
     def metabolize_outcome(self, flux):
         """
-        Learns from reality using a simplified Advantage-Actor-Critic (A2C) update.
-        flux: The reward from the Oracle
+        Learns from reality using a simplified Actor-Critic update.
+        flux: The energy reward from the Oracle.
         """
-        if self.last_value is None:
+        if self.last_value is None or self.last_vector is None:
             return False
 
-        # Reward Signal: External Flux + IQ Incentive (Neural Variance)
-        iq_reward = self.last_vector.std() * 5.0 # Punish uniform thinking
-        reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
+        # --- 🧠 THE IQ INCENTIVE (BRUTAL TRUTH FIX) ---
+        # We must detach the reward signal from the gradient graph to avoid 
+        # "modified by in-place" errors during multiple path backprop.
+        iq_bonus = self.last_vector.detach().std() * 5.0
         
-        # Advantage Calculation
-        advantage = reward - self.last_value.detach()
+        # Target value for the Critic (Total Reality Reward)
+        target = torch.tensor([[flux]], dtype=torch.float32) + iq_bonus
         
-        # Losses
-        # 1. Critic Loss: Mean Squared Error between prediction and actual flux
-        critic_loss = 0.5 * (reward - self.last_value).pow(2)
+        # 1. Critic Loss: Predict the flux accurately
+        critic_loss = 0.5 * (target - self.last_value).pow(2)
         
-        # 2. Actor Loss: Policy Gradient (Surrogate objective)
-        # Simplified: Move weights to make 'last_vector' more likely if advantage is positive
-        actor_loss = -(advantage * self.last_vector.sum()) # Crude approximation for demonstration
+        # 2. Actor Loss: Policy Gradient approach
+        # Advantage = Reality - Prediction
+        advantage = (target - self.last_value.detach())
+        
+        # Move policy towards the specific vector that worked
+        actor_loss = -(advantage * self.last_vector).mean()
         
         total_loss = actor_loss + critic_loss
         
         # Backprop (Online Learning)
         self.optimizer.zero_grad()
         total_loss.backward()
+        # Clip gradients for stability
+        torch.nn.utils.clip_grad_norm_(self.brain.parameters(), 1.0)
         self.optimizer.step()
+        
+        # Cleanup pointers to the graph
+        self.last_value = None
+        self.last_vector = None
         
         self.thoughts_had += 1
         return True
 
     def _mutate(self, rate=0.2):
-        """Randomly alters brain weights to explore the genetic landscape."""
+        """Alters brain weights without disturbing the autograd graph (No in-place)."""
         with torch.no_grad():
             for param in self.brain.parameters():
                 if random.random() < rate:
                     mutation = torch.randn_like(param) * 0.1
-                    param.add_(mutation)
+                    # Use out-of-place addition to be safe
+                    param.copy_(param + mutation)
 
     def get_genome(self):
         """Serializes brain state for inheritance."""
