@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "3.2.1" # Stability fix: Restore missing agent tags
+SYSTEM_VERSION = "3.2.2" # Stability fix: Restore missing imitate method
 
 def init_system():
     # Force reset if version mismatch
