@@ -62,24 +62,36 @@ class GenesisAgent:
         self.y = y
         self.generation = generation
         self.age = 0
-        self.energy = 50.0 
+        self.energy = 60.0 # Increased starting energy
         self.energy_stored = 0.0 # 1.5 Homeostasis
-        self.inventory = [0, 0, 0] if parent_inventory is None else parent_inventory # 2.8 Trade + 3.0 Epigenetic Wealth
+        self.inventory = [0, 0, 0] if parent_inventory is None else parent_inventory
         
         # 1.3 Landauer Limit metrics
         self.last_weight_entropy = 0.0
         self.reflexes_used = 0
+        self.thoughts_had = 0
         self.social_memory = {}
+        
+        # 1.6 Circadian Rhythms
+        self.internal_phase = random.random() * 2 * np.pi
         
         # Neural State
         self.brain = GenesisBrain()
         self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005)
-        self.hidden_state = torch.zeros(1, 64)
+        
+        # 3.0 Epigenetic Memory: Inherit mental state
+        if parent_hidden is not None:
+            self.hidden_state = parent_hidden.detach().clone() + torch.randn_like(parent_hidden) * 0.1
+        else:
+            self.hidden_state = torch.zeros(1, 64)
         
         # Memory for learning
-        self.last_vector = None
-        self.last_value = None
-        self.last_comm = None
+        self.last_vector = torch.zeros(1, 21)
+        self.last_value = torch.zeros(1, 1)
+        self.last_comm = torch.zeros(1, 16)
+        self.last_reward = 0.0
+        self.last_prediction = None
+        self.last_input = None
         self.last_weight_entropy = self.calculate_weight_entropy()
         
         # If born from parents, inherit genome
