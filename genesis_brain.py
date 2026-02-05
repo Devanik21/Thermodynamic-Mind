@@ -71,6 +71,7 @@ class GenesisAgent:
         self.reflexes_used = 0
         self.thoughts_had = 0
         self.social_memory = {}
+        self.tag = np.random.rand(3) # 3.10 Cultural tag (RGB tribe)
         
         # 1.6 Circadian Rhythms
         self.internal_phase = random.random() * 2 * np.pi
@@ -234,3 +235,7 @@ class GenesisAgent:
         # Remove metadata before loading into brain
         brain_state = {k: v for k, v in genome.items() if k != 'tag'}
         self.brain.load_state_dict(brain_state)
+        
+        # Inherit tag with slight drift
+        if 'tag' in genome:
+            self.tag = np.clip(genome['tag'] + np.random.randn(3) * 0.05, 0, 1)
