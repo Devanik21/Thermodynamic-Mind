@@ -440,7 +440,7 @@ with st.container():
             )
 
 # --- MAIN TABS FRAGMENT ---
-tab_macro, tab_micro, tab_omega = st.tabs(["🔭 OBSERVATION DECK", "🧬 QUANTUM SPECTROGRAM", "Ω OMEGA TELEMETRY"])
+tab_macro, tab_micro, tab_culture, tab_nobel, tab_omega = st.tabs(["🔭 OBSERVATION DECK", "🧬 QUANTUM SPECTROGRAM", "🏺 Culture", "🏆 Nobel Committee", "Ω OMEGA TELEMETRY"])
 
 with tab_macro:
     if st.session_state.stats_history:
