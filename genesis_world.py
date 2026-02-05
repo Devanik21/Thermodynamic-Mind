@@ -11,7 +11,7 @@ GRID_SIZE = 40
 SIGNAL_DIM = 16
 MAX_ENERGY = 100.0
 # "Easy mode" - metabolic cost is low, but stupidity kills
-METABOLIC_COST = 0.2 
+METABOLIC_COST = 0.1 
 SEASON_LENGTH = 50 
 
 # ============================================================
@@ -76,7 +76,7 @@ class Resource(Entity):
 
     def get_nutrition(self, current_season):
         # Summer (Even) favors Red/Green, Winter (Odd) favors Blue
-        base = 20.0
+        base = 30.0
         if current_season % 2 == 0:
             if self.type == 0: return base
             if self.type == 1: return base * 2.0
