@@ -216,6 +216,12 @@ class GenesisAgent:
 
         return True
 
+    def imitate(self, mentor, rate=0.05):
+        """3.1 Social Learning: Blends own weights with a successful neighbor."""
+        with torch.no_grad():
+            for self_param, mentor_param in zip(self.brain.parameters(), mentor.brain.parameters()):
+                self_param.data.copy_(self_param.data * (1.0 - rate) + mentor_param.data * rate)
+
     def _mutate(self, rate=0.2):
         """Randomly alters brain weights to explore the genetic landscape."""
         with torch.no_grad():
