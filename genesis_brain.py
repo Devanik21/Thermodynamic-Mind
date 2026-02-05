@@ -11,31 +11,24 @@ import uuid
 class GenesisBrain(nn.Module):
     """
     The cognitive engine of an agent.
-    Input: [Local Matter (16) + Pheromone (16) + Phase (2) + Energy (1) + Reward (1) + Trust (1) + Gradient (1)] = 38 Dimensions
+    Input: [Local Matter (16) + Pheromone (16) + Meme (3) + Phase (2) + Energy (1) + Reward (1) + Trust (1) + Gradient (1)] = 41 Dimensions
     Hidden: 64
     Output: 21 (Reality Vector) + 16 (Comm Vector) + 4 (Mate, Adhesion, Punish, Trade) + 1 (Critic)
     """
-    def __init__(self, input_dim=38, hidden_dim=64, output_dim=21):
+    def __init__(self, input_dim=41, hidden_dim=64, output_dim=21):
         super().__init__()
         self.hidden_dim = hidden_dim
         
-        # Encoder: Project sensory data to hidden space
-        self.encoder = nn.Linear(input_dim, hidden_dim)
+        # 1.1 Neural Learning
+        self.gru = nn.GRU(input_dim, hidden_dim, batch_first=True)
+        self.actor = nn.Linear(hidden_dim, output_dim) 
+        self.comm_out = nn.Linear(hidden_dim, 16) # Social Signaling Layer
+        self.meta_out = nn.Linear(hidden_dim, 4) # [Mate, Adhesion, Punish, Trade]
+        self.critic = nn.Linear(hidden_dim, 1) # Value function for RL
         
-        # Temporal Memory: GRU Cell for sequential reasoning
-        self.gru = nn.GRUCell(hidden_dim, hidden_dim)
-        
-        # Action Head: The Reality Vector (Casting Spells)
-        self.actor = nn.Linear(hidden_dim, output_dim)
-        
-        # Language Head (Level 2.0): 16D Semantic Vector
-        self.communicator = nn.Linear(hidden_dim, 16)
-        
-        # Meta Head: Social/Biological behaviors (Mate, Adhesion, Punish, Trade)
-        self.meta = nn.Linear(hidden_dim, 4)
-        
-        # Critic Head: Internal Value estimation (for learning)
-        self.critic = nn.Linear(hidden_dim, 1)
+        # 3.9 Narrative Memory (Predictive Processing)
+        # Predicts the NEXT input state (Self-Supervised Learning)
+        self.predictor = nn.Linear(hidden_dim, input_dim) 
         
         # Initialize weights
         for m in self.modules():
@@ -45,53 +38,37 @@ class GenesisBrain(nn.Module):
                     nn.init.constant_(m.bias, 0.0)
 
     def forward(self, x, hidden):
-        h_enc = torch.relu(self.encoder(x))
-        h_next = self.gru(h_enc, hidden)
+        if hidden is None:
+            hidden = torch.zeros(1, x.size(0), self.hidden_dim)
+            
+        out, h_next = self.gru(x.unsqueeze(1), hidden)
+        last_hidden = out[:, -1, :]
         
-        vector = torch.tanh(self.actor(h_next))
-        comm = torch.relu(self.communicator(h_next))
-        meta = torch.sigmoid(self.meta(h_next))
-        value = self.critic(h_next)
+        vector = torch.relu(self.actor(last_hidden))    # Reality Vector (Flux)
+        comm = torch.sigmoid(self.comm_out(last_hidden)) # Signal Vector (Pheromones/Memes)
+        meta = torch.sigmoid(self.meta_out(last_hidden)) # [Mate, Adhesion, Punish, Trade]
+        value = self.critic(last_hidden)               # Estimated Value
+        prediction = self.predictor(last_hidden)       # 3.9 Predicted Next State
         
-        return vector, comm, meta, value, h_next
+        return vector, comm, meta, value, h_next, prediction
 
 # ============================================================
 # 🤖 THE AGENT
 # ============================================================
 class GenesisAgent:
-    def __init__(self, x, y, genome=None, generation=0):
+    def __init__(self, x, y, genome=None, generation=0, parent_hidden=None, parent_inventory=None):
         self.id = str(uuid.uuid4())
         self.x = x
         self.y = y
         self.generation = generation
         self.age = 0
-        self.energy = 80.0
-        self.inventions = []
+        self.energy = 50.0 
+        self.energy_stored = 0.0 # 1.5 Homeostasis
+        self.inventory = [0, 0, 0] if parent_inventory is None else parent_inventory # 2.8 Trade + 3.0 Epigenetic Wealth
         
-        # Performance Metrics
-        self.thoughts_had = 0
+        # 1.3 Landauer Limit metrics
+        self.last_weight_entropy = 0.0
         self.reflexes_used = 0
-        
-        # 1.5 Homeostatic Regulation
-        self.energy_stored = 20.0  # Long-term buffer
-        self.energy = 60.0        # Operational energy (Short-term)
-        self.last_reward = 0.0    # 2.2 Receiver Interpretation
-        
-        # 1.6 Circadian Rhythms
-        self.internal_phase = random.random() * 2 * np.pi
-        
-        # 2.8 Trade Emergence: Resource Inventory (R, G, B)
-        self.inventory = [0, 0, 0]
-        
-        # Level 2.4: Tribal Tags (RGB)
-        if genome and 'tag' in genome:
-            self.tag = np.array(genome['tag'])
-            if random.random() < 0.1: # Cultural Drift
-                self.tag = np.clip(self.tag + np.random.normal(0, 0.1, 3), 0, 1)
-        else:
-            self.tag = np.random.rand(3)
-            
-        # Level 2.6: Social Memory
         self.social_memory = {}
         
         # Neural State
@@ -121,6 +98,9 @@ class GenesisAgent:
     def decide(self, signal_16, **kwargs):
         self.age += 1
         pheromone_16 = kwargs.get('pheromone_16', torch.zeros(16))
+        # 3.3 Meme Perception
+        meme_3 = kwargs.get('meme_3', torch.zeros(3))
+        
         env_phase = kwargs.get('env_phase', 0.0)
         social_trust = kwargs.get('social_trust', 0.0)
         gradient = kwargs.get('gradient', 0.0)
@@ -135,24 +115,27 @@ class GenesisAgent:
         trust_signal = torch.tensor([[social_trust]])
         gradient_signal = torch.tensor([[gradient]])
         
-        # Concatenate: [Matter(16), Pheromone(16), Phase(2), Energy(1), Reward(1), Trust(1), Gradient(1)] = 38
+        # Concatenate: [Matter(16), Pheromone(16), Meme(3), Phase(2), Energy(1), Reward(1), Trust(1), Gradient(1)] = 41
         input_tensor = torch.cat([
             signal_16.unsqueeze(0), 
             pheromone_16.unsqueeze(0),
+            meme_3.unsqueeze(0), # 3.3 New Input
             phase_signal,
             energy_signal,
             reward_signal,
             trust_signal,
             gradient_signal
         ], dim=1).float()
-        
+    
         # Forward Pass
-        vector, comm_vector, meta, value, h_next = self.brain(input_tensor, self.hidden_state)
+        vector, comm_vector, meta, value, h_next, prediction = self.brain(input_tensor, self.hidden_state)
         
         self.hidden_state = h_next.detach()
         self.last_vector = vector
         self.last_comm = comm_vector
         self.last_value = value
+        self.last_prediction = prediction # 3.9 Store for loss calculation
+        self.last_input = input_tensor    # Store input for next tick's comparison
         
         # Unpack Meta (Mate, Adhesion, Punish, Trade)
         mate_desire = meta[0, 0].item()
@@ -160,7 +143,11 @@ class GenesisAgent:
         punish_val = meta[0, 2].item()
         trade_val = meta[0, 3].item()
         
-        return vector, comm_vector[0], mate_desire, adhesion_val, punish_val, trade_val
+        # 3.3 Stigmergy Output
+        meme_write = comm_vector[13:16] 
+        
+        return vector, comm_vector[0], mate_desire, adhesion_val, punish_val, trade_val, meme_write
+        
 
     def metabolize_outcome(self, flux):
         """

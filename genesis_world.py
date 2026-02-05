@@ -103,6 +103,10 @@ class GenesisWorld:
         # 🌐 PHASE 13: "TURING" UPGRADE (16D Pheromone Grid)
         self.pheromone_grid = np.zeros((size, size, SIGNAL_DIM))
         
+        # 3.3 Environmental Marking (Stigmergy)
+        # Channels: 0:Danger(Red), 1:Resource(Green), 2:Sacred(Blue)
+        self.meme_grid = np.zeros((size, size, 3)) 
+        
         # 🔗 PHASE 15: "SYMBIOGENESIS" UPGRADE (Elastic Bonds)
         self.bonds = set() # Set of tuples (frozenset of agent IDs)
         

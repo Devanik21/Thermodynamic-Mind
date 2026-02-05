@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "2.10.6" # Force reset on architecture change
+SYSTEM_VERSION = "3.1.0" # Level 3: Visualization & Metrics
 
 def init_system():
     # Force reset if version mismatch
@@ -144,6 +144,10 @@ def update_simulation():
         # 1.7: Energy gradient (Stress response)
         env_phase = getattr(world, 'env_phase', 0.0)
         
+        # 3.3 Meme Grid (Stigmergy)
+        mx, my = int(agent.x), int(agent.y)
+        meme_vector = torch.tensor(world.meme_grid[mx, my])
+        
         # 2.6 Reciprocal Altruism: Social Trust Context
         # Mean trust for visible neighbors
         neighbors = [world.agents[oid] for oid in world.agents if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
@@ -151,18 +155,30 @@ def update_simulation():
         if neighbors:
             trust_values = [agent.social_memory.get(n.id, 0.5) for n in neighbors]
             social_trust = np.mean(trust_values) / 2.0 # Scale to roughly 0-1
+            
+            # 3.1 Social Learning (Imitation)
+            # If agent is struggling (low energy) or young, imitate successful neighbor
+            if agent.energy < 40.0 or agent.age < 20:
+                best_neighbor = max(neighbors, key=lambda n: n.energy)
+                if best_neighbor.energy > agent.energy + 20.0:
+                    agent.imitate(best_neighbor, rate=0.05)
         
         # 1.7 Gradient Sensing (Stress Response)
         gradient_val = world.get_energy_gradient(agent.x, agent.y).item()
 
-        # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade)
-        reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val = agent.decide(
+        # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade, MemeWrite)
+        reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val, meme_write = agent.decide(
             signal, 
             pheromone_16=pheromone_vector, 
+            meme_3=meme_vector, # 3.3 Input
             env_phase=env_phase,
             social_trust=social_trust,
             gradient=gradient_val
         ) 
+        
+        # 3.3 Stigmergy: Write to Meme Grid
+        # Decaying write to avoid saturation: Old * 0.9 + New * 0.1
+        world.meme_grid[mx, my] = world.meme_grid[mx, my] * 0.9 + meme_write.detach().numpy() * 0.1
         
         flux, log_text = world.resolve_quantum_state(
             agent, reality_vector_tensor, emit_vector=comm_vector, 
@@ -199,7 +215,10 @@ def update_simulation():
                 new_x = (agent.x + random.randint(-1, 1)) % world.size
                 new_y = (agent.y + random.randint(-1, 1)) % world.size
                 
-                child = GenesisAgent(new_x, new_y, genome=child_genome, generation=max(agent.generation, partner.generation) + 1)
+                # 3.0 Epigenetics: Inherit average hidden state
+                parent_hidden_avg = (agent.hidden_state + partner.hidden_state) / 2.0
+                
+                child = GenesisAgent(new_x, new_y, genome=child_genome, generation=max(agent.generation, partner.generation) + 1, parent_hidden=parent_hidden_avg)
                 world.agents[child.id] = child
                 
                 # Cost
@@ -271,7 +290,8 @@ def update_simulation():
             off_y = (agent.y + np.random.randint(-1, 2)) % 40
             
             child_genome = agent.get_genome()
-            child = GenesisAgent(off_x, off_y, genome=child_genome, generation=agent.generation + 1)
+            # 3.0 Epigenetics: Inherit parent hidden state
+            child = GenesisAgent(off_x, off_y, genome=child_genome, generation=agent.generation + 1, parent_hidden=agent.hidden_state)
             child._mutate(rate=0.2) 
             
             world.agents[child.id] = child
@@ -578,6 +598,76 @@ with tab_micro:
                 st.plotly_chart(fig_spec, width="stretch")
         else:
             st.warning("Extinction Event. No Minds Detected.")
+
+with tab_culture:
+    st.markdown("## 🏺 The Cultural Replicator (Level 3)")
+    col_meme, col_dyn = st.columns([1, 1])
+    
+    with col_meme:
+        st.markdown("### 🗺️ Stigmergy Map (Meme Grid)")
+        # Normalize Meme Grid for visual
+        # Grid is (40, 40, 3). Channels: R(Danger), G(Food), B(Sacred)
+        if hasattr(st.session_state.world, 'meme_grid'):
+            meme_vis = st.session_state.world.meme_grid.copy()
+            # Clip to 0-1 range for RGB display
+            meme_vis = np.clip(meme_vis, 0, 1)
+            # Resize for better visibility (optional, but plotly heatmap handles it)
+            
+            fig_meme = px.imshow(
+                meme_vis, 
+                title="Collective Memory (RGB: Danger/Resource/Sacred)",
+                labels=dict(x="X", y="Y")
+            )
+            fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+            st.plotly_chart(fig_meme, use_container_width=True)
+        else:
+            st.info("Meme Grid initializing...")
+            
+    with col_dyn:
+        st.markdown("### 📜 Cultural Dynamics")
+        
+        # 3.4 Tradition Formation (Stability of Action Vectors)
+        # We need history of mean action vectors.
+        # Let's compute current mean action vector
+        if st.session_state.world.agents:
+            current_actions = []
+            for a in st.session_state.world.agents.values():
+                if a.last_vector is not None:
+                     current_actions.append(a.last_vector.detach().numpy().flatten())
+            
+            if current_actions:
+                mean_action = np.mean(current_actions, axis=0)
+                # Store simple scalar proxy (norm) for now to track stability
+                action_norm = np.linalg.norm(mean_action)
+                
+                # Update stats history if needed or just use a local list
+                if "tradition_history" not in st.session_state:
+                    st.session_state.tradition_history = []
+                
+                st.session_state.tradition_history.append(action_norm)
+                if len(st.session_state.tradition_history) > 100:
+                    st.session_state.tradition_history.pop(0)
+                
+                # Plot
+                fig_trad = px.line(
+                    y=st.session_state.tradition_history, 
+                    title="Tradition Index (Action Stability)",
+                    labels={'y': "Mean Action Norm", 'x': "Time"}
+                )
+                fig_trad.update_layout(height=200)
+                st.plotly_chart(fig_trad, use_container_width=True)
+                
+        # 3.6 Innovation Diffusion
+        st.markdown("### 🚀 Innovation Rate")
+        inv_count = len(st.session_state.global_registry)
+        st.metric("Total Patents", inv_count)
+        
+        if st.session_state.global_registry:
+            # Show recent inventions
+            recents = st.session_state.global_registry[-5:]
+            for inv in recents:
+                st.caption(f"Tick {inv['tick']}: **{inv['name']}** (Yield {inv['value']:.1f})")
+
             
     with col_log:
         st.markdown("### ⚡ Event Stream")
