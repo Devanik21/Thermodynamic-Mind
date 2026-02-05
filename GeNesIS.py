@@ -130,18 +130,23 @@ def update_simulation():
         # 🌐 PHASE 13: "TURING" UPGRADE (Chemical Signaling)
         smell = world.get_pheromone(agent.x, agent.y)
         
+        # 1.6: Environment phase (Circadian)
+        # 1.7: Energy gradient (Stress response)
+        env_phase = getattr(world, 'env_phase', 0.0)
+        
         # Decide now returns (Vector, Emit, Mate, Adhesion)
-        reality_vector_tensor, emit_val, mate_desire, adhesion_val = agent.decide(signal, smell_intensity=smell) 
+        reality_vector_tensor, emit_val, mate_desire, adhesion_val = agent.decide(
+            signal, 
+            smell_intensity=smell, 
+            env_phase=env_phase
+        ) 
         
         flux, log_text = world.resolve_quantum_state(agent, reality_vector_tensor, emit_strength=emit_val, adhesion=adhesion_val)
         
         # ❤️ PHASE 14: "GOD-REMOVER" UPGRADE (Autopoietic Reproduction)
         # Agents reproduce themselves without system intervention.
-        if mate_desire > 0.5 and agent.energy > 80.0:
+        if mate_desire > 0.5 and agent.energy > 80.0 and len(world.agents) < 256:
             # Look for partner
-            # Simple implementation: Scan neighbours
-            # Optimization: could use a spatial hash, but for <50 agents handled here is fine?
-            # Actually, agents list is shuffled, so we can just grab candidates.
             partners = [
                 other for other in agents 
                 if other.id != agent.id 
@@ -151,12 +156,6 @@ def update_simulation():
             ]
             
             if partners:
-                # Mate with the first willing partner (or just first capable one)
-                # In future, partner also needs to consent (mate_desire > 0.5).
-                # But we don't know partner's decision yet if they are later in the loop.
-                # Simplified: Rape/Force is not allowed. Mutual desire required?
-                # For now: Just proximity + energy is enough trigger, assuming pheromones led them there.
-                
                 partner = partners[0]
                 
                 # Crossover
@@ -231,14 +230,13 @@ def update_simulation():
             })
             
         # 📉 Malthusian Decay (Crowding Penalty)
-        # As population grows, it becomes harder to sustain individual existence.
-        # Base cost 0.5 + scaling factor (log base 10 of population / 2)
+        # 1.4 Environmental Pressure: Scarcity scaling
         malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 3.0)
         agent.energy -= malthusian_cost 
         
-        # 🧬 MITOSIS (Hard Cap: 1500)
-        if agent.energy > 100.0 and len(world.agents) < 1500:
-            agent.energy -= 50.0 
+        # 🧬 MITOSIS (Hard Cap: 256 per user request)
+        if agent.energy > 120.0 and len(world.agents) < 256:
+            agent.energy -= 60.0 
             off_x = (agent.x + np.random.randint(-1, 2)) % 40
             off_y = (agent.y + np.random.randint(-1, 2)) % 40
             
@@ -257,6 +255,22 @@ def update_simulation():
     for dead_id in deaths:
         if dead_id in world.agents: # Safety check
             dead_agent = world.agents[dead_id]
+            
+            # 1.9 Apoptotic Information Transfer (Death Broadcast)
+            # Neighboring agents learn from the dead agent's weights
+            with torch.no_grad():
+                dead_genome = dead_agent.get_genome()
+                # Find physical neighbors
+                neighbors = [
+                    a for a in world.agents.values() 
+                    if a.id != dead_id and abs(a.x - dead_agent.x) <= 2 and abs(a.y - dead_agent.y) <= 2
+                ]
+                for n in neighbors:
+                    # Transfer 10% of weight knowledge
+                    for k, v in n.brain.state_dict().items():
+                        if k in dead_genome:
+                            v.copy_(v * 0.9 + dead_genome[k] * 0.1)
+            
             if dead_agent.age > 20: 
                 st.session_state.gene_pool.append(dead_agent.get_genome())
                 if len(st.session_state.gene_pool) > 50:
@@ -265,7 +279,7 @@ def update_simulation():
                     "Tick": world.time_step,
                     "Agent": dead_agent.id,
                     "Gen": dead_agent.generation,
-                    "Event": "💀 DIED",
+                    "Event": "💀 DIED (Broadcasted)",
                     "Vector": [0.0]*21
                 })
             del world.agents[dead_id]
@@ -288,7 +302,9 @@ def update_simulation():
         "thoughts": current_thoughts,
         "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
         "pos_flux": total_pos_flux,
-        "neg_flux": total_neg_flux
+        "neg_flux": total_neg_flux,
+        "scarcity": np.exp(-world.scarcity_lambda * world.time_step),
+        "agent_entropy": getattr(world, 'agent_entropy', 0.0)
     }
     
     st.session_state.stats_history.append(stats)
@@ -368,20 +384,27 @@ with tab_macro:
         df = pd.DataFrame(st.session_state.stats_history)
         
         # Row 1: Graphs
-        col_g1, col_g2 = st.columns(2)
+        col_g1, col_g2, col_g3 = st.columns(3)
         with col_g1:
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Survivors", line=dict(color='#00ffa3')))
             fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Plasticity Events", line=dict(color='#ff4b4b')))
-            fig.update_layout(title="Evolutionary Trajectory", height=250, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, width="stretch")
+            fig.update_layout(title="Evolutionary Trajectory", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig, use_container_width=True)
             
         with col_g2:
             fig2 = go.Figure()
-            fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Positive Inventions", line=dict(color='yellow'), fill='tozeroy'))
-            fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Negative Disasters", line=dict(color='red'), fill='tozeroy'))
-            fig2.update_layout(title="The Moral Compass (Efficiency vs Chaos)", height=250, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig2, width="stretch")
+            fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Invention Yield", line=dict(color='yellow'), fill='tozeroy'))
+            fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Resource Drain", line=dict(color='red'), fill='tozeroy'))
+            fig2.update_layout(title="Efficiency vs Chaos", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig2, use_container_width=True)
+
+        with col_g3:
+            fig3 = go.Figure()
+            fig3.add_trace(go.Scatter(x=df['tick'], y=df['agent_entropy'], name="Neural Entropy", line=dict(color='#45b6fe')))
+            fig3.add_trace(go.Scatter(x=df['tick'], y=df['scarcity'], name="Env Availability", line=dict(color='gray'), dash='dot'))
+            fig3.update_layout(title="Thermodynamics (Ω Metric)", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig3, use_container_width=True)
             
         # Row 2: Map
         grid_map = np.zeros((40, 40))
@@ -501,8 +524,9 @@ with tab_omega:
                 "Gen": agent.generation,
                 "Age": agent.age,
                 "Energy": f"{agent.energy:.2f}",
+                "Stored": f"{getattr(agent, 'energy_stored', 0):.1f}",
                 "IQ": f"{iq_score:.4f}",
-                "Love": f"{love_score:.4f}",
+                "H(W)": f"{getattr(agent, 'last_weight_entropy', 0):.3f}",
                 "Bio-Hack %": f"{neuro_plasticity:.2f}%",
                 "Entropy": f"{np.log(agent.age + 1):.4f}",
                 "Reflexes": agent.reflexes_used,

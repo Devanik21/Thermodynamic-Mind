@@ -111,7 +111,14 @@ class GenesisWorld:
         # 🔗 PHASE 15: "SYMBIOGENESIS" UPGRADE (Elastic Bonds)
         self.bonds = set() # Set of tuples (frozenset of agent IDs)
         
-        # The Laws of Physics
+        # 1.4 Scarcity Scaling
+        self.scarcity_lambda = 0.0001
+        self.base_spawn_rate = 5
+        
+        # 1.10 Entropy Tracking
+        self.system_entropy = 0.0
+        self.agent_entropy = 0.0
+        self.dissipated_energy = 0.0
         self.oracle = PhysicsOracle()
         # Freeze the laws (God does not play dice twice)
         for p in self.oracle.parameters():
@@ -130,6 +137,20 @@ class GenesisWorld:
     def get_pheromone(self, x, y):
         # Read the chemical signal at this location
         return float(self.pheromone_grid[x, y])
+
+    def get_energy_gradient(self, x, y):
+        """1.7 Stress Response: Detect energy flux gradient."""
+        # Check neighbors
+        gradients = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                nx, ny = (x + dx) % self.size, (y + dy) % self.size
+                if (nx, ny) in self.grid:
+                    # Positive for food, negative for poison (based on current season)
+                    gradients.append(self.grid[(nx, ny)].get_nutrition(self.current_season))
+                else:
+                    gradients.append(0.0)
+        return torch.tensor([np.mean(gradients)], dtype=torch.float32)
 
     def update_pheromones(self):
         """

@@ -15,7 +15,7 @@ class GenesisBrain(nn.Module):
     Hidden: 32 (GRU State)
     Output: 21 (Reality Vector) + 3 (Emit, Mate, Adhesion) + 1 (Critic)
     """
-    def __init__(self, input_dim=17, hidden_dim=32, output_dim=21):
+    def __init__(self, input_dim=19, hidden_dim=32, output_dim=21):
         super().__init__()
         self.hidden_dim = hidden_dim
         
@@ -70,6 +70,13 @@ class GenesisAgent:
         self.thoughts_had = 0
         self.reflexes_used = 0
         
+        # 1.5 Homeostatic Regulation
+        self.energy_stored = 20.0  # Long-term buffer
+        self.energy = 60.0        # Operational energy (Short-term)
+        
+        # 1.6 Circadian Rhythms
+        self.internal_phase = random.random() * 2 * np.pi
+        
         # Neural State
         self.brain = GenesisBrain()
         self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005)
@@ -79,16 +86,36 @@ class GenesisAgent:
         self.last_vector = None
         self.last_value = None
         self.last_log_prob = None
+        self.last_weight_entropy = self.calculate_weight_entropy()
         
         # If born from parents, inherit genome
         if genome:
             self._apply_genome(genome)
 
-    def decide(self, signal_16, smell_intensity=0.0):
+    def calculate_weight_entropy(self):
+        """1.3 Landauer Metric: Shannon entropy of the brain's weight distribution."""
+        with torch.no_grad():
+            all_weights = torch.cat([p.view(-1) for p in self.brain.parameters()])
+            # Simple histogram-based entropy
+            hist = torch.histc(all_weights, bins=20, min=-2, max=2)
+            prob = hist / (hist.sum() + 1e-8)
+            entropy = -torch.sum(prob * torch.log2(prob + 1e-8))
+            return entropy.item()
+
+    def decide(self, signal_16, smell_intensity=0.0, env_phase=0.0):
         self.age += 1
         
-        # Prepare Input
-        input_tensor = torch.cat([signal_16.unsqueeze(0), torch.tensor([[smell_intensity]])], dim=1).float()
+        # 1.6 Synchronization: Update internal phase
+        # Agents slowly drift towards environmental phase
+        self.internal_phase += 0.1 * np.sin(env_phase - self.internal_phase)
+        
+        # Prepare Input (Add internal phase as temporal context)
+        phase_signal = torch.tensor([[np.sin(self.internal_phase), np.cos(self.internal_phase)]])
+        input_tensor = torch.cat([
+            signal_16.unsqueeze(0), 
+            torch.tensor([[smell_intensity]]),
+            phase_signal
+        ], dim=1).float()
         
         # Forward Pass
         vector, meta, value, h_next = self.brain(input_tensor, self.hidden_state)
@@ -113,6 +140,14 @@ class GenesisAgent:
         if self.last_value is None:
             return False
 
+        # 1.3 Landauer Cost: k_B * T * delta(H(W))
+        current_entropy = self.calculate_weight_entropy()
+        entropy_diff = current_entropy - self.last_weight_entropy
+        # Cost is proportional to information erased or restructured (entropy change)
+        landauer_cost = max(0.01, 0.5 * abs(entropy_diff)) 
+        self.energy -= landauer_cost
+        self.last_weight_entropy = current_entropy
+
         # Reward Signal: External Flux + IQ Incentive (Neural Variance)
         iq_reward = self.last_vector.std() * 5.0 # Punish uniform thinking
         reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
@@ -126,7 +161,7 @@ class GenesisAgent:
         
         # 2. Actor Loss: Policy Gradient (Surrogate objective)
         # Simplified: Move weights to make 'last_vector' more likely if advantage is positive
-        actor_loss = -(advantage * self.last_vector.sum()) # Crude approximation for demonstration
+        actor_loss = -(advantage * self.last_vector.sum()) 
         
         total_loss = actor_loss + critic_loss
         
@@ -136,6 +171,17 @@ class GenesisAgent:
         self.optimizer.step()
         
         self.thoughts_had += 1
+
+        # 1.5 Homeostasis check: Transfer energy to/from buffer
+        if self.energy > 80.0:
+            transfer = (self.energy - 80.0) * 0.5
+            self.energy -= transfer
+            self.energy_stored += transfer
+        elif self.energy < 30.0 and self.energy_stored > 0:
+            transfer = min(self.energy_stored, (30.0 - self.energy) * 0.8)
+            self.energy += transfer
+            self.energy_stored -= transfer
+
         return True
 
     def _mutate(self, rate=0.2):
