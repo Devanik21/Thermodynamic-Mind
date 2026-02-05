@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "3.1.6" # Fix GRU dimensionality error
+SYSTEM_VERSION = "3.1.7" # Fix visualization: Reshape 3D h_state to 2D
 
 def init_system():
     # Force reset if version mismatch
@@ -628,7 +628,8 @@ with tab_micro:
         with col_spec_b:
             # Visualize Hidden State (The "Mind State")
             if target.hidden_state is not None:
-                h_state = target.hidden_state.detach().cpu().numpy()
+                # Shape is (1, 1, 64) due to GRU batch requirements. Reshape to 2D for imshow.
+                h_state = target.hidden_state.detach().cpu().numpy().reshape(1, -1)
                 fig_h = px.imshow(
                     h_state, 
                     color_continuous_scale='Viridis',
