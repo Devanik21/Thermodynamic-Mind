@@ -295,6 +295,13 @@ def update_simulation():
         new_agent = GenesisAgent(x, y, genome=genome, generation=gen)
         world.agents[new_agent.id] = new_agent
         
+    # Calculate Entropy Fallback
+    ent_val = getattr(world, 'agent_entropy', 0.0)
+    if ent_val == 0.0 and len(world.agents) > 0:
+        energies = np.array([a.energy for a in world.agents.values()])
+        e_norm = (energies + 1e-8) / (energies.sum() + 1e-7)
+        ent_val = -np.sum(e_norm * np.log2(e_norm))
+
     # Update Stats
     stats = {
         "tick": world.time_step,
@@ -304,7 +311,7 @@ def update_simulation():
         "pos_flux": total_pos_flux,
         "neg_flux": total_neg_flux,
         "scarcity": np.exp(-world.scarcity_lambda * world.time_step),
-        "agent_entropy": getattr(world, 'agent_entropy', 0.0)
+        "agent_entropy": ent_val
     }
     
     st.session_state.stats_history.append(stats)
