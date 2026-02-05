@@ -156,7 +156,7 @@ class GenesisAgent:
         trade_val = meta[0, 3].item()
         
         # 3.3 Stigmergy Output
-        meme_write = comm_vector[13:16] 
+        meme_write = comm_vector[0, 13:16] 
         
         return vector, comm_vector[0], mate_desire, adhesion_val, punish_val, trade_val, meme_write
         
