@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "2.10.4" # Force reset on architecture change
+SYSTEM_VERSION = "2.10.5" # Force reset on architecture change
 
 def init_system():
     # Force reset if version mismatch
@@ -93,7 +93,7 @@ def init_system():
 
     if "world" not in st.session_state:
         st.session_state.world = GenesisWorld(size=40)
-        for _ in range(64):
+        for _ in range(100):
             x, y = np.random.randint(0, 40), np.random.randint(0, 40)
             agent = GenesisAgent(x, y)
             st.session_state.world.agents[agent.id] = agent
@@ -247,13 +247,17 @@ def update_simulation():
                         })
         
         if "IDLE" not in log_text and "MOVE" not in log_text:
-             events_this_tick.append({
-                "Tick": world.time_step,
-                "Agent": agent.id,
-                "Gen": agent.generation,
-                "Event": f"{log_text} ({flux:.1f}E)",
-                "Vector": reality_vector_tensor.tolist()[0]
-            })
+             # Filter noise: Only show flux events if they are significant (> 10.0) or are special events
+             is_boring_flux = ("FLUX" in log_text) and (abs(flux) < 10.0)
+             
+             if not is_boring_flux:
+                events_this_tick.append({
+                    "Tick": world.time_step,
+                    "Agent": agent.id,
+                    "Gen": agent.generation,
+                    "Event": f"{log_text} ({flux:.1f}E)",
+                    "Vector": reality_vector_tensor.tolist()[0]
+                })
             
         # 📉 Malthusian Decay (Crowding Penalty)
         # 1.4 Environmental Pressure: Scarcity scaling
