@@ -11,11 +11,11 @@ import uuid
 class GenesisBrain(nn.Module):
     """
     The cognitive engine of an agent.
-    Input: [Local Matter (16) + Pheromone (16) + Phase (2) + Energy (1) + Reward (1) + Trust (1)] = 37 Dimensions
+    Input: [Local Matter (16) + Pheromone (16) + Phase (2) + Energy (1) + Reward (1) + Trust (1) + Gradient (1)] = 38 Dimensions
     Hidden: 64
     Output: 21 (Reality Vector) + 16 (Comm Vector) + 4 (Mate, Adhesion, Punish, Trade) + 1 (Critic)
     """
-    def __init__(self, input_dim=37, hidden_dim=64, output_dim=21):
+    def __init__(self, input_dim=38, hidden_dim=64, output_dim=21):
         super().__init__()
         self.hidden_dim = hidden_dim
         
@@ -118,27 +118,32 @@ class GenesisAgent:
             entropy = -torch.sum(prob * torch.log2(prob + 1e-8))
             return entropy.item()
 
-    def decide(self, signal_16, pheromone_16=None, env_phase=0.0, social_trust=0.0):
+    def decide(self, signal_16, **kwargs):
         self.age += 1
-        if pheromone_16 is None: pheromone_16 = torch.zeros(16)
+        pheromone_16 = kwargs.get('pheromone_16', torch.zeros(16))
+        env_phase = kwargs.get('env_phase', 0.0)
+        social_trust = kwargs.get('social_trust', 0.0)
+        gradient = kwargs.get('gradient', 0.0)
             
         # 1.6 Synchronization
         self.internal_phase += 0.1 * np.sin(env_phase - self.internal_phase)
         phase_signal = torch.tensor([[np.sin(self.internal_phase), np.cos(self.internal_phase)]])
         
-        # 2.2 State-Dependent Input
+        # 2.2 State-Dependent Input & 1.7 Stress Response
         energy_signal = torch.tensor([[self.energy / 200.0]]) # Normalized
         reward_signal = torch.tensor([[self.last_reward / 50.0]])
         trust_signal = torch.tensor([[social_trust]])
+        gradient_signal = torch.tensor([[gradient]])
         
-        # Concatenate: [Matter(16), Pheromone(16), Phase(2), Energy(1), Reward(1), Trust(1)] = 37
+        # Concatenate: [Matter(16), Pheromone(16), Phase(2), Energy(1), Reward(1), Trust(1), Gradient(1)] = 38
         input_tensor = torch.cat([
             signal_16.unsqueeze(0), 
             pheromone_16.unsqueeze(0),
             phase_signal,
             energy_signal,
             reward_signal,
-            trust_signal
+            trust_signal,
+            gradient_signal
         ], dim=1).float()
         
         # Forward Pass
