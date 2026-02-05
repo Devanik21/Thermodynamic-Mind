@@ -599,6 +599,49 @@ with tab_micro:
         else:
             st.warning("Extinction Event. No Minds Detected.")
 
+    # --- NEW: NEURAL BLUEPRINT SECTION (Moved to Micro) ---
+    st.markdown("---")
+    st.markdown("### 🕸️ Neural Blueprint (Real-Time Brain State)")
+    if st.session_state.world.agents:
+        agent_list = list(st.session_state.world.agents.keys())
+        selected_id = st.selectbox("Select Agent to Inspect", agent_list, index=0)
+        
+        target = st.session_state.world.agents[selected_id]
+        
+        col_spec_a, col_spec_b = st.columns([1, 2])
+        
+        with col_spec_a:
+            st.markdown(f"**Agent Specs: `{selected_id[:8]}`**")
+            st.write(f"- **Architecture**: [41] -> GRU[64] -> [21+16]")
+            st.write(f"- **Optimizer**: Adam (lr=0.001)")
+            st.write(f"- **Layers**: Encoder, GRU, Actor, Critic, Comm, Meta, Predictor")
+            
+            # Weight Stats
+            with torch.no_grad():
+                # Note: Brain architecture updated to GRU(input, hidden)
+                # target.brain.encoder no longer exists. Using target.brain.actor or similar.
+                w_actor = target.brain.actor.weight.mean().item()
+                w_std = target.brain.actor.weight.std().item()
+                st.write(f"- **Synaptic Density**: `{w_actor:.4f}`")
+                st.write(f"- **Synaptic Variance**: `{w_std:.4f}`")
+        
+        with col_spec_b:
+            # Visualize Hidden State (The "Mind State")
+            if target.hidden_state is not None:
+                h_state = target.hidden_state.detach().cpu().numpy()
+                fig_h = px.imshow(
+                    h_state, 
+                    color_continuous_scale='Viridis',
+                    labels=dict(x="Memory Dim (0-63)", color="Charge"),
+                    title="Short-Term Memory (GRU Hidden State)"
+                )
+                fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
+                st.plotly_chart(fig_h, use_container_width=True)
+            else:
+                st.info("Agent is in Reflex-Only mode (Brain idle).")
+    else:
+        st.warning("No Neural Networks detected.")
+
 with tab_culture:
     st.markdown("## 🏺 The Cultural Replicator (Level 3)")
     col_meme, col_dyn = st.columns([1, 1])
@@ -742,85 +785,46 @@ with tab_omega:
             df_agents = pd.DataFrame(agent_data)
             st.dataframe(df_agents, width="stretch", height=400)
 
-    # --- NEW: NEURAL BLUEPRINT SECTION ---
-    st.markdown("---")
-    st.markdown("### 🕸️ Neural Blueprint (Real-Time Brain State)")
-    if st.session_state.world.agents:
-        agent_list = list(st.session_state.world.agents.keys())
-        selected_id = st.selectbox("Select Agent to Inspect", agent_list, index=0)
-        
-        target = st.session_state.world.agents[selected_id]
-        
-        col_spec_a, col_spec_b = st.columns([1, 2])
-        
-        with col_spec_a:
-            st.markdown(f"**Agent Specs: `{selected_id[:8]}`**")
-            st.write(f"- **Architecture**: [34] -> GRU[64] -> [21+16]")
-            st.write(f"- **Optimizer**: Adam (lr=0.005)")
-            st.write(f"- **Layers**: Encoder, GRUCell, Actor, Critic, Language")
-            
-            # Weight Stats
-            with torch.no_grad():
-                w_encoder = target.brain.encoder.weight.mean().item()
-                w_std = target.brain.encoder.weight.std().item()
-                st.write(f"- **Synaptic Density**: `{w_encoder:.4f}`")
-                st.write(f"- **Synaptic Variance**: `{w_std:.4f}`")
-        
-        with col_spec_b:
-            # Visualize Hidden State (The "Mind State")
-            if target.hidden_state is not None:
-                h_state = target.hidden_state.detach().cpu().numpy()
-                fig_h = px.imshow(
-                    h_state, 
-                    color_continuous_scale='Viridis',
-                    labels=dict(x="Memory Dim (0-63)", color="Charge"),
-                    title="Short-Term Memory (GRU Hidden State)"
-                )
-                fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
-                st.plotly_chart(fig_h, use_container_width=True)
-            else:
-                st.info("Agent is in Reflex-Only mode (Brain idle).")
-    else:
-        st.warning("No Neural Networks detected.")
 
-    # --- NEW: NOBEL COMMITTEE SECTION ---
-    st.markdown("---")
-    st.markdown("### 🏆 The Nobel Committee for Artificial Minds")
+with tab_nobel:
+    st.markdown("## 🏆 The Nobel Committee for Artificial Minds")
     if st.session_state.world.agents:
-        # Reuse 'selected_id' from Neural Blueprint if available
-        if 'selected_id' in locals():
-            target_n = st.session_state.world.agents[selected_id]
-            st.markdown(f"#### 📜 Patent Portfolio: `{target_n.id[:8]}`")
-            
-            inventions = getattr(target_n, 'inventions', [])
-            if inventions:
-                for inv in inventions:
-                    st.success(f"**{inv['name']}** (Yield: `{inv['value']:.1f}`)")
-                    with st.expander(f"Details on {inv['name']}"):
-                         st.write(f"**Vector DNA**: `{inv['vector'][:5]}...`")
-                         st.json(inv)
-            else:
-                st.caption("This individual agent has not patented anything yet.")
-                
-            # 🏛️ GLOBAL HALL OF FAME
-            st.markdown("#### 🏛️ Civilization Hall of Fame (Global Patents)")
-            if st.session_state.global_registry:
-                for g_inv in st.session_state.global_registry:
-                    st.info(f"🏆 **{g_inv['name']}** - Discovered by `{g_inv['agent'][:6]}` at Tick `{g_inv['tick']}` (Yield: `{g_inv['value']:.1f}`)")
-            else:
-                st.warning("The civilization is still in the dark ages. No global patents recorded.")
-                
-            # THE INFINITE PARAMETER WIDGET
-            with st.expander("♾️ View Infinite Parameters (God Mode)"):
-                st.warning("⚠️ Warning: Direct introspection of Synaptic Weights. May cause lag.")
-                if st.checkbox("🔓 Decrypt Neural Weights"):
-                    # Flatten the entire brain logic into one massive parameter list
-                    all_params = {}
-                    for name, param in target_n.brain.named_parameters():
-                        all_params[name] = param.detach().cpu().numpy().tolist()
-                    st.json(all_params)
+        # We need a selectbox here as well since it's a different tab
+        agent_list_n = list(st.session_state.world.agents.keys())
+        selected_id_n = st.selectbox("Select Agent Portfolio", agent_list_n, index=0, key="nobel_select")
+        
+        target_n = st.session_state.world.agents[selected_id_n]
+        st.markdown(f"#### 📜 Patent Portfolio: `{target_n.id[:8]}`")
+        
+        inventions = getattr(target_n, 'inventions', [])
+        if inventions:
+            for inv in inventions:
+                st.success(f"**{inv['name']}** (Yield: `{inv['value']:.1f}`)")
+                with st.expander(f"Details on {inv['name']}"):
+                     st.write(f"**Vector DNA**: `{inv['vector'][:5]}...`")
+                     st.json(inv)
         else:
-             st.info("Select an agent in the Neural Blueprint section above to view their Inventions.")
+            st.caption("This individual agent has not patented anything yet.")
+            
+        # 🏛️ GLOBAL HALL OF FAME
+        st.markdown("#### 🏛️ Civilization Hall of Fame (Global Patents)")
+        if st.session_state.global_registry:
+            for g_inv in st.session_state.global_registry:
+                st.info(f"🏆 **{g_inv['name']}** - Discovered by `{g_inv['agent'][:6]}` at Tick `{g_inv['tick']}` (Yield: `{g_inv['value']:.1f}`)")
+        else:
+            st.warning("The civilization is still in the dark ages. No global patents recorded.")
+            
+        # THE INFINITE PARAMETER WIDGET
+        with st.expander("♾️ View Infinite Parameters (God Mode)"):
+            st.warning("⚠️ Warning: Direct introspection of Synaptic Weights. May cause lag.")
+            if st.checkbox("🔓 Decrypt Neural Weights"):
+                # Flatten the entire brain logic into one massive parameter list
+                all_params = {}
+                for name, param in target_n.brain.named_parameters():
+                    all_params[name] = param.detach().cpu().numpy().tolist()
+                st.json(all_params)
+    else:
+        st.warning("No minds detected for review.")
 
 
 if st.session_state.running:
