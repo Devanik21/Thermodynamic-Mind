@@ -112,7 +112,7 @@ class GenesisWorld:
         self.bonds = set() # Set of tuples (frozenset of agent IDs)
         
         # 1.4 Scarcity Scaling
-        self.scarcity_lambda = 0.0001
+        self.scarcity_lambda = 0.01
         self.base_spawn_rate = 5
         
         # 1.10 Entropy Tracking
