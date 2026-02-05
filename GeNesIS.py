@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "3.1.7" # Fix visualization: Reshape 3D h_state to 2D
+SYSTEM_VERSION = "3.2.0" # Stability & UI Modernization
 
 def init_system():
     # Force reset if version mismatch
@@ -178,7 +178,7 @@ def update_simulation():
         
         # 3.3 Stigmergy: Write to Meme Grid
         # Decaying write to avoid saturation: Old * 0.9 + New * 0.1
-        world.meme_grid[mx, my] = world.meme_grid[mx, my] * 0.9 + meme_write.detach().numpy() * 0.1
+        world.meme_grid[mx, my] = world.meme_grid[mx, my] * 0.9 + meme_write.detach().cpu().numpy().flatten() * 0.1
         
         flux, log_text = world.resolve_quantum_state(
             agent, reality_vector_tensor, emit_vector=comm_vector, 
@@ -557,7 +557,7 @@ with tab_micro:
                     color_discrete_sequence=px.colors.qualitative.Bold
                 )
                 fig_cluster.update_layout(height=350, plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig_cluster, use_container_width=True)
+                st.plotly_chart(fig_cluster, width='stretch')
             else:
                 st.caption("Not enough active signals to cluster.")
                 
@@ -573,7 +573,7 @@ with tab_micro:
              if states:
                  fig_mod = px.scatter(x=states, y=actions, labels={'x': "Internal Energy", 'y': "Mean Action Vector"}, title="Energy vs Action Modulation")
                  fig_mod.update_layout(height=300)
-                 st.plotly_chart(fig_mod, use_container_width=True)
+                 st.plotly_chart(fig_mod, width='stretch')
                 
         st.markdown("### �🧠 The Mind Cloud")
         if st.session_state.world.agents:
@@ -637,7 +637,7 @@ with tab_micro:
                     title="Short-Term Memory (GRU Hidden State)"
                 )
                 fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
-                st.plotly_chart(fig_h, use_container_width=True)
+                st.plotly_chart(fig_h, width='stretch')
             else:
                 st.info("Agent is in Reflex-Only mode (Brain idle).")
     else:
@@ -663,7 +663,7 @@ with tab_culture:
                 labels=dict(x="X", y="Y")
             )
             fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-            st.plotly_chart(fig_meme, use_container_width=True)
+            st.plotly_chart(fig_meme, width='stretch')
         else:
             st.info("Meme Grid initializing...")
             
@@ -699,7 +699,7 @@ with tab_culture:
                     labels={'y': "Mean Action Norm", 'x': "Time"}
                 )
                 fig_trad.update_layout(height=200)
-                st.plotly_chart(fig_trad, use_container_width=True)
+                st.plotly_chart(fig_trad, width='stretch')
                 
         # 3.6 Innovation Diffusion
         st.markdown("### 🚀 Innovation Rate")
