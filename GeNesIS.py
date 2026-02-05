@@ -402,7 +402,7 @@ with tab_macro:
         with col_g3:
             fig3 = go.Figure()
             fig3.add_trace(go.Scatter(x=df['tick'], y=df['agent_entropy'], name="Neural Entropy", line=dict(color='#45b6fe')))
-            fig3.add_trace(go.Scatter(x=df['tick'], y=df['scarcity'], name="Env Availability", line=dict(color='gray'), dash='dot'))
+            fig3.add_trace(go.Scatter(x=df['tick'], y=df['scarcity'], name="Env Availability", line=dict(color='gray', dash='dot')))
             fig3.update_layout(title="Thermodynamics (Ω Metric)", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig3, use_container_width=True)
             
