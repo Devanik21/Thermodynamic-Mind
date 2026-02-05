@@ -305,12 +305,6 @@ def update_simulation():
                 st.session_state.gene_pool.append(dead_agent.get_genome())
                 if len(st.session_state.gene_pool) > 50:
                     st.session_state.gene_pool.pop(0)
-
-    # Global Max Gen Update
-    if world.agents:
-        current_max = max(a.generation for a in world.agents.values())
-        if current_max > st.session_state.max_generation:
-            st.session_state.max_generation = current_max
                 events_this_tick.append({
                     "Tick": world.time_step,
                     "Agent": dead_agent.id,
@@ -320,6 +314,12 @@ def update_simulation():
                 })
             del world.agents[dead_id]
         
+    # Global Max Gen Update
+    if world.agents:
+        current_max = max(a.generation for a in world.agents.values())
+        if current_max > st.session_state.max_generation:
+            st.session_state.max_generation = current_max
+                
     # Failsafe: only restart if TRULY extinct
     if len(world.agents) < 4:
         x, y = np.random.randint(0, 40), np.random.randint(0, 40)
