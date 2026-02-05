@@ -173,8 +173,9 @@ class GenesisAgent:
         self.thoughts_had += 1
 
         # 1.5 Homeostasis check: Transfer energy to/from buffer
-        if self.energy > 80.0:
-            transfer = (self.energy - 80.0) * 0.5
+        # Threshold set to 130 to allow accumulation for Mitosis (cost 60, trigger 120)
+        if self.energy > 130.0:
+            transfer = (self.energy - 130.0) * 0.5
             self.energy -= transfer
             self.energy_stored += transfer
         elif self.energy < 30.0 and self.energy_stored > 0:
