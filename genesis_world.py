@@ -344,7 +344,7 @@ class GenesisWorld:
         # 1. Agent Weight Entropy (Neural Compression)
         if self.agents:
             weights = []
-            for a in self.agents.values():
+            for a in list(self.agents.values()):
                 weights.append(a.calculate_weight_entropy())
             self.agent_entropy = np.mean(weights)
         
