@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "3.1.0" # Level 3: Visualization & Metrics
+SYSTEM_VERSION = "3.1.5" # Level 3: Final Stability Update
 
 def init_system():
     # Force reset if version mismatch
