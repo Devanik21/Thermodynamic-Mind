@@ -83,7 +83,7 @@ class GenesisAgent:
         if parent_hidden is not None:
             self.hidden_state = parent_hidden.detach().clone() + torch.randn_like(parent_hidden) * 0.1
         else:
-            self.hidden_state = torch.zeros(1, 64)
+            self.hidden_state = torch.zeros(1, 1, 64)
         
         # Memory for learning
         self.last_vector = torch.zeros(1, 21)
