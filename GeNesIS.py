@@ -83,7 +83,14 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
+SYSTEM_VERSION = "2.10.1" # Force reset on architecture change
+
 def init_system():
+    # Force reset if version mismatch
+    if "system_version" not in st.session_state or st.session_state.system_version != SYSTEM_VERSION:
+        if "world" in st.session_state: del st.session_state.world
+        st.session_state.system_version = SYSTEM_VERSION
+
     if "world" not in st.session_state:
         st.session_state.world = GenesisWorld(size=40)
         for _ in range(64):
