@@ -145,12 +145,16 @@ def update_simulation():
             trust_values = [agent.social_memory.get(n.id, 0.5) for n in neighbors]
             social_trust = np.mean(trust_values) / 2.0 # Scale to roughly 0-1
         
+        # 1.7 Gradient Sensing (Stress Response)
+        gradient_val = world.get_energy_gradient(agent.x, agent.y).item()
+
         # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade)
         reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val = agent.decide(
             signal, 
             pheromone_16=pheromone_vector, 
             env_phase=env_phase,
-            social_trust=social_trust
+            social_trust=social_trust,
+            gradient=gradient_val
         ) 
         
         flux, log_text = world.resolve_quantum_state(
@@ -486,7 +490,7 @@ with tab_micro:
             comm_labels = []
             for a in st.session_state.world.agents.values():
                 if hasattr(a, 'last_comm') and a.last_comm is not None:
-                     vec = a.last_comm.detach().numpy()
+                     vec = a.last_comm.detach().cpu().numpy().flatten()
                      if vec.sum() > 0.1:
                          comm_vectors.append(vec)
                          comm_labels.append(f"{a.id[:4]}")
