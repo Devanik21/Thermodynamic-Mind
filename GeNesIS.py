@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "2.10.5" # Force reset on architecture change
+SYSTEM_VERSION = "2.10.6" # Force reset on architecture change
 
 def init_system():
     # Force reset if version mismatch
@@ -301,10 +301,16 @@ def update_simulation():
                         if k in dead_genome:
                             v.copy_(v * 0.9 + dead_genome[k] * 0.1)
             
-            if dead_agent.age > 20: 
+            if dead_agent.age > 10: 
                 st.session_state.gene_pool.append(dead_agent.get_genome())
                 if len(st.session_state.gene_pool) > 50:
                     st.session_state.gene_pool.pop(0)
+
+    # Global Max Gen Update
+    if world.agents:
+        current_max = max(a.generation for a in world.agents.values())
+        if current_max > st.session_state.max_generation:
+            st.session_state.max_generation = current_max
                 events_this_tick.append({
                     "Tick": world.time_step,
                     "Agent": dead_agent.id,
