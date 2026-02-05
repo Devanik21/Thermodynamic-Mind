@@ -11,6 +11,8 @@ import torch
 import random
 from genesis_world import GenesisWorld, Resource
 from genesis_brain import GenesisAgent
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 
 # ============================================================
 # 🔮 THE NAMING ORACLE (Procedural Tech Tree)
@@ -128,20 +130,33 @@ def update_simulation():
             
         signal = world.get_local_signal(agent.x, agent.y)
         # 🌐 PHASE 13: "TURING" UPGRADE (Chemical Signaling)
-        smell = world.get_pheromone(agent.x, agent.y)
+        # Level 2.0: Pheromone Vector
+        pheromone_vector = world.get_pheromone(agent.x, agent.y)
         
         # 1.6: Environment phase (Circadian)
         # 1.7: Energy gradient (Stress response)
         env_phase = getattr(world, 'env_phase', 0.0)
         
-        # Decide now returns (Vector, Emit, Mate, Adhesion)
-        reality_vector_tensor, emit_val, mate_desire, adhesion_val = agent.decide(
+        # 2.6 Reciprocal Altruism: Social Trust Context
+        # Mean trust for visible neighbors
+        neighbors = [world.agents[oid] for oid in world.agents if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
+        social_trust = 0.0
+        if neighbors:
+            trust_values = [agent.social_memory.get(n.id, 0.5) for n in neighbors]
+            social_trust = np.mean(trust_values) / 2.0 # Scale to roughly 0-1
+        
+        # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade)
+        reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val = agent.decide(
             signal, 
-            smell_intensity=smell, 
-            env_phase=env_phase
+            pheromone_16=pheromone_vector, 
+            env_phase=env_phase,
+            social_trust=social_trust
         ) 
         
-        flux, log_text = world.resolve_quantum_state(agent, reality_vector_tensor, emit_strength=emit_val, adhesion=adhesion_val)
+        flux, log_text = world.resolve_quantum_state(
+            agent, reality_vector_tensor, emit_vector=comm_vector, 
+            adhesion=adhesion_val, punish=punish_val, trade=trade_val
+        ) 
         
         # ❤️ PHASE 14: "GOD-REMOVER" UPGRADE (Autopoietic Reproduction)
         # Agents reproduce themselves without system intervention.
@@ -413,17 +428,32 @@ with tab_macro:
             fig3.update_layout(title="Thermodynamics (Ω Metric)", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig3, use_container_width=True)
             
-        # Row 2: Map
+        # Row 2: Map with Tribal Colors
+        # 1. Background Heatmap (Environment)
         grid_map = np.zeros((40, 40))
         for (rx, ry), res in st.session_state.world.grid.items():
             val = res.get_nutrition(curr_season_idx)
             grid_map[ry, rx] = val 
-        for agent in st.session_state.world.agents.values():
-            intensity = 50 + (agent.energy * 2.0) 
-            grid_map[agent.y, agent.x] = intensity 
-
+        
         custom_colors = [[0.0, "red"], [0.25, "black"], [0.35, "green"], [1.0, "white"]]
-        fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Environment Truth: {season_mode}")
+        fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Geo-Social Map: {season_mode}")
+        
+        # 2. Agents as Scatter Markers (Colored by Tribe Tag)
+        ax, ay, ac, at = [], [], [], []
+        for agent in st.session_state.world.agents.values():
+            ax.append(agent.x)
+            ay.append(agent.y)
+            # Tag is RGB float 0-1. Convert to hex or CSS string
+            rgb = (agent.tag * 255).astype(int)
+            ac.append(f"rgb({rgb[0]},{rgb[1]},{rgb[2]})")
+            at.append(f"{agent.id[:4]} ({agent.energy:.0f}E)")
+            
+        fig_map.add_trace(go.Scatter(
+            x=ax, y=ay, mode='markers',
+            marker=dict(color=ac, size=8, line=dict(width=1, color='white')),
+            text=at, hoverinfo='text',
+            showlegend=False
+        ))
 
         # Draw Bonds
         if st.session_state.world.bonds:
@@ -448,7 +478,63 @@ with tab_macro:
 with tab_micro:
     col_vis, col_log = st.columns([2, 1])
     with col_vis:
-        st.markdown("### 🧠 The Mind Cloud")
+        st.markdown("### � Quantum Spectrogram (Linguistic Field)")
+        
+        # Level 2.1: Signal Differentiation Analysis
+        if len(st.session_state.world.agents) > 10:
+            comm_vectors = []
+            comm_labels = []
+            for a in st.session_state.world.agents.values():
+                if hasattr(a, 'last_comm') and a.last_comm is not None:
+                     vec = a.last_comm.detach().numpy()
+                     if vec.sum() > 0.1:
+                         comm_vectors.append(vec)
+                         comm_labels.append(f"{a.id[:4]}")
+            
+            if len(comm_vectors) > 5:
+                from sklearn.metrics import silhouette_score
+                # K-Means Clustering on Communication Vectors
+                X_comm = np.array(comm_vectors)
+                n_clusters = min(len(X_comm), 4) 
+                kmeans = KMeans(n_clusters=n_clusters, random_state=42).fit(X_comm)
+                sil = silhouette_score(X_comm, kmeans.labels_)
+                
+                # PCA for 2D Projection
+                pca = PCA(n_components=2)
+                X_pca = pca.fit_transform(X_comm)
+                
+                df_pca = pd.DataFrame(data=X_pca, columns=['PC1', 'PC2'])
+                df_pca['Cluster'] = kmeans.labels_.astype(str)
+                df_pca['Agent'] = comm_labels
+                
+                st.metric("Signal Silhouette Score (2.1)", f"{sil:.3f}")
+                
+                fig_cluster = px.scatter(
+                    df_pca, x='PC1', y='PC2', color='Cluster', 
+                    hover_data=['Agent'],
+                    title=f"Semantic Signal Clusters (k={n_clusters})",
+                    color_discrete_sequence=px.colors.qualitative.Bold
+                )
+                fig_cluster.update_layout(height=350, plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig_cluster, use_container_width=True)
+            else:
+                st.caption("Not enough active signals to cluster.")
+                
+        # 2.2 Receiver Interpretation: Action vs Internal State
+        st.markdown("### 🧬 Receiver Interpretation (2.2)")
+        if st.session_state.world.agents:
+             # Sample data for correlation
+             states, actions = [], []
+             for a in st.session_state.world.agents.values():
+                 if a.last_vector is not None:
+                     states.append(a.energy)
+                     actions.append(float(torch.mean(a.last_vector).item()))
+             if states:
+                 fig_mod = px.scatter(x=states, y=actions, labels={'x': "Internal Energy", 'y': "Mean Action Vector"}, title="Energy vs Action Modulation")
+                 fig_mod.update_layout(height=300)
+                 st.plotly_chart(fig_mod, use_container_width=True)
+                
+        st.markdown("### �🧠 The Mind Cloud")
         if st.session_state.world.agents:
             sample_agents = random.sample(list(st.session_state.world.agents.values()), min(len(st.session_state.world.agents), 15))
             vectors = []
@@ -532,6 +618,7 @@ with tab_omega:
                 "Age": agent.age,
                 "Energy": f"{agent.energy:.2f}",
                 "Stored": f"{getattr(agent, 'energy_stored', 0):.1f}",
+                "Inv (R,G,B)": f"{agent.inventory}",
                 "IQ": f"{iq_score:.4f}",
                 "H(W)": f"{getattr(agent, 'last_weight_entropy', 0):.3f}",
                 "Bio-Hack %": f"{neuro_plasticity:.2f}%",
@@ -557,9 +644,9 @@ with tab_omega:
         
         with col_spec_a:
             st.markdown(f"**Agent Specs: `{selected_id[:8]}`**")
-            st.write(f"- **Architecture**: [17] -> GRU[32] -> [21]")
+            st.write(f"- **Architecture**: [34] -> GRU[64] -> [21+16]")
             st.write(f"- **Optimizer**: Adam (lr=0.005)")
-            st.write(f"- **Layers**: Encoder, GRUCell, Actor, Critic")
+            st.write(f"- **Layers**: Encoder, GRUCell, Actor, Critic, Language")
             
             # Weight Stats
             with torch.no_grad():
@@ -575,11 +662,11 @@ with tab_omega:
                 fig_h = px.imshow(
                     h_state, 
                     color_continuous_scale='Viridis',
-                    labels=dict(x="Memory Dim (0-31)", color="Charge"),
+                    labels=dict(x="Memory Dim (0-63)", color="Charge"),
                     title="Short-Term Memory (GRU Hidden State)"
                 )
                 fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
-                st.plotly_chart(fig_h, width="stretch")
+                st.plotly_chart(fig_h, use_container_width=True)
             else:
                 st.info("Agent is in Reflex-Only mode (Brain idle).")
     else:
