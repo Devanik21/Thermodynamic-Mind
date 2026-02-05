@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "2.10.1" # Force reset on architecture change
+SYSTEM_VERSION = "2.10.2" # Force reset on architecture change
 
 def init_system():
     # Force reset if version mismatch
