@@ -232,4 +232,6 @@ class GenesisAgent:
 
     def _apply_genome(self, genome):
         """Loads brain state from parent(s)."""
-        self.brain.load_state_dict(genome)
+        # Remove metadata before loading into brain
+        brain_state = {k: v for k, v in genome.items() if k != 'tag'}
+        self.brain.load_state_dict(brain_state)
