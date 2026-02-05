@@ -71,6 +71,7 @@ class GenesisAgent:
         self.reflexes_used = 0
         self.thoughts_had = 0
         self.social_memory = {}
+        self.inventions = [] # Level 3.6 Innovation Tracking
         self.tag = np.random.rand(3) # 3.10 Cultural tag (RGB tribe)
         
         # 1.6 Circadian Rhythms
