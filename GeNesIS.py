@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "3.1.5" # Level 3: Final Stability Update
+SYSTEM_VERSION = "3.1.6" # Fix GRU dimensionality error
 
 def init_system():
     # Force reset if version mismatch
