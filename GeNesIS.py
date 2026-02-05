@@ -83,7 +83,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "3.2.4" # Stability fix: Thread-safe agent iteration
+SYSTEM_VERSION = "3.2.5" # Normalization: Fixed IQ and Neural Inflation
 
 def init_system():
     # Force reset if version mismatch
@@ -762,7 +762,10 @@ with tab_omega:
             iq_score = 0.0
             love_score = 0.0
             if agent.last_vector is not None:
-                iq_score = float(torch.std(agent.last_vector.detach())) * 100.0
+                # 1.10 IQ Normalization: Center 100 IQ at 1.0 Neural Std
+                # Added clipping to prevent astronomical values
+                raw_std = float(torch.std(agent.last_vector.detach()))
+                iq_score = min(202, raw_std * 100.0) 
                 love_score = float(torch.mean(agent.last_vector.detach()))
             
             neuro_plasticity = (agent.thoughts_had / max(1, agent.age)) * 100.0
