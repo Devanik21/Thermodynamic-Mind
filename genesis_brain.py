@@ -181,6 +181,11 @@ class GenesisAgent:
 
         # Reward Signal: External Flux + IQ Incentive (Neural Variance)
         self.last_reward = flux
+        # 1.3 Landauer + Metabolic Cost for 'loud' thinking
+        thought_loudness = self.last_vector.sum().item()
+        thought_cost = thought_loudness * 0.05 # Metabolic penalty
+        self.energy -= thought_cost
+        
         iq_reward = self.last_vector.std() * 5.0 # Punish uniform thinking
         reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
@@ -193,7 +198,8 @@ class GenesisAgent:
         
         # 2. Actor Loss: Policy Gradient (Surrogate objective)
         # Simplified: Move weights to make 'last_vector' more likely if advantage is positive
-        actor_loss = -(advantage * self.last_vector.sum()) 
+        # Added regularization to prevent activation explosion
+        actor_loss = -(advantage * self.last_vector.sum()) + 0.01 * self.last_vector.pow(2).sum()
         
         total_loss = actor_loss + critic_loss
         
