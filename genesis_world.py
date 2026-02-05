@@ -274,6 +274,12 @@ class GenesisWorld:
         self.time_step += 1
         self.season_timer += 1
         
+        # 1.4 Scarcity: Exponential decay of spawn rate
+        current_spawn_prob = np.exp(-self.scarcity_lambda * self.time_step)
+        
+        # 1.6 Circadian Rhythms: Environment Phase
+        self.env_phase = (self.time_step / SEASON_LENGTH) * 2 * np.pi
+        
         # Phase 13: Biology Update
         self.update_pheromones()
         
@@ -283,7 +289,9 @@ class GenesisWorld:
         if self.season_timer >= SEASON_LENGTH:
             self.current_season += 1
             self.season_timer = 0
-            for _ in range(20): self.spawn_resource()
+            # 1.4 Scarcity applied to seasonal spawn
+            for _ in range(int(20 * current_spawn_prob)): 
+                self.spawn_resource()
         
         if self.time_step % 2 == 0:
             for _ in range(5): self.spawn_resource()
