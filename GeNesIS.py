@@ -108,6 +108,8 @@ def init_system():
     if "event_log" not in st.session_state: st.session_state.event_log = []
     if "total_events_count" not in st.session_state: st.session_state.total_events_count = 0
     if "global_registry" not in st.session_state: st.session_state.global_registry = []
+    # 3.4 Tradition Formation: Track average behavior per generation
+    if "culture_history" not in st.session_state: st.session_state.culture_history = {} # {gen: [vector]}
 
 init_system()
 
@@ -424,6 +426,26 @@ def update_simulation():
     if len(st.session_state.stats_history) > 200:
         st.session_state.stats_history.pop(0)
         
+    # --- PHASE 14: LEVEL 3.4 TRADITION FORMATION ---
+    # Periodically sample population behavior by generation
+    if world.time_step % 100 == 0 and agents:
+        gen_map = {}
+        for a in agents:
+            if a.last_vector is not None:
+                g = a.generation
+                if g not in gen_map: gen_map[g] = []
+                gen_map[g].append(a.last_vector.detach().cpu().numpy().flatten())
+        
+        # Update Global History
+        for g, vecs in gen_map.items():
+            avg_vec = np.mean(vecs, axis=0).tolist()
+            if g not in st.session_state.culture_history:
+                st.session_state.culture_history[g] = []
+            st.session_state.culture_history[g].append(avg_vec)
+            # Keep history short (last 20 samples per gen)
+            if len(st.session_state.culture_history[g]) > 20: 
+                st.session_state.culture_history[g].pop(0)
+
     for e in events_this_tick:
         st.session_state.event_log.insert(0, e) 
         st.session_state.total_events_count += 1 # Global discovery counter
@@ -798,6 +820,48 @@ with tab_culture:
     with col_meme:
         st.markdown("### 🗺️ Stigmergy Map (Meme Grid)")
         # Normalize Meme Grid for visual
+        if st.session_state.get("show_charts", False):
+            # Show Channel 0 (Danger) in Red, 1 (Resource) in Green
+            # We composite them
+            grid_data = st.session_state.world.meme_grid
+            rgb_grid = (grid_data[:, :, :3] * 255).astype(np.uint8)
+            fig_meme = px.imshow(rgb_grid, title="Global Knowledge (Meme Grid)")
+            fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+            st.plotly_chart(fig_meme, use_container_width=True)
+        else:
+            st.info("Meme Grid Hidden.")
+
+    with col_dyn:
+        st.markdown("### 📜 Tradition Persistence (3.4)")
+        # Calculate consistency across generations
+        if st.session_state.culture_history:
+            gens = sorted(list(st.session_state.culture_history.keys()))
+            if len(gens) > 1:
+                # Compare Gen T with Gen T-1
+                consistencies = []
+                for i in range(1, len(gens)):
+                    g_curr = gens[i]
+                    g_prev = gens[i-1]
+                    if st.session_state.culture_history[g_curr] and st.session_state.culture_history[g_prev]:
+                        # Get latest average vector
+                        curr_vec = np.array(st.session_state.culture_history[g_curr][-1])
+                        prev_vec = np.array(st.session_state.culture_history[g_prev][-1])
+                        
+                        # Cosine similarity
+                        sim = np.dot(curr_vec, prev_vec) / (np.linalg.norm(curr_vec)*np.linalg.norm(prev_vec) + 1e-8)
+                        consistencies.append(sim)
+                
+                if consistencies:
+                    avg_tradition = np.mean(consistencies)
+                    st.metric("Inter-Generational Fidelity", f"{avg_tradition:.3f}")
+                    if avg_tradition > 0.7:
+                        st.success("✅ Milestone 3.4 Reached: Stable Traditions")
+                    else:
+                        st.warning("Culture is drifting randomly.")
+            else:
+                st.info("Waiting for multi-generational data...")
+        else:
+            st.info("No cultural history yet.")
         # Grid is (40, 40, 3). Channels: R(Danger), G(Food), B(Sacred)
         if hasattr(st.session_state.world, 'meme_grid'):
             meme_vis = st.session_state.world.meme_grid.copy()
