@@ -10,7 +10,7 @@ import streamlit as st
 # ============================================================
 GRID_SIZE = 40
 SIGNAL_DIM = 16
-MAX_ENERGY = 100.0
+MAX_ENERGY = 100000.0 # Effectively Infinite (Type II Civilization Potential)
 # "Easy mode" - metabolic cost is low, but stupidity kills
 METABOLIC_COST = 0.1 
 SEASON_LENGTH = 50 
@@ -76,15 +76,25 @@ class Resource(Entity):
         self.signal = torch.nn.functional.normalize(self.signal, dim=0)
 
     def get_nutrition(self, current_season):
-        # Summer (Even) favors Red/Green, Winter (Odd) favors Blue
+        # Summer (Even) favors Red/Green
+        # Winter (Odd) favors Blue
         base = 30.0
-        if current_season % 2 == 0:
-            if self.type == 0: return base
-            if self.type == 1: return base * 2.0
-            return -base # Blue is toxic in summer
-        else:
+        
+        is_summer = (current_season % 2 == 0)
+        
+        if is_summer:
+            if self.type == 0 or self.type == 1: return base
+            # Blue in Summer: Low value, not toxic
+            return 5.0 
+        else: # Winter
             if self.type == 2: return base * 5.0 # Blue is winter-survival fuel
-            return -base # Red/Green die in winter
+            
+            # Nuanced Winter Scarcity:
+            # Red/Green are not toxic, just scarce (0-30 energy)
+            # 0.01% chance of being mildly toxic (-1)
+            if random.random() < 0.0001:
+                return -1.0
+            return random.uniform(0.0, 30.0)
 
 class MegaResource(Entity):
     """4.8 Distributed Cognition: Requires multiple agents or high synergy."""

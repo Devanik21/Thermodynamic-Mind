@@ -371,7 +371,7 @@ class GenesisAgent:
              
              # 5.1 Meta-Learning (Hypergradient)
              if len(self.prediction_errors) > 2 and self.prediction_errors[-1] > self.prediction_errors[-2] * 1.5:
-                 self.meta_lr = min(0.05, self.meta_lr * 1.2)
+                 self.meta_lr = min(0.1, self.meta_lr * 1.2) # Relaxed cap to 0.1 for faster adaptation
              else:
                  self.meta_lr = max(0.001, self.meta_lr * 0.99)
                  
