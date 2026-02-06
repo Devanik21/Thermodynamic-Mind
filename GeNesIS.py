@@ -1020,6 +1020,9 @@ with tab_omega:
             gens = [a.generation for a in all_agents]
             
             # Quick Stats
+            # Calculate Scarcity Factor manually (it's a local variable in world.step)
+            current_scarcity = max(0.2, np.exp(-st.session_state.world.scarcity_lambda * st.session_state.world.time_step))
+            
             stats_md = f"""
 | 🌍 Global Metric | 📊 Value | 🌍 Global Metric | 📊 Value |
 | :--- | :--- | :--- | :--- |
@@ -1028,11 +1031,11 @@ with tab_omega:
 | **Total Biomass** | `{sum(energies):.0f}` | **Average Energy** | `{np.mean(energies):.1f}` |
 | **Max Generation** | `{max(gens)}` | **Avg Generation** | `{np.mean(gens):.1f}` |
 | **Total Inventions** | `{st.session_state.total_events_count}` | **Global Patents** | `{len(st.session_state.global_registry)}` |
-| **World Time Step** | `{st.session_state.world.time_step}` | **Season Clock** | `{st.session_state.world.season_clock:.2f}` |
+| **World Time Step** | `{st.session_state.world.time_step}` | **Season Clock** | `{st.session_state.world.season_timer}/50` |
 | **Active Bonds** | `{len(st.session_state.world.bonds)}` | **Gene Pool Size** | `{len(st.session_state.gene_pool)}` |
-| **System Entropy** | `{getattr(st.session_state.world, 'agent_entropy', 0):.3f}` | **Scarcity Factor** | `{getattr(st.session_state.world, 'scarcity_factor', 0):.3f}` |
+| **System Entropy** | `{getattr(st.session_state.world, 'agent_entropy', 0):.3f}` | **Scarcity Factor** | `{current_scarcity:.3f}` |
 | **Thoughts/Sec** | `{sum(a.thoughts_had for a in all_agents)}` | **Reflexes/Sec** | `{sum(a.reflexes_used for a in all_agents)}` |
-| **Civ Type** | `Type {min(4, int(np.log10(max(1, sum(energies)))/2))}` | **Omega Point** | `{min(100.0, world.time_step/1000.0):.1f}%` |
+| **Civ Type** | `Type {min(4, int(np.log10(max(1, sum(energies)))/2))}` | **Omega Point** | `{min(100.0, st.session_state.world.time_step/1000.0):.1f}%` |
             """
             st.markdown(stats_md)
             
