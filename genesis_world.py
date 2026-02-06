@@ -90,11 +90,12 @@ class Resource(Entity):
             if self.type == 2: return base * 5.0 # Blue is winter-survival fuel
             
             # Nuanced Winter Scarcity:
-            # Red/Green are not toxic, just scarce (0-30 energy)
-            # 0.01% chance of being mildly toxic (-1)
+            # "Easy Mode": Red/Green are almost as good as summer (20-30 vs 30)
+            # Just slightly suboptimal. No scarcity cliff.
+            # 0.01% chance of toxicity (-1)
             if random.random() < 0.0001:
                 return -1.0
-            return random.uniform(0.0, 30.0)
+            return random.uniform(20.0, 30.0)
 
 class MegaResource(Entity):
     """4.8 Distributed Cognition: Requires multiple agents or high synergy."""
@@ -133,7 +134,7 @@ class GenesisWorld:
         
         # 1.4 Scarcity Scaling
         self.scarcity_lambda = 0.01
-        self.base_spawn_rate = 5
+        self.base_spawn_rate = 10
         
         # 1.10 Entropy Tracking
         self.system_entropy = 0.0
@@ -440,8 +441,12 @@ class GenesisWorld:
         # Phase 13: Biology Update
         self.update_pheromones()
         
-        # Phase 15: Symbiosis Update
-        self.metabolic_osmosis()
+        # Nobel Safeguard: Universal Fertility (Phenotypic Plasticity)
+        # If population crashes, everyone becomes a Queen to save the species.
+        if len(self.agents) < 50:
+            for agent in self.agents.values():
+                agent.is_fertile = True
+        
         # Phase 15: Symbiosis Update
         self.metabolic_osmosis()
         
