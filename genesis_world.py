@@ -392,7 +392,7 @@ class GenesisWorld:
             
             if final_flux > 0:
                 outcome_log = f"⚡ {agent.role} FLUX (+)"
-                if loc in self.grid:
+                
                 if loc in self.grid:
                     res = self.grid[loc]
                     # 4.8 Distributed Cognition Check
@@ -586,3 +586,4 @@ class GenesisWorld:
         # Apply to Oracle (Simulated Epigenetics of the Universe?)
         # No, just store it and apply in resolve_quantum_state
         pass
+
