@@ -354,7 +354,13 @@ def update_simulation():
         # 1.4 Environmental Pressure: Scarcity scaling
         # ELASTIC: Only apply overcrowding penalty if population is healthy (> 450)
         if len(world.agents) >= 450:
-            malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 3.0)
+            # GOLDEN ERA FIX: Reduced decay to allow Elders to survive
+            # Was: 0.5 + log/3.0 (~2.5 cost) -> Now: 0.1 + log/10.0 (~0.7 cost)
+            malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 10.0)
+            
+            # SAGE BONUS: Elders (>100 ticks) are cleaner metabolizers
+            if agent.age > 100: malthusian_cost *= 0.5
+            
             agent.energy -= malthusian_cost 
         
         # 🧬 MITOSIS (Hard Cap: 512 per user request)

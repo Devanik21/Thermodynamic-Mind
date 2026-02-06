@@ -133,7 +133,7 @@ class GenesisWorld:
         
         # 1.4 Scarcity Scaling
         self.scarcity_lambda = 0.01
-        self.base_spawn_rate = 10
+        self.base_spawn_rate = 15 # GOLDEN ERA: Increased from 10 to 15
         
         # 1.10 Entropy Tracking
         self.system_entropy = 0.0
@@ -437,8 +437,8 @@ class GenesisWorld:
         self.season_timer += 1
         
         # 1.4 Scarcity: Exponential decay of spawn rate
-        # Nobel-Level Fix: floor at 0.4 (Always 40% abundance) to prevent extinction
-        current_spawn_prob = max(0.4, np.exp(-self.scarcity_lambda * self.time_step))
+        # Nobel-Level Fix: floor at 0.7 (Always 70% abundance) to prevent extinction
+        current_spawn_prob = max(0.7, np.exp(-self.scarcity_lambda * self.time_step))
         
         # 1.6 Circadian Rhythms: Environment Phase
         self.env_phase = (self.time_step / SEASON_LENGTH) * 2 * np.pi
