@@ -504,7 +504,19 @@ with st.container():
         # Streamlit's new button callback pattern is cleaner.
         
         if st.button("📦 PREPARE EXPORT", help="Collects simulation data and creates a download link."):
-            encoded_pool_clean = [{k: v.cpu().tolist() for k, v in g.items()} for g in st.session_state.gene_pool]
+            # Fix: Use a safer conversion that handles both Tensors and NumPy arrays
+            encoded_pool_clean = []
+            for g in st.session_state.gene_pool:
+                clean_g = {}
+                for k, v in g.items():
+                    if hasattr(v, 'cpu'): # It's a torch tensor
+                        clean_g[k] = v.cpu().tolist()
+                    elif hasattr(v, 'tolist'): # It's a numpy array
+                        clean_g[k] = v.tolist()
+                    else: # It's already a primitive
+                        clean_g[k] = v
+                encoded_pool_clean.append(clean_g)
+                
             st.session_state.export_zip = generate_report(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log)
             st.toast("Export ready!", icon="✅")
 
