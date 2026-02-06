@@ -339,8 +339,12 @@ def update_simulation():
         agent.energy -= malthusian_cost 
         
         # 🧬 MITOSIS (Hard Cap: 512 per user request)
-        if agent.energy > 90.0 and len(world.agents) < 512:
-            agent.energy -= 60.0 
+        # Nobel Safeguard: Panic Mitosis if pop < 50 (Cheaper cost, lower threshold)
+        mitosis_threshold = 30.0 if len(world.agents) < 50 else 90.0
+        mitosis_cost = 20.0 if len(world.agents) < 50 else 60.0
+        
+        if agent.energy > mitosis_threshold and len(world.agents) < 512:
+            agent.energy -= mitosis_cost 
             off_x = (agent.x + np.random.randint(-1, 2)) % 40
             off_y = (agent.y + np.random.randint(-1, 2)) % 40
             
