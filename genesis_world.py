@@ -420,7 +420,7 @@ class GenesisWorld:
         self.season_timer += 1
         
         # 1.4 Scarcity: Exponential decay of spawn rate
-        current_spawn_prob = np.exp(-self.scarcity_lambda * self.time_step)
+        current_spawn_prob = max(0.3, np.exp(-self.scarcity_lambda * self.time_step))
         
         # 1.6 Circadian Rhythms: Environment Phase
         self.env_phase = (self.time_step / SEASON_LENGTH) * 2 * np.pi
