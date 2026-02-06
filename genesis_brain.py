@@ -465,6 +465,10 @@ class GenesisAgent:
         """4.7 Dynamic Tensor Fusion: Physical/Functional merging of two agents."""
         if self.is_fused or partner.is_fused:
             return False
+            
+        # Nobel-Level Fusion: Lower threshold to 40.0 (Survival Strategy)
+        if self.energy < 40.0 or partner.energy < 40.0:
+            return False
         
         self.is_fused = True
         partner.is_fused = True
