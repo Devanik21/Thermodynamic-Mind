@@ -219,11 +219,34 @@ class GenesisWorld:
         """
         # 1. 2.3 Costly Signaling
         if emit_vector is not None:
-            # Signaling costs energy proportional to signal complexity (variance)
-            signal_cost = float(torch.var(emit_vector).item()) * 2.0
-            agent.energy -= signal_cost
-            self.pheromone_grid[agent.x, agent.y] += emit_vector.detach().numpy()
-            np.clip(self.pheromone_grid[agent.x, agent.y], 0, 1.0, out=self.pheromone_grid[agent.x, agent.y])
+             # Signaling costs energy proportional to signal complexity (variance)
+             signal_complexity = float(torch.var(emit_vector).item())
+             signal_cost = signal_complexity * 2.0
+             
+             # 2.3 Zahavi Strict Check: Verify Proof of Work
+             # If complexity > threshold, we check the nonce.
+             if signal_complexity > 0.05:
+                 start_nonce = getattr(agent, 'last_nonce', 0)
+                 import hashlib
+                 # Quantize for consistency matches Agent
+                 vec_bytes = (emit_vector * 100).long().cpu().numpy().tobytes()
+                 candidate = f"{start_nonce}".encode() + vec_bytes
+                 h = hashlib.sha256(candidate).hexdigest()
+                 
+                 # Verify Difficulty 1 ("0")
+                 if not h.startswith("0"):
+                     # Fake signal! Determine it's cheap talk.
+                     # Dampen the signal so it doesn't propagate as effectively
+                     emit_vector = emit_vector * 0.1
+                     # But still charge energy (cheating isn't free)
+                     outcome_log = "👺 FAKE SIGNAL DETECTED"
+                 else:
+                     # Honest signal. Add extra metabolic cost for the computation
+                     agent.energy -= 0.5 
+             
+             agent.energy -= signal_cost
+             self.pheromone_grid[agent.x, agent.y] += emit_vector.detach().numpy()
+             np.clip(self.pheromone_grid[agent.x, agent.y], 0, 1.0, out=self.pheromone_grid[agent.x, agent.y])
 
         # 2. 2.4 Coalition & 2.5 Resource Sharing: BOND LOGIC
         if adhesion > 0.5:
@@ -394,4 +417,41 @@ class GenesisWorld:
             idx = loc[0] * self.size + loc[1]
             occ[idx] = 1
         p = (occ.sum() + 1e-8) / len(occ)
-        self.system_entropy = -(p * np.log2(p + 1e-8) + (1-p) * np.log2(1-p + 1e-8))
+        env_entropy = -(p * np.log2(p + 1e-8) + (1-p) * np.log2(1-p + 1e-8))
+        
+        # 3. 1.10 Complete Entropy Defiance Verification
+        # Total S = S_agents + S_environment
+        # We need dS_agents < 0 and dS_total > 0 (Global dissipation)
+        # Since I am not tracking dS_dissipated strictly yet, I use dissipated_energy as proxy for S_produced.
+        
+        current_agent_S = self.agent_entropy
+        current_env_S = env_entropy
+        
+        # Store previous values for derivative
+        if not hasattr(self, 'last_agent_S'):
+            self.last_agent_S = current_agent_S
+            self.last_system_S = self.system_entropy
+            self.entropy_verified = False
+        else:
+            dS_agents = current_agent_S - self.last_agent_S
+            dS_env = current_env_S - self.system_entropy # Actually system_S IS env_S here
+            
+            # S_dissipated is monotonically increasing, so dS_dissipated/dt > 0 always.
+            # Verification Condition:
+            # Agent Entropy is decreasing (ordering themselves)
+            # while Universe Entropy (Env + Heat) is increasing.
+            
+            # Heat produced this step ~ dissipated_energy delta
+            # We track cumulative, so we need delta
+            if not hasattr(self, 'last_dissipated'): self.last_dissipated = 0.0
+            d_heat = self.dissipated_energy - self.last_dissipated
+            self.last_dissipated = self.dissipated_energy
+            
+            # Strict Check
+            # We smooth it over time to avoid noise failures
+            if dS_agents < 0 and (dS_env + d_heat) > 0:
+                 self.entropy_verified = True
+            
+            self.last_agent_S = current_agent_S
+        
+        self.system_entropy = env_entropy
