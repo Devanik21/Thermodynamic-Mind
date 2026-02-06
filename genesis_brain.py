@@ -56,7 +56,9 @@ class PruningMask(nn.Module):
         return torch.sigmoid(self.mask_logits)
 
     def sparsity(self):
-        return (self.forward() < 0.1).float().mean()
+        # Return "Soft Sparsity" (1.0 - average density) for better visualization
+        # Hard thresholding stays at 0% for too long.
+        return 1.0 - self.forward().mean()
 
 class GenesisBrain(nn.Module):
     """
