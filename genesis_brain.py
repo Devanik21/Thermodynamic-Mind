@@ -352,12 +352,8 @@ class GenesisAgent:
         # Calculate Prediction Error (Surprise)
         surprise = 0.0
         if self.last_input is not None and self.last_prediction is not None:
-            # Compare what we predicted last tick vs what actually happened (self.last_input is CURRENT input here? No, last_input is stored from prev)
-            # Wait, metabolize is called AFTER decide. 
-            # In decide: self.last_input = input_tensor (Current tick input)
-            # In metabolize: We need NEXT tick input vs PREDICTION from THIS tick.
-            # Actually, we compare Prediction from PREVIOUS tick vs Input from CURRENT tick.
-            # Storing "prev_prediction" is needed.
+            # 5.3 Active Inference: Prediction error is the core learning signal
+            # Use detached inputs to avoid backpropping through previous tick's full graph
             pass
             
         # Simplified: We treat 'flux' as the 'observation' we wanted to predict? 
@@ -402,7 +398,7 @@ class GenesisAgent:
         # Unless constantly reinforced
         with torch.no_grad():
             for p in self.brain.parameters():
-                p.mul_(0.9999) # Very slow entropy
+                p.data.mul_(0.9999) # Safe version-incrementing weight decay
         
         
         self.thoughts_had += 1
@@ -514,6 +510,7 @@ class GenesisAgent:
         # 1. Calculate SUPRISE (Prediction Error)
         # last_prediction was made at t-1 to predict t (current_input)
         pred_loss_fn = nn.MSELoss()
+        # Detach current_input to ensure we only update the predictor for THIS step
         prediction_error = pred_loss_fn(self.last_prediction, current_input.detach())
         
         # 5.0 Self-Monitoring
