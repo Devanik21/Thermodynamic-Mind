@@ -530,21 +530,21 @@ with tab_macro:
                 fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Survivors", line=dict(color='#00ffa3')))
                 fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Plasticity Events", line=dict(color='#ff4b4b')))
                 fig.update_layout(title="Evolutionary Trajectory", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 
             with col_g2:
                 fig2 = go.Figure()
                 fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Invention Yield", line=dict(color='yellow'), fill='tozeroy'))
                 fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Resource Drain", line=dict(color='red'), fill='tozeroy'))
                 fig2.update_layout(title="Efficiency vs Chaos", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig2, width='stretch')
 
             with col_g3:
                 fig3 = go.Figure()
                 fig3.add_trace(go.Scatter(x=df['tick'], y=df['agent_entropy'], name="Neural Entropy", line=dict(color='#45b6fe')))
                 fig3.add_trace(go.Scatter(x=df['tick'], y=df['scarcity'], name="Env Availability", line=dict(color='gray', dash='dot')))
                 fig3.update_layout(title="Thermodynamics (Ω Metric)", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig3, use_container_width=True)
+                st.plotly_chart(fig3, width='stretch')
                 
             # Row 2: Map with Tribal Colors
             # 1. Background Heatmap (Environment)
@@ -589,7 +589,7 @@ with tab_macro:
 
             fig_map.update_traces(showscale=False, selector={'type': 'heatmap'})
             fig_map.update_layout(height=500, margin=dict(l=0,r=0,t=30,b=0))
-            st.plotly_chart(fig_map, use_container_width=True)
+            st.plotly_chart(fig_map, width='stretch')
         else:
             st.info("📉 Charts Hidden for Performance (Enable in Header to View)")
     else:
