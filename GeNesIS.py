@@ -674,7 +674,7 @@ with tab_hive:
                     st.info("No social bonds formed yet.")
 
         with st.expander("🔬 Caste Genetic Audit (4.6)"):
-            if st.button("Run Heritability Analysis", key="caste_audit"):
+            if st.button("Run Heritability Analysis", key="caste_audit", width='stretch'):
                 st.write("Caste Gene distribution matches phenotypic roles with high fidelity.")
                 st.success("✅ Milestone 4.6 Heritability Confirmed!")
     else:
