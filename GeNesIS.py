@@ -251,8 +251,9 @@ def update_simulation():
         scale_factor = (n_pop / 500.0) ** 2
         repro_cost = 10.0 + (30.0 * scale_factor)
         
-        # Threshold is Cost + Safety Buffer (20)
-        repro_thresh = repro_cost + 20.0 
+        # Threshold is Cost + Safety Buffer (40) - "Parental Responsibility"
+        # Middle Path: Agents must have 40 energy LEFT OVER to survive the 1.6/tick tax.
+        repro_thresh = repro_cost + 40.0 
         
         # Only fertile agents (Queens) reproduce. Others must support them (feed).
         can_reproduce = agent.is_fertile and agent.energy > repro_thresh
@@ -354,9 +355,9 @@ def update_simulation():
         # 1.4 Environmental Pressure: Scarcity scaling
         # ELASTIC: Only apply overcrowding penalty if population is healthy (> 450)
         if len(world.agents) >= 450:
-            # GOLDEN ERA FIX: Reduced decay to allow Elders to survive
-            # Was: 0.5 + log/3.0 (~2.5 cost) -> Now: 0.1 + log/10.0 (~0.7 cost)
-            malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 1.0)
+            # MIDDLE PATH FIX: Balanced decay for Darwinian Selection
+            # Was: 0.1 + log/10.0 (~0.7 cost) -> Now: 0.1 + log/4.0 (~1.6 cost)
+            malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 4.0)
             
             # SAGE BONUS: Elders (>100 ticks) are cleaner metabolizers
             if agent.age > 100: malthusian_cost *= 0.5
@@ -1100,7 +1101,7 @@ with tab_omega:
                 "Energy": f"{agent.energy:.2f}",
                 "Stored": f"{getattr(agent, 'energy_stored', 0):.1f}",
                 "Inv (R,G,B)": f"{agent.inventory}",
-                "IQ": f"{iq_score:.4f}",
+                "IQ": f"{max(iq_score, 0.001):.4f}",
                 "H(W)": f"{getattr(agent, 'last_weight_entropy', 0):.3f}",
                 "Bio-Hack %": f"{neuro_plasticity:.2f}%",
                 "Entropy": f"{np.log(agent.age + 1):.4f}",
@@ -1237,4 +1238,3 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
