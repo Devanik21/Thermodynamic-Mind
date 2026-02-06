@@ -379,7 +379,10 @@ class GenesisAgent:
                  param_group['lr'] = self.meta_lr
 
         # 5.2 Sparsity Loss
-        sparsity_loss = self.brain.actor_mask.sparsity() * 0.01
+        # FIX: Originally punished sparsity (rewarding density). Inverted to punish density.
+        # sparsity() returns (1.0 - mean_activation). We want to maximize sparsity, so we minimize (1.0 - sparsity)
+        density = 1.0 - self.brain.actor_mask.sparsity()
+        sparsity_loss = density * 0.05
         
         reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
