@@ -397,10 +397,10 @@ with st.container():
         st.markdown(f"### Orbit: <span style='color:{season_color}'>{season_mode}</span>", unsafe_allow_html=True)
         st.caption(f"Gene Pool: {len(st.session_state.gene_pool)} | Max Gen: {st.session_state.max_generation}")
     with col_h2:
-        if st.button("▶️ TOGGLE SIMULATION", width="stretch", type="primary" if not st.session_state.running else "secondary"):
+        if st.button("▶️ TOGGLE SIMULATION", use_container_width=True, type="primary" if not st.session_state.running else "secondary"):
             st.session_state.running = not st.session_state.running
     with col_h3:
-        if st.button("♻️ RESET WORLD", width="stretch"):
+        if st.button("♻️ RESET WORLD", use_container_width=True):
             st.session_state.world = GenesisWorld(size=40)
             st.session_state.stats_history = []
             st.session_state.gene_pool = []
@@ -408,6 +408,8 @@ with st.container():
             st.session_state.global_registry = []
             st.rerun()
     with col_h4:
+        # Global Chart Toggle for Performance
+        st.session_state.show_charts = st.checkbox("Show Live Charts", value=False, help="Enable heavy plots. Keep off for speed.")
         # Optimized Report Generator
         # No cache here to avoid filling media storage with high-frequency updates
         def generate_report(stats, genes, events):
@@ -436,7 +438,7 @@ with st.container():
                 st.session_state.export_zip, 
                 "genesis_data.zip", 
                 "application/zip", 
-                width="stretch"
+                use_container_width=True
             )
 
 # --- MAIN TABS FRAGMENT ---
@@ -446,73 +448,76 @@ with tab_macro:
     if st.session_state.stats_history:
         df = pd.DataFrame(st.session_state.stats_history)
         
-        # Row 1: Graphs
-        col_g1, col_g2, col_g3 = st.columns(3)
-        with col_g1:
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Survivors", line=dict(color='#00ffa3')))
-            fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Plasticity Events", line=dict(color='#ff4b4b')))
-            fig.update_layout(title="Evolutionary Trajectory", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True)
-            
-        with col_g2:
-            fig2 = go.Figure()
-            fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Invention Yield", line=dict(color='yellow'), fill='tozeroy'))
-            fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Resource Drain", line=dict(color='red'), fill='tozeroy'))
-            fig2.update_layout(title="Efficiency vs Chaos", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig2, use_container_width=True)
+        if st.session_state.get("show_charts", False):
+            # Row 1: Graphs
+            col_g1, col_g2, col_g3 = st.columns(3)
+            with col_g1:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Survivors", line=dict(color='#00ffa3')))
+                fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Plasticity Events", line=dict(color='#ff4b4b')))
+                fig.update_layout(title="Evolutionary Trajectory", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig, use_container_width=True)
+                
+            with col_g2:
+                fig2 = go.Figure()
+                fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Invention Yield", line=dict(color='yellow'), fill='tozeroy'))
+                fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Resource Drain", line=dict(color='red'), fill='tozeroy'))
+                fig2.update_layout(title="Efficiency vs Chaos", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig2, use_container_width=True)
 
-        with col_g3:
-            fig3 = go.Figure()
-            fig3.add_trace(go.Scatter(x=df['tick'], y=df['agent_entropy'], name="Neural Entropy", line=dict(color='#45b6fe')))
-            fig3.add_trace(go.Scatter(x=df['tick'], y=df['scarcity'], name="Env Availability", line=dict(color='gray', dash='dot')))
-            fig3.update_layout(title="Thermodynamics (Ω Metric)", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig3, use_container_width=True)
+            with col_g3:
+                fig3 = go.Figure()
+                fig3.add_trace(go.Scatter(x=df['tick'], y=df['agent_entropy'], name="Neural Entropy", line=dict(color='#45b6fe')))
+                fig3.add_trace(go.Scatter(x=df['tick'], y=df['scarcity'], name="Env Availability", line=dict(color='gray', dash='dot')))
+                fig3.update_layout(title="Thermodynamics (Ω Metric)", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig3, use_container_width=True)
+                
+            # Row 2: Map with Tribal Colors
+            # 1. Background Heatmap (Environment)
+            grid_map = np.zeros((40, 40))
+            for (rx, ry), res in st.session_state.world.grid.items():
+                val = res.get_nutrition(curr_season_idx)
+                grid_map[ry, rx] = val 
             
-        # Row 2: Map with Tribal Colors
-        # 1. Background Heatmap (Environment)
-        grid_map = np.zeros((40, 40))
-        for (rx, ry), res in st.session_state.world.grid.items():
-            val = res.get_nutrition(curr_season_idx)
-            grid_map[ry, rx] = val 
-        
-        custom_colors = [[0.0, "red"], [0.25, "black"], [0.35, "green"], [1.0, "white"]]
-        fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Geo-Social Map: {season_mode}")
-        
-        # 2. Agents as Scatter Markers (Colored by Tribe Tag)
-        ax, ay, ac, at = [], [], [], []
-        for agent in st.session_state.world.agents.values():
-            ax.append(agent.x)
-            ay.append(agent.y)
-            # Tag is RGB float 0-1. Convert to hex or CSS string
-            rgb = (agent.tag * 255).astype(int)
-            ac.append(f"rgb({rgb[0]},{rgb[1]},{rgb[2]})")
-            at.append(f"{agent.id[:4]} ({agent.energy:.0f}E)")
+            custom_colors = [[0.0, "red"], [0.25, "black"], [0.35, "green"], [1.0, "white"]]
+            fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Geo-Social Map: {season_mode}")
             
-        fig_map.add_trace(go.Scatter(
-            x=ax, y=ay, mode='markers',
-            marker=dict(color=ac, size=8, line=dict(width=1, color='white')),
-            text=at, hoverinfo='text',
-            showlegend=False
-        ))
+            # 2. Agents as Scatter Markers (Colored by Tribe Tag)
+            ax, ay, ac, at = [], [], [], []
+            for agent in st.session_state.world.agents.values():
+                ax.append(agent.x)
+                ay.append(agent.y)
+                # Tag is RGB float 0-1. Convert to hex or CSS string
+                rgb = (agent.tag * 255).astype(int)
+                ac.append(f"rgb({rgb[0]},{rgb[1]},{rgb[2]})")
+                at.append(f"{agent.id[:4]} ({agent.energy:.0f}E)")
+                
+            fig_map.add_trace(go.Scatter(
+                x=ax, y=ay, mode='markers',
+                marker=dict(color=ac, size=8, line=dict(width=1, color='white')),
+                text=at, hoverinfo='text',
+                showlegend=False
+            ))
 
-        # Draw Bonds
-        if st.session_state.world.bonds:
-            for bond in st.session_state.world.bonds:
-                id_a, id_b = list(bond)
-                if id_a in st.session_state.world.agents and id_b in st.session_state.world.agents:
-                    a = st.session_state.world.agents[id_a]
-                    b = st.session_state.world.agents[id_b]
-                    fig_map.add_trace(go.Scatter(
-                        x=[a.x, b.x], y=[a.y, b.y],
-                        mode='lines',
-                        line=dict(color='rgba(0, 255, 163, 0.4)', width=1),
-                        showlegend=False
-                    ))
+            # Draw Bonds
+            if st.session_state.world.bonds:
+                for bond in st.session_state.world.bonds:
+                    id_a, id_b = list(bond)
+                    if id_a in st.session_state.world.agents and id_b in st.session_state.world.agents:
+                        a = st.session_state.world.agents[id_a]
+                        b = st.session_state.world.agents[id_b]
+                        fig_map.add_trace(go.Scatter(
+                            x=[a.x, b.x], y=[a.y, b.y],
+                            mode='lines',
+                            line=dict(color='rgba(0, 255, 163, 0.4)', width=1),
+                            showlegend=False
+                        ))
 
-        fig_map.update_traces(showscale=False, selector={'type': 'heatmap'})
-        fig_map.update_layout(height=500, margin=dict(l=0,r=0,t=30,b=0))
-        st.plotly_chart(fig_map, width="stretch")
+            fig_map.update_traces(showscale=False, selector={'type': 'heatmap'})
+            fig_map.update_layout(height=500, margin=dict(l=0,r=0,t=30,b=0))
+            st.plotly_chart(fig_map, use_container_width=True)
+        else:
+            st.info("📉 Charts Hidden for Performance (Enable in Header to View)")
     else:
         st.info("System Initializing...")
 
@@ -550,14 +555,17 @@ with tab_micro:
                 
                 st.metric("Signal Silhouette Score (2.1)", f"{sil:.3f}")
                 
-                fig_cluster = px.scatter(
-                    df_pca, x='PC1', y='PC2', color='Cluster', 
-                    hover_data=['Agent'],
-                    title=f"Semantic Signal Clusters (k={n_clusters})",
-                    color_discrete_sequence=px.colors.qualitative.Bold
-                )
-                fig_cluster.update_layout(height=350, plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig_cluster, width='stretch')
+                if st.session_state.get("show_charts", False):
+                    fig_cluster = px.scatter(
+                        df_pca, x='PC1', y='PC2', color='Cluster', 
+                        hover_data=['Agent'],
+                        title=f"Semantic Signal Clusters (k={n_clusters})",
+                        color_discrete_sequence=px.colors.qualitative.Bold
+                    )
+                    fig_cluster.update_layout(height=350, plot_bgcolor='rgba(0,0,0,0)')
+                    st.plotly_chart(fig_cluster, use_container_width=True)
+                else:
+                    st.caption("Plots hidden.")
             else:
                 st.caption("Not enough active signals to cluster.")
                 
@@ -571,9 +579,10 @@ with tab_micro:
                      states.append(a.energy)
                      actions.append(float(torch.mean(a.last_vector).item()))
              if states:
-                 fig_mod = px.scatter(x=states, y=actions, labels={'x': "Internal Energy", 'y': "Mean Action Vector"}, title="Energy vs Action Modulation")
-                 fig_mod.update_layout(height=300)
-                 st.plotly_chart(fig_mod, width='stretch')
+                 if st.session_state.get("show_charts", False):
+                     fig_mod = px.scatter(x=states, y=actions, labels={'x': "Internal Energy", 'y': "Mean Action Vector"}, title="Energy vs Action Modulation")
+                     fig_mod.update_layout(height=300)
+                     st.plotly_chart(fig_mod, use_container_width=True)
                 
         st.markdown("### �🧠 The Mind Cloud")
         if st.session_state.world.agents:
@@ -586,16 +595,17 @@ with tab_micro:
                     labels.append(f"{a.id[:4]}")
             
             if vectors:
-                vec_arr = np.array(vectors)
-                fig_spec = px.imshow(
-                    vec_arr, 
-                    color_continuous_scale='Plasma', 
-                    aspect='auto',
-                    labels=dict(x="Dimension (0-20)", y="Agent Sample", color="Activation"),
-                    title=f"Real-Time Thought Spectrum (n={len(vectors)})"
-                )
-                fig_spec.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_spec, width="stretch")
+                if st.session_state.get("show_charts", False):
+                    vec_arr = np.array(vectors)
+                    fig_spec = px.imshow(
+                        vec_arr, 
+                        color_continuous_scale='Plasma', 
+                        aspect='auto',
+                        labels=dict(x="Dimension (0-20)", y="Agent Sample", color="Activation"),
+                        title=f"Real-Time Thought Spectrum (n={len(vectors)})"
+                    )
+                    fig_spec.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+                    st.plotly_chart(fig_spec, use_container_width=True)
         else:
             st.warning("Extinction Event. No Minds Detected.")
 
@@ -630,14 +640,15 @@ with tab_micro:
             if target.hidden_state is not None:
                 # Shape is (1, 1, 64) due to GRU batch requirements. Reshape to 2D for imshow.
                 h_state = target.hidden_state.detach().cpu().numpy().reshape(1, -1)
-                fig_h = px.imshow(
-                    h_state, 
-                    color_continuous_scale='Viridis',
-                    labels=dict(x="Memory Dim (0-63)", color="Charge"),
-                    title="Short-Term Memory (GRU Hidden State)"
-                )
-                fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
-                st.plotly_chart(fig_h, width='stretch')
+                if st.session_state.get("show_charts", False):
+                    fig_h = px.imshow(
+                        h_state, 
+                        color_continuous_scale='Viridis',
+                        labels=dict(x="Memory Dim (0-63)", color="Charge"),
+                        title="Short-Term Memory (GRU Hidden State)"
+                    )
+                    fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
+                    st.plotly_chart(fig_h, use_container_width=True)
             else:
                 st.info("Agent is in Reflex-Only mode (Brain idle).")
     else:
@@ -657,13 +668,16 @@ with tab_culture:
             meme_vis = np.clip(meme_vis, 0, 1)
             # Resize for better visibility (optional, but plotly heatmap handles it)
             
-            fig_meme = px.imshow(
-                meme_vis, 
-                title="Collective Memory (RGB: Danger/Resource/Sacred)",
-                labels=dict(x="X", y="Y")
-            )
-            fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-            st.plotly_chart(fig_meme, width='stretch')
+            if st.session_state.get("show_charts", False):
+                fig_meme = px.imshow(
+                    meme_vis, 
+                    title="Collective Memory (RGB: Danger/Resource/Sacred)",
+                    labels=dict(x="X", y="Y")
+                )
+                fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig_meme, use_container_width=True)
+            else:
+                st.text("[Chart Hidden] Enabling Live Charts to see Stigmergy Map")
         else:
             st.info("Meme Grid initializing...")
             
@@ -693,13 +707,14 @@ with tab_culture:
                     st.session_state.tradition_history.pop(0)
                 
                 # Plot
-                fig_trad = px.line(
-                    y=st.session_state.tradition_history, 
-                    title="Tradition Index (Action Stability)",
-                    labels={'y': "Mean Action Norm", 'x': "Time"}
-                )
-                fig_trad.update_layout(height=200)
-                st.plotly_chart(fig_trad, width='stretch')
+                if st.session_state.get("show_charts", False):
+                    fig_trad = px.line(
+                        y=st.session_state.tradition_history, 
+                        title="Tradition Index (Action Stability)",
+                        labels={'y': "Mean Action Norm", 'x': "Time"}
+                    )
+                    fig_trad.update_layout(height=200)
+                    st.plotly_chart(fig_trad, use_container_width=True)
                 
         # 3.6 Innovation Diffusion
         st.markdown("### 🚀 Innovation Rate")
@@ -717,7 +732,7 @@ with tab_culture:
         st.markdown("### ⚡ Event Stream")
         if st.session_state.event_log:
              log_df = pd.DataFrame(st.session_state.event_log)
-             st.dataframe(log_df[["Agent", "Event"]], width="stretch", height=400)
+             st.dataframe(log_df[["Agent", "Event"]], use_container_width=True, height=400)
 
 with tab_omega:
     col_civ, col_agent = st.columns([1, 2])
@@ -787,7 +802,7 @@ with tab_omega:
             
         if agent_data:
             df_agents = pd.DataFrame(agent_data)
-            st.dataframe(df_agents, width="stretch", height=400)
+            st.dataframe(df_agents, use_container_width=True, height=400)
 
 
 with tab_nobel:
