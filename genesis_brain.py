@@ -330,6 +330,14 @@ class GenesisAgent:
         total_loss.backward()
         self.optimizer.step()
         
+        # 4.9 Collective Memory: Natural Forgetting (Weight Decay)
+        # Weights slowly decay towards 0, simulating information loss
+        # Unless constantly reinforced
+        with torch.no_grad():
+            for p in self.brain.parameters():
+                p.mul_(0.9999) # Very slow entropy
+        
+        
         self.thoughts_had += 1
 
         # 1.5 Homeostasis check: Transfer energy to/from buffer
@@ -352,6 +360,17 @@ class GenesisAgent:
                 self_param.data.copy_(self_param.data * (1.0 - rate) + mentor_param.data * rate)
             # 4.6 Caste Gene Drift during imitation
             self.caste_gene = self.caste_gene * (1.0 - rate) + mentor.caste_gene * rate
+
+    def restorative_imitation(self, mentor):
+        """4.9 Collective Memory: Rapidly learn from a mentor to restore lost knowledge."""
+        # Significant weight update towards mentor (0.2 rate) to recover stability
+        with torch.no_grad():
+            for self_param, mentor_param in zip(self.brain.parameters(), mentor.brain.parameters()):
+                # Pull self towards mentor
+                self_param.data.copy_(self_param.data * 0.8 + mentor_param.data * 0.2)
+            
+            # Boost confidence as we "remembered"
+            self.confidence = min(0.9, self.confidence + 0.3)
 
     def fuse_with(self, partner):
         """4.7 Dynamic Tensor Fusion: Physical/Functional merging of two agents."""
