@@ -298,6 +298,7 @@ class GenesisAgent:
         # HACK: Using the predictor gradient to find "information seeking" actions
         if random.random() < 0.2: # 20% Active Inference override
              # "What action would reduce my uncertainty?"
+             self.reflexes_used += 1 # Tracking "Intuitive" actions as reflexes
              # Cloud-Optimized: Analytical gradient of uncertainty w.r.t action
              pass # Complex to implement efficiently, relying on metabolize_free_energy for learning signal
              
