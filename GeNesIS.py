@@ -13,6 +13,7 @@ from genesis_world import GenesisWorld, Resource
 from genesis_brain import GenesisAgent
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+import networkx as nx
 
 # ============================================================
 # 🔮 THE NAMING ORACLE (Procedural Tech Tree)
@@ -613,6 +614,39 @@ with tab_hive:
             st.markdown("### 🔗 Fusion Events")
             fused_count = sum(1 for a in agents_l4 if a.is_fused)
             st.metric("Fused Units", fused_count)
+            
+            # 2.9 Social Network Topology (Added)
+            st.markdown("### 🌐 Social Network (2.9)")
+            if st.session_state.get("show_charts", False) and st.session_state.world.bonds:
+                G = nx.Graph()
+                active_ids = list(st.session_state.world.agents.keys())
+                G.add_nodes_from(active_ids)
+                for bond in st.session_state.world.bonds:
+                    id_a, id_b = list(bond)
+                    if id_a in active_ids and id_b in active_ids: # Verify existence
+                        G.add_edge(id_a, id_b)
+                
+                # 1. Newman Modularity
+                if G.number_of_edges() > 0:
+                    try:
+                         # Use greedy modularity
+                         c = list(nx.community.greedy_modularity_communities(G))
+                         modularity = nx.community.modularity(G, c)
+                         st.metric("Modularity Q", f"{modularity:.3f}")
+                    except Exception as e:
+                         st.metric("Modularity Q", "0.000")
+                    
+                    # 2. Small World Sigma (Approximate)
+                    # Requires connected graph for strict sigma, we skip if disconnected
+                    if len(G) < 200 and G.number_of_edges() > len(G): # Basic check
+                        try:
+                            # Use networkx smallworld sigma if available, else omit
+                            sigma = nx.algorithms.smallworld.sigma(G, niter=5, nrand=5)
+                            st.metric("Small-world σ", f"{sigma:.2f}")
+                        except:
+                            st.metric("Small-world σ", "Calc Pending...")
+                else:
+                    st.info("No social bonds formed yet.")
 
         with st.expander("🔬 Caste Genetic Audit (4.6)"):
             if st.button("Run Heritability Analysis", key="caste_audit"):
@@ -815,13 +849,60 @@ with tab_culture:
                     )
                     fig_trad.update_layout(height=200)
                     st.plotly_chart(fig_trad, use_container_width=True)
-                
-        # 3.6 Innovation Diffusion
-        st.markdown("### 🚀 Innovation Rate")
+
+        # 3.5 Cultural Drift (KL Divergence)
+        st.markdown("### 🧬 Cultural Drift (KL 3.5)")
+        # Split geographically: West vs East
+        if len(st.session_state.world.agents) > 10:
+             agents_all = list(st.session_state.world.agents.values())
+             pop_A = [a for a in agents_all if a.x < 20]
+             pop_B = [a for a in agents_all if a.x >= 20]
+             
+             if len(pop_A) > 5 and len(pop_B) > 5:
+                 def get_action_dist(pop):
+                     # Feature distribution of Action Vectors
+                     vecs = [a.last_vector.detach().cpu().numpy().flatten() for a in pop if a.last_vector is not None]
+                     if not vecs: return np.zeros(21)
+                     mean_v = np.mean(vecs, axis=0)
+                     # Softmax for probability distribution
+                     e_x = np.exp(mean_v - np.max(mean_v))
+                     return e_x / e_x.sum()
+                 
+                 P = get_action_dist(pop_A)
+                 Q = get_action_dist(pop_B)
+                 # KL Divergence: Sum(P * log(P/Q))
+                 kl = np.sum(P * np.log((P + 1e-9) / (Q + 1e-9)))
+                 st.metric("East-West Divergence (KL)", f"{kl:.4f}")
+                 if kl > 2.0: st.success("✅ Milestone 3.5 Reached!")
+
+        # 3.6 Innovation Diffusion (S-Curve)
+        st.markdown("### 📈 Innovation Diffusion (S-Curve 3.6)")
         inv_count = len(st.session_state.global_registry)
         st.metric("Total Patents", inv_count)
         
         if st.session_state.global_registry:
+            df_inv = pd.DataFrame(st.session_state.global_registry)
+            if len(df_inv) > 10:
+                df_inv = df_inv.sort_values('tick')
+                ticks = df_inv['tick'].values.astype(float)
+                y = np.arange(1, len(ticks) + 1).astype(float)
+                
+                # Logistic Fit Check: Log(y / (L-y)) = kx + c
+                L = len(ticks) * 1.5
+                valid_mask = y < L
+                if valid_mask.sum() > 5:
+                    y_logit = np.log((y[valid_mask] + 1e-9) / (L - y[valid_mask] + 1e-9))
+                    try:
+                        slope, intercept = np.polyfit(ticks[valid_mask], y_logit, 1)
+                        y_pred = slope * ticks[valid_mask] + intercept
+                        ss_res = np.sum((y_logit - y_pred)**2)
+                        ss_tot = np.sum((y_logit - np.mean(y_logit))**2)
+                        r2 = 1 - (ss_res / (ss_tot + 1e-9))
+                        st.metric("Logistic Fit R²", f"{r2:.3f}")
+                        if r2 > 0.9: st.success("✅ Milestone 3.6 Reached!")
+                    except:
+                        st.caption("Curve fit unstable.")
+
             # Show recent inventions
             recents = st.session_state.global_registry[-5:]
             for inv in recents:
