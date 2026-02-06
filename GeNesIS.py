@@ -134,8 +134,8 @@ def update_simulation():
     total_neg_flux = 0.0
     
     # --- PHASE 17: LEVEL 4 GLOBAL AUDITS ---
-    # 4.0 Behavioral Polymorphism Auditor (Every 50 ticks)
-    if world.time_step % 50 == 0 and len(agents) >= 2:
+    # 4.0 Behavioral Polymorphism Auditor (Every 10 ticks - Fast Update)
+    if world.time_step % 10 == 0 and len(agents) >= 2:
         actions = []
         valid_agents = []
         for a in agents:
@@ -1145,6 +1145,70 @@ with tab_nobel:
     else:
         st.warning("No minds detected for review.")
 
+
+
+with tab_meta:
+    st.markdown("## 🧠 Level 5: Recursive Self-Improvement")
+    
+    if st.session_state.world.agents:
+        # Sample an agent for introspection
+        agent_list_m = list(st.session_state.world.agents.keys())
+        # Just pick the first one or random for aggregate stats
+        target_m = st.session_state.world.agents[agent_list_m[0]]
+        
+        col_m1, col_m2 = st.columns(2)
+        
+        with col_m1:
+            st.markdown("### 5.0 Self-Monitoring & Confidence")
+            confidence_scores = [a.confidence for a in st.session_state.world.agents.values()]
+            avg_conf = np.mean(confidence_scores)
+            st.metric("Mean Agent Confidence", f"{avg_conf*100:.2f}%")
+            
+            error_scores = []
+            for a in st.session_state.world.agents.values():
+                if a.prediction_errors:
+                    error_scores.append(np.mean(a.prediction_errors))
+            
+            if error_scores:
+                st.metric("Mean Prediction Error (Surprise)", f"{np.mean(error_scores):.4f}")
+            else:
+                st.metric("Mean Prediction Error", "0.0000")
+                
+            st.markdown("### 5.10 Autonomous Research Log")
+            # Collect recent discoveries
+            discoveries = []
+            for a in st.session_state.world.agents.values():
+                discoveries.extend(a.research_log)
+            
+            if discoveries:
+                st.success(f"Latest Hypothesis: {discoveries[-1]}")
+                with st.expander("Full Research Log"):
+                    st.write(list(set(discoveries))[-10:])
+            else:
+                st.info("Agents are conducting experiments... No major discoveries yet.")
+
+        with col_m2:
+            st.markdown("### 5.2 Architecture Search (Sparsity)")
+            # Calculate Soft Sparsity (Average Mask Value)
+            # We want to show how much is PRUNED. Pruned = (1 - mask_value).
+            sparsities = []
+            for a in st.session_state.world.agents.values():
+                # Access the mask directly
+                # mask is sigmoid(logits). Mean value is 'density'. 
+                # Sparsity = 1 - density.
+                if hasattr(a.brain, 'actor_mask'):
+                    # We can use the method we just updated in genesis_brain
+                    sparsities.append(a.brain.actor_mask.sparsity().item())
+            
+            if sparsities:
+                avg_sparsity = np.mean(sparsities)
+                st.metric("Mean Neural Sparsity", f"{avg_sparsity*100:.2f}%")
+                st.progress(min(1.0, max(0.0, avg_sparsity)))
+            else:
+                st.metric("Mean Neural Sparsity", "0.00%")
+                
+            st.markdown("### 5.6 Collective Values")
+            st.json(st.session_state.world.collective_values)
 
 if st.session_state.running:
     time.sleep(0.02) 
