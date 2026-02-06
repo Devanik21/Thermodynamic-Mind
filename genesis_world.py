@@ -84,6 +84,16 @@ class Resource(Entity):
         else:
             if self.type == 2: return base * 5.0 # Blue is winter-survival fuel
             return -base # Red/Green die in winter
+
+class MegaResource(Entity):
+    """4.8 Distributed Cognition: Requires multiple agents or high synergy."""
+    def __init__(self, x, y):
+        super().__init__(x, y, 'mega_resource')
+        self.strength = 100.0
+        self.signal = torch.ones(SIGNAL_DIM) * 0.5
+    
+    def get_nutrition(self, current_season):
+        return 150.0 # High payout
             
 # ============================================================
 # 🌍 THE QUANTUM WORLD
@@ -273,8 +283,18 @@ class GenesisWorld:
         # 5. Query Oracle
         loc = (agent.x, agent.y)
         local_sig = self.get_local_signal(*loc).unsqueeze(0)
+        
+        # --- PHASE 16: LEVEL 4 TENSOR FUSION & ROLES ---
+        final_reality_vector = reality_vector
+        if agent.is_fused and agent.fused_partner and agent.fused_partner.id in self.agents:
+            partner = agent.fused_partner
+            dist_p = math.sqrt((agent.x - partner.x)**2 + (agent.y - partner.y)**2)
+            if dist_p < 2.0:
+                # 4.7 Fusion: Additive reality vectors (Conceptual merge)
+                final_reality_vector = reality_vector + partner.last_vector
+        
         with torch.no_grad():
-            effects = self.oracle(reality_vector, local_sig)[0] 
+            effects = self.oracle(final_reality_vector, local_sig)[0] 
         
         # 6. Decode Effects
         energy_flux = effects[0].item() * 15.0 
@@ -293,11 +313,25 @@ class GenesisWorld:
                 
         # --- B. ENERGY & RECOURSES ---
         else:
-            agent.energy += energy_flux
-            if energy_flux > 0:
-                outcome_log = "⚡ POSITIVE FLUX (+)"
+            # 4.3 Supply Chain & Role Bonuses
+            bonus = 1.0
+            if agent.role == "Forager": bonus = 1.2
+            elif agent.role == "Processor": bonus = 1.5 if any(v > 0 for v in agent.inventory) else 0.8
+            
+            final_flux = energy_flux * bonus
+            agent.energy += final_flux
+            
+            if final_flux > 0:
+                outcome_log = f"⚡ {agent.role} FLUX (+)"
                 if loc in self.grid:
                     res = self.grid[loc]
+                    # 4.8 Distributed Cognition Check
+                    if isinstance(res, MegaResource):
+                        if final_reality_vector.sum() < 2.0:
+                            agent.energy -= 10.0 # Failed to harvest
+                            outcome_log = "❌ TOO WEAK FOR MEGA"
+                            return final_flux, outcome_log
+                    
                     # 2.8 Token Collection
                     agent.inventory[res.type] += 1
                     # Synergy Bonus: Complete set (R,G,B) gives +30 Energy
@@ -338,6 +372,11 @@ class GenesisWorld:
         
         if self.time_step % 2 == 0:
             for _ in range(5): self.spawn_resource()
+        
+        # 4.8 Spawn MegaResource rarely
+        if self.time_step % 100 == 0:
+            mx, my = random.randint(0, self.size-1), random.randint(0, self.size-1)
+            self.grid[(mx, my)] = MegaResource(mx, my)
 
     def _update_entropy_metrics(self):
         """1.10 Complete Entropy Defiance: Track system-wide entropy changes."""
