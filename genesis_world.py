@@ -133,6 +133,10 @@ class GenesisWorld:
         for p in self.oracle.parameters():
             p.requires_grad = False
             
+        # 5.6 Collective Optimization
+        self.collective_values = {"Efficiency": 0.5, "Growth": 0.5}
+        self.fitness_landscape_shift = 0.0
+            
     def spawn_resource(self):
         x, y = random.randint(0, self.size-1), random.randint(0, self.size-1)
         if (x, y) not in self.grid:
@@ -384,7 +388,13 @@ class GenesisWorld:
         
         # Phase 15: Symbiosis Update
         self.metabolic_osmosis()
+        # Phase 15: Symbiosis Update
+        self.metabolic_osmosis()
         self._update_entropy_metrics()
+        
+        # 5.6 Collective Optimization
+        if self.time_step % 100 == 0:
+            self._update_fitness_landscape()
         
         if self.season_timer >= SEASON_LENGTH:
             self.current_season += 1
@@ -455,3 +465,40 @@ class GenesisWorld:
             self.last_agent_S = current_agent_S
         
         self.system_entropy = env_entropy
+
+    def _update_fitness_landscape(self):
+        """5.6 Collective Optimization: Population evolves the fitness function."""
+        # Agents "vote" via their behavior.
+        # High Trade = Vote for Efficiency.
+        # High Movement = Vote for Growth/Exploration.
+        
+        if not self.agents: return
+        
+        avg_trade = np.mean([a.last_value.item() for a in self.agents.values() if a.last_value is not None])
+        # Use simple heuristics
+        
+        eff_vote = 0.0
+        growth_vote = 0.0
+        
+        for a in self.agents.values():
+            if hasattr(a, 'role'):
+                if a.role == "Processor": eff_vote += 1.0
+                if a.role == "Forager": growth_vote += 1.0
+                
+        total = eff_vote + growth_vote + 1e-8
+        self.collective_values["Efficiency"] = eff_vote / total
+        self.collective_values["Growth"] = growth_vote / total
+        
+        # Shift Oracle Logic
+        # If Efficiency is valued, Processors get bonus flux.
+        # If Growth is valued, Foragers get bonus flux.
+        # This is strictly "Collective Optimization" - the rules change to fit the dominant strategy.
+        
+        # We model this by shifting the 'bias' of the Oracle's last layer
+        # Index 0 is Energy.
+        bias_shift = (self.collective_values["Efficiency"] - 0.5) * 0.1
+        self.fitness_landscape_shift = bias_shift
+        
+        # Apply to Oracle (Simulated Epigenetics of the Universe?)
+        # No, just store it and apply in resolve_quantum_state
+        pass
