@@ -159,6 +159,7 @@ class GenesisAgent:
         
         # 1.6 Circadian Rhythms
         self.internal_phase = random.random() * 2 * np.pi
+        self.influence = 0.0 # 4.4 Initialize early to avoid AttributeError
         
         # --- PHASE 15: LEVEL 4 SPECIALIZATION ---
         self.role = "Generalist" # 4.0 Behavioral Polymorphism
@@ -180,6 +181,8 @@ class GenesisAgent:
             self.hidden_state = parent_hidden.detach().clone() + torch.randn_like(parent_hidden) * 0.1
         else:
             self.hidden_state = torch.zeros(1, 1, 64)
+        
+        self.last_concepts = torch.zeros(1, 8) # 5.8 Initialize
         
         # LEVEL 5 STATE MEMORY
         # 5.0 Self-Monitoring
@@ -345,20 +348,12 @@ class GenesisAgent:
         iq_reward = self.last_vector.std() * 5.0 # Punish uniform thinking
         
         # 5.3 Free Energy Reward (FRISTONIAN OVERRIDE)
-        # Reward is not just flux, but NEGATIVE SURPRISE (Prediction Error)
-        # F = E - Entropy. We want to Minimize F.
-        # So Reward = -F.
-        
-        # Calculate Prediction Error (Surprise)
-        surprise = 0.0
+        # We calculate the predictor loss but don't call backward yet.
+        # It will be combined with the A2C loss below.
+        predictor_loss = torch.tensor(0.0)
         if self.last_input is not None and self.last_prediction is not None:
-            # 5.3 Active Inference: Prediction error is the core learning signal
-            # Use detached inputs to avoid backpropping through previous tick's full graph
-            pass
-            
-        # Simplified: We treat 'flux' as the 'observation' we wanted to predict? 
-        # No, predictor predicts the 41-dim tensor.
-        # We need to compute loss strictly in metabolize.
+             pred_loss_fn = nn.MSELoss()
+             predictor_loss = pred_loss_fn(self.last_prediction, self.last_input.detach())
         
         reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
@@ -374,7 +369,9 @@ class GenesisAgent:
         # Added regularization to prevent activation explosion
         actor_loss = -(advantage * self.last_vector.sum()) + 0.01 * self.last_vector.pow(2).sum()
         
-        total_loss = actor_loss + critic_loss
+        # 5.3 Consolidated Loss: A2C + Active Inference Predictor
+        # Combining them allows a single unified update per tick.
+        total_loss = actor_loss + critic_loss + predictor_loss
         
         # Backprop (Online Learning)
         self.optimizer.zero_grad()
@@ -538,10 +535,10 @@ class GenesisAgent:
         # Total Loss
         loss = prediction_error + sparsity_loss
         
-        # Backprop
-        self.optimizer.zero_grad()
-        loss.backward(retain_graph=True) # Retain for A2C part if needed
-        self.optimizer.step()
+        # Backprop: REMOVED. Consolidated into metabolize_outcome to avoid stale graph errors.
+        # self.optimizer.zero_grad()
+        # loss.backward(retain_graph=True) 
+        # self.optimizer.step()
         
         # 5.10 Autonomous Research (Sensitivity Analysis)
         if random.random() < 0.01: # Rare event to save compute
