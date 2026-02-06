@@ -81,10 +81,10 @@ class Resource(Entity):
         if current_season % 2 == 0:
             if self.type == 0: return base
             if self.type == 1: return base * 2.0
-            return -base * 0.12 # Reduced toxicity to prevent mass extinction (-6 instead of -30)
+            return -base # Blue is toxic in summer
         else:
             if self.type == 2: return base * 5.0 # Blue is winter-survival fuel
-            return -base * 0.12 # Reduced toxicity (-6)
+            return -base # Red/Green die in winter
 
 class MegaResource(Entity):
     """4.8 Distributed Cognition: Requires multiple agents or high synergy."""
@@ -392,7 +392,6 @@ class GenesisWorld:
             
             if final_flux > 0:
                 outcome_log = f"⚡ {agent.role} FLUX (+)"
-                
                 if loc in self.grid:
                     res = self.grid[loc]
                     # 4.8 Distributed Cognition Check
@@ -401,29 +400,16 @@ class GenesisWorld:
                             agent.energy -= 10.0 # Failed to harvest
                             outcome_log = "❌ TOO WEAK FOR MEGA"
                             return final_flux, outcome_log
-                        else:
-                            # Successful Mega Harvest!
-                            # Grant massive bonus and 1 of each token
-                            agent.energy += 50.0 
-                            for i in range(3): agent.inventory[i] += 1
-                            outcome_log = "🌌 OMEGA HARVEST (+50 E)"
-                            del self.grid[loc]
-                            return final_flux + 50.0, outcome_log
-
-                    # 2.8 Token Collection (Standard Resource)
-                    # Ensure type is valid before indexing
-                    if isinstance(res.type, int) and 0 <= res.type < 3:
-                        agent.inventory[res.type] += 1
-                        # Synergy Bonus: Complete set (R,G,B) gives +30 Energy
-                        if all(count > 0 for count in agent.inventory):
-                            agent.energy += 30.0
-                            for i in range(3): agent.inventory[i] -= 1
-                            outcome_log = "🌟 SYNERGY BONUS!"
-                        else:
-                            outcome_log = f"😋 CONSUMED {['Red','Green','Blue'][res.type]}"
+                    
+                    # 2.8 Token Collection
+                    agent.inventory[res.type] += 1
+                    # Synergy Bonus: Complete set (R,G,B) gives +30 Energy
+                    if all(count > 0 for count in agent.inventory):
+                        agent.energy += 30.0
+                        for i in range(3): agent.inventory[i] -= 1
+                        outcome_log = "🌟 SYNERGY BONUS!"
                     else:
-                        outcome_log = "😋 CONSUMED MYSTERY MATTER"
-                        
+                        outcome_log = f"😋 CONSUMED {['Red','Green','Blue'][res.type]}"
                     del self.grid[loc]
             else: outcome_log = "🔥 NEGATIVE FLUX (-)"
         
@@ -586,4 +572,3 @@ class GenesisWorld:
         # Apply to Oracle (Simulated Epigenetics of the Universe?)
         # No, just store it and apply in resolve_quantum_state
         pass
-
