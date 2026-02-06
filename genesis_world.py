@@ -13,7 +13,7 @@ SIGNAL_DIM = 16
 MAX_ENERGY = 100000.0 # Effectively Infinite (Type II Civilization Potential)
 # "Easy mode" - metabolic cost is low, but stupidity kills
 METABOLIC_COST = 0.1 
-SEASON_LENGTH = 50 
+SEASON_LENGTH = 20 # Shortened winter (Nobel Optimization)
 
 # ============================================================
 # 🔮 THE PHYSICS ORACLE (The Laws of Nature)
@@ -412,7 +412,8 @@ class GenesisWorld:
                             return final_flux, outcome_log
                     
                     # 2.8 Token Collection
-                    agent.inventory[res.type] += 1
+                    idx = int(res.type) # Ensure integer index
+                    agent.inventory[idx] += 1
                     # Synergy Bonus: Complete set (R,G,B) gives +30 Energy
                     if all(count > 0 for count in agent.inventory):
                         agent.energy += 30.0
@@ -430,7 +431,8 @@ class GenesisWorld:
         self.season_timer += 1
         
         # 1.4 Scarcity: Exponential decay of spawn rate
-        current_spawn_prob = max(0.2, np.exp(-self.scarcity_lambda * self.time_step))
+        # Nobel-Level Fix: floor at 0.4 (Always 40% abundance) to prevent extinction
+        current_spawn_prob = max(0.4, np.exp(-self.scarcity_lambda * self.time_step))
         
         # 1.6 Circadian Rhythms: Environment Phase
         self.env_phase = (self.time_step / SEASON_LENGTH) * 2 * np.pi
