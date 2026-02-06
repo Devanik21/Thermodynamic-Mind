@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "3.2.5" # Normalization: Fixed IQ and Neural Inflation
+SYSTEM_VERSION = "5.0.1" # Level 5: Recursive Self-Improvement Active
 
 def init_system():
     # Force reset if version mismatch
@@ -245,6 +245,9 @@ def update_simulation():
             ]
             
             if partners:
+                # 5.5 Selective Reproduction: Choose BEST partner (Sexual Selection)
+                # 5.4 Peer Evaluation: Use evaluate_neighbor()
+                partners.sort(key=lambda p: agent.evaluate_neighbor(p), reverse=True)
                 partner = partners[0]
                 
                 # Crossover
@@ -489,8 +492,8 @@ with st.container():
             )
 
 # --- MAIN TABS FRAGMENT ---
-tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega = st.tabs([
-    "🔭 OBSERVATION DECK", "🧬 QUANTUM SPECTROGRAM", "🐝 HIVE STRUCTURES", "🏺 Culture", "🏆 Nobel Committee", "Ω OMEGA TELEMETRY"
+tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st.tabs([
+    "🔭 OBSERVATION DECK", "🧬 QUANTUM SPECTROGRAM", "🐝 HIVE STRUCTURES", "🏺 Culture", "🏆 Nobel Committee", "Ω OMEGA TELEMETRY", "🧠 METACOGNITION"
 ])
 
 with tab_macro:
@@ -798,6 +801,54 @@ with tab_culture:
         # Grid is (40, 40, 3). Channels: R(Danger), G(Food), B(Sacred)
         if hasattr(st.session_state.world, 'meme_grid'):
             meme_vis = st.session_state.world.meme_grid.copy()
+            
+with tab_meta:
+    st.markdown("## 🧠 Level 5: Recursive Self-Improvement")
+    
+    if st.session_state.world.agents:
+        agents = list(st.session_state.world.agents.values())
+        
+        col_m1, col_m2 = st.columns(2)
+        
+        with col_m1:
+            st.markdown("### 5.0 Self-Monitoring & Confidence")
+            confidence_vals = [a.confidence for a in agents if hasattr(a, 'confidence')]
+            if confidence_vals:
+                avg_conf = np.mean(confidence_vals)
+                st.metric("Mean Agent Confidence", f"{avg_conf:.2%}")
+                
+            errors = [np.mean(a.prediction_errors) for a in agents if hasattr(a, 'prediction_errors') and a.prediction_errors]
+            if errors:
+                avg_error = np.mean(errors)
+                st.metric("Mean Prediction Error (Surprise)", f"{avg_error:.4f}")
+                
+        with col_m2:
+            st.markdown("### 5.10 Autonomous Research Log")
+            # Aggregate research logs
+            all_discoveries = []
+            for a in agents:
+                if hasattr(a, 'research_log'):
+                    for entry in a.research_log:
+                        all_discoveries.append(f"{entry} (Agent {a.id[:4]})")
+            
+            if all_discoveries:
+                st.write(all_discoveries[-10:])
+            else:
+                st.info("Agents are conducting experiments... No major discoveries yet.")
+                
+        st.markdown("---")
+        st.markdown("### 5.2 Architecture Search (Sparsity)")
+        sparsities = []
+        for a in agents:
+            if hasattr(a.brain, 'actor_mask'):
+                sparsities.append(a.brain.actor_mask.sparsity().item())
+        
+        if sparsities:
+            st.metric("Mean Neural Sparsity", f"{np.mean(sparsities):.2%}")
+            
+        st.markdown("### 5.6 Collective Values")
+        if hasattr(st.session_state.world, 'collective_values'):
+            st.json(st.session_state.world.collective_values)
             # Clip to 0-1 range for RGB display
             meme_vis = np.clip(meme_vis, 0, 1)
             # Resize for better visibility (optional, but plotly heatmap handles it)
