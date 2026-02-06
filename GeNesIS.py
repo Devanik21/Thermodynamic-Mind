@@ -156,8 +156,11 @@ def update_simulation():
                     a.role_history.append(a.role)
                     if len(a.role_history) > 100: a.role_history.pop(0)
                 a.role = new_role
-                # 4.10 Eusociality: Queens are fertile
-                a.is_fertile = (a.role == "Queen")
+                # 4.10 Eusociality: Queens are fertile (Only restrict if established hive)
+                if len(agents) > 20:
+                    a.is_fertile = (a.role == "Queen")
+                else:
+                    a.is_fertile = True
 
     # 4.4 Emergent Hierarchy: Calculate Influence
     if world.time_step % 20 == 0 and agents:
@@ -235,8 +238,8 @@ def update_simulation():
 
         # ❤️ PHASE 14/17: "EUSOCIAL" REPRODUCTION (4.10)
         # Only fertile agents (Queens) reproduce. Others must support them (feed).
-        can_reproduce = agent.is_fertile and agent.energy > 60.0
-        if mate_desire > 0.5 and can_reproduce and len(world.agents) < 256:
+        can_reproduce = agent.is_fertile and agent.energy > 70.0
+        if mate_desire > 0.5 and can_reproduce and len(world.agents) < 512:
             # Look for partner
             partners = [
                 other for other in agents 
@@ -335,8 +338,8 @@ def update_simulation():
         malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 3.0)
         agent.energy -= malthusian_cost 
         
-        # 🧬 MITOSIS (Hard Cap: 256 per user request)
-        if agent.energy > 120.0 and len(world.agents) < 256:
+        # 🧬 MITOSIS (Hard Cap: 512 per user request)
+        if agent.energy > 90.0 and len(world.agents) < 512:
             agent.energy -= 60.0 
             off_x = (agent.x + np.random.randint(-1, 2)) % 40
             off_y = (agent.y + np.random.randint(-1, 2)) % 40
@@ -392,16 +395,17 @@ def update_simulation():
         if current_max > st.session_state.max_generation:
             st.session_state.max_generation = current_max
                 
-    # Failsafe: only restart if TRULY extinct
-    if len(world.agents) < 4:
-        x, y = np.random.randint(0, 40), np.random.randint(0, 40)
-        genome = None
-        gen = 0
-        if st.session_state.gene_pool:
-            genome = random.choice(st.session_state.gene_pool)
-            gen = st.session_state.max_generation
-        new_agent = GenesisAgent(x, y, genome=genome, generation=gen)
-        world.agents[new_agent.id] = new_agent
+    # Failsafe: only restart if TRULY extinct or critically low
+    if len(world.agents) < 10:
+        for _ in range(5):
+            x, y = np.random.randint(0, 40), np.random.randint(0, 40)
+            genome = None
+            gen = 0
+            if st.session_state.gene_pool:
+                genome = random.choice(st.session_state.gene_pool)
+                gen = st.session_state.max_generation
+            new_agent = GenesisAgent(x, y, genome=genome, generation=gen)
+            world.agents[new_agent.id] = new_agent
         
     # Calculate Entropy Fallback
     ent_val = getattr(world, 'agent_entropy', 0.0)
