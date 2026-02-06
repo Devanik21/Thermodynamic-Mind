@@ -145,7 +145,7 @@ class GenesisAgent:
         self.y = y
         self.generation = generation
         self.age = 0
-        self.energy = 60.0 # Increased starting energy
+        self.energy = 120.0 # Increased starting energy (Survival Buffer)
         self.energy_stored = 0.0 # 1.5 Homeostasis
         self.inventory = [0, 0, 0] if parent_inventory is None else parent_inventory
         
