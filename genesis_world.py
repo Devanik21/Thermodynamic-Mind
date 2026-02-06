@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import random
 import math
+import streamlit as st
 
 # ============================================================
 # 🌌 DYNAMIC PHYSICS CONSTANTS
