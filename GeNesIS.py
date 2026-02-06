@@ -356,7 +356,7 @@ def update_simulation():
         if len(world.agents) >= 450:
             # GOLDEN ERA FIX: Reduced decay to allow Elders to survive
             # Was: 0.5 + log/3.0 (~2.5 cost) -> Now: 0.1 + log/10.0 (~0.7 cost)
-            malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 10.0)
+            malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 1.0)
             
             # SAGE BONUS: Elders (>100 ticks) are cleaner metabolizers
             if agent.age > 100: malthusian_cost *= 0.5
@@ -1237,3 +1237,4 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
