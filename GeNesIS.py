@@ -469,10 +469,10 @@ with st.container():
         st.markdown(f"### Orbit: <span style='color:{season_color}'>{season_mode}</span>", unsafe_allow_html=True)
         st.caption(f"Gene Pool: {len(st.session_state.gene_pool)} | Max Gen: {st.session_state.max_generation}")
     with col_h2:
-        if st.button("▶️ TOGGLE SIMULATION", use_container_width=True, type="primary" if not st.session_state.running else "secondary"):
+        if st.button("▶️ TOGGLE SIMULATION", width='stretch', type="primary" if not st.session_state.running else "secondary"):
             st.session_state.running = not st.session_state.running
     with col_h3:
-        if st.button("♻️ RESET WORLD", use_container_width=True):
+        if st.button("♻️ RESET WORLD", width='stretch'):
             st.session_state.world = GenesisWorld(size=40)
             st.session_state.stats_history = []
             st.session_state.gene_pool = []
@@ -510,7 +510,7 @@ with st.container():
                 st.session_state.export_zip, 
                 "genesis_data.zip", 
                 "application/zip", 
-                use_container_width=True
+                width='stretch'
             )
 
 # --- MAIN TABS FRAGMENT ---
