@@ -120,6 +120,27 @@ class GenesisAgent:
             entropy = -torch.sum(prob * torch.log2(prob + 1e-8))
             return entropy.item()
 
+    def generate_zahavi_proof(self, vector, difficulty=1):
+        """
+        2.3 Zahavi Handicap: Generate Proof of Work (Hash(message || nonce)).
+        Returns a nonce that produces 'difficulty' leading zeros.
+        """
+        import hashlib
+        target = "0" * difficulty
+        nonce = 0
+        # Quantize vector to avoid float instability in hashing
+        vec_bytes = (vector * 100).long().cpu().numpy().tobytes()
+        
+        # Limit iterations to avoid freezing the simulation
+        max_iter = 100 
+        for _ in range(max_iter):
+            candidate = f"{nonce}".encode() + vec_bytes
+            h = hashlib.sha256(candidate).hexdigest()
+            if h.startswith(target):
+                return nonce
+            nonce += 1
+        return 0 # Failed to find proof within effort budget
+
     def decide(self, signal_16, **kwargs):
         self.age += 1
         pheromone_16 = kwargs.get('pheromone_16', torch.zeros(16))
@@ -161,6 +182,14 @@ class GenesisAgent:
         self.last_value = value
         self.last_prediction = prediction # 3.9 Store for loss calculation
         self.last_input = input_tensor    # Store input for next tick's comparison
+        
+        # 2.3 Zahavi Costly Signaling: Generate Proof of Work
+        # If signal is complex (high variance), we must prove it's not cheap noise.
+        # This incurs a computational cost (simulated loop or just calculating it)
+        self.last_nonce = 0
+        comm_variance = comm_vector.var().item()
+        if comm_variance > 0.05:
+            self.last_nonce = self.generate_zahavi_proof(comm_vector, difficulty=1)
         
         # Unpack Meta (Mate, Adhesion, Punish, Trade)
         mate_desire = meta[0, 0].item()
