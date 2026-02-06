@@ -440,6 +440,30 @@ class GenesisWorld:
         # 5.6 Collective Optimization
         if self.time_step % 100 == 0:
             self._update_fitness_landscape()
+            
+        # --- 3.2 HORIZONTAL NEURAL TRANSFER (Viral Propagation) ---
+        # Highly fit agents (Energy > 90) spontaneously create "Weight Viruses"
+        # and sneeze them onto their neighbors.
+        if self.time_step % 50 == 0:
+            for agent in list(self.agents.values()):
+                if agent.energy > 90.0:
+                    # Create virus packet
+                    packet = agent.create_weight_packet()
+                    # Broadcast to neighbors
+                    neighbors = [
+                        a for a in self.agents.values() 
+                        if a.id != agent.id and abs(a.x - agent.x) <= 2 and abs(a.y - agent.y) <= 2
+                    ]
+                    for n in neighbors:
+                         n.receive_infection(packet)
+                         # Log the infection event sparingly
+                         if random.random() < 0.05:
+                            st.session_state.event_log.insert(0, {
+                                "Tick": self.time_step,
+                                "Agent": n.id,
+                                "Event": f"🦠 INFECTED by {agent.id[:4]}",
+                                "Vector": [0]*21
+                            })
         
         if self.season_timer >= SEASON_LENGTH:
             self.current_season += 1
