@@ -135,7 +135,7 @@ def update_simulation():
     
     # --- PHASE 17: LEVEL 4 GLOBAL AUDITS ---
     # 4.0 Behavioral Polymorphism Auditor (Every 50 ticks)
-    if world.time_step % 50 == 0 and len(agents) > 10:
+    if world.time_step % 50 == 0 and len(agents) >= 2:
         actions = []
         valid_agents = []
         for a in agents:
@@ -235,7 +235,7 @@ def update_simulation():
 
         # ❤️ PHASE 14/17: "EUSOCIAL" REPRODUCTION (4.10)
         # Only fertile agents (Queens) reproduce. Others must support them (feed).
-        can_reproduce = agent.is_fertile and agent.energy > 80.0
+        can_reproduce = agent.is_fertile and agent.energy > 60.0
         if mate_desire > 0.5 and can_reproduce and len(world.agents) < 256:
             # Look for partner
             partners = [
