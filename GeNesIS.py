@@ -1009,9 +1009,43 @@ with tab_omega:
         st.write(f"**Discoveries:** `{st.session_state.total_events_count}`")
 
     with col_agent:
-        st.markdown("### 🔬 100+ Metric Grid")
+        st.markdown("### 🔬 100+ Metric Grid (Top 50)")
+        
+        # --- GLOBAL TELEMETRY (20+ Metrics) ---
+        if st.session_state.world.agents:
+            all_agents = list(st.session_state.world.agents.values())
+            n_pop = len(all_agents)
+            ages = [a.age for a in all_agents]
+            energies = [a.energy for a in all_agents]
+            gens = [a.generation for a in all_agents]
+            
+            # Quick Stats
+            stats_md = f"""
+| 🌍 Global Metric | 📊 Value | 🌍 Global Metric | 📊 Value |
+| :--- | :--- | :--- | :--- |
+| **Current Population** | `{n_pop}` | **Average Age** | `{np.mean(ages):.1f}` |
+| **Peak Population** | `{max(n_pop, st.session_state.get('max_pop', n_pop))}` | **Oldest Elder** | `{max(ages)}` |
+| **Total Biomass** | `{sum(energies):.0f}` | **Average Energy** | `{np.mean(energies):.1f}` |
+| **Max Generation** | `{max(gens)}` | **Avg Generation** | `{np.mean(gens):.1f}` |
+| **Total Inventions** | `{st.session_state.total_events_count}` | **Global Patents** | `{len(st.session_state.global_registry)}` |
+| **World Time Step** | `{st.session_state.world.time_step}` | **Season Clock** | `{st.session_state.world.season_clock:.2f}` |
+| **Active Bonds** | `{len(st.session_state.world.bonds)}` | **Gene Pool Size** | `{len(st.session_state.gene_pool)}` |
+| **System Entropy** | `{getattr(st.session_state.world, 'agent_entropy', 0):.3f}` | **Scarcity Factor** | `{getattr(st.session_state.world, 'scarcity_factor', 0):.3f}` |
+| **Thoughts/Sec** | `{sum(a.thoughts_had for a in all_agents)}` | **Reflexes/Sec** | `{sum(a.reflexes_used for a in all_agents)}` |
+| **Civ Type** | `Type {min(4, int(np.log10(max(1, sum(energies)))/2))}` | **Omega Point** | `{min(100.0, world.time_step/1000.0):.1f}%` |
+            """
+            st.markdown(stats_md)
+            
+            # Update max pop tracker
+            st.session_state.max_pop = max(n_pop, st.session_state.get('max_pop', 0))
+
+        # --- TOP 50 AGENTS GRID ---
+        st.caption("Showing Top 50 Agents by Age")
         agent_data = []
-        for agent in st.session_state.world.agents.values():
+        # Sort by Age descending (Elders first)
+        top_agents = sorted(st.session_state.world.agents.values(), key=lambda x: x.age, reverse=True)[:50]
+        
+        for agent in top_agents:
             iq_score = 0.0
             love_score = 0.0
             if agent.last_vector is not None:
