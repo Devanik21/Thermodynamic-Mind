@@ -354,24 +354,24 @@ def update_simulation():
         # 📉 Malthusian Decay (Crowding Penalty)
         # 1.4 Environmental Pressure: Scarcity scaling
         # ELASTIC: Only apply overcrowding penalty if population is healthy (> 450)
-        if len(world.agents) >= 450:
+        if len(world.agents) >= 480:
             # MIDDLE PATH FIX: Balanced decay for Darwinian Selection
             # Was: 0.1 + log/10.0 (~0.7 cost) -> Now: 0.1 + log/4.0 (~1.6 cost)
             malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 4.0)
             
             # SAGE BONUS: Elders (>100 ticks) are cleaner metabolizers
-            if agent.age > 100: malthusian_cost *= 0.5
+            if agent.age > 80: malthusian_cost *= 0.5
             
             agent.energy -= malthusian_cost 
         
         # 🧬 MITOSIS (Hard Cap: 512 per user request)
         # Nobel Safeguard: Panic Mitosis if pop < 300 (Cheaper cost, lower threshold)
         if len(world.agents) < 300:
-            mitosis_threshold = 35.0
-            mitosis_cost = 20.0
+            mitosis_threshold = 30.0
+            mitosis_cost = 10.0
         else:
-            mitosis_threshold = 95.0
-            mitosis_cost = 60.0
+            mitosis_threshold = 90.0
+            mitosis_cost = 40.0
         
         if agent.energy > mitosis_threshold and len(world.agents) < 512:
             agent.energy -= mitosis_cost 
@@ -1238,3 +1238,4 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
