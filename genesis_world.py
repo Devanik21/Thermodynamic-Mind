@@ -90,12 +90,11 @@ class Resource(Entity):
             if self.type == 2: return base * 5.0 # Blue is winter-survival fuel
             
             # Nuanced Winter Scarcity:
-            # "Easy Mode": Red/Green are almost as good as summer (20-30 vs 30)
-            # Just slightly suboptimal. No scarcity cliff.
+            # "Elite Mode": Red/Green are 25-30 vs 30. Barely different.
             # 0.01% chance of toxicity (-1)
             if random.random() < 0.0001:
                 return -1.0
-            return random.uniform(20.0, 30.0)
+            return random.uniform(25.0, 30.0)
 
 class MegaResource(Entity):
     """4.8 Distributed Cognition: Requires multiple agents or high synergy."""
@@ -412,16 +411,22 @@ class GenesisWorld:
                             outcome_log = "❌ TOO WEAK FOR MEGA"
                             return final_flux, outcome_log
                     
-                    # 2.8 Token Collection
-                    idx = int(res.type) # Ensure integer index
-                    agent.inventory[idx] += 1
-                    # Synergy Bonus: Complete set (R,G,B) gives +30 Energy
-                    if all(count > 0 for count in agent.inventory):
-                        agent.energy += 30.0
-                        for i in range(3): agent.inventory[i] -= 1
-                        outcome_log = "🌟 SYNERGY BONUS!"
-                    else:
-                        outcome_log = f"😋 CONSUMED {['Red','Green','Blue'][res.type]}"
+                    # 2.8 Token Collection (Standard Resource)
+                    try:
+                        idx = int(res.type)
+                        agent.inventory[idx] += 1
+                        # Synergy Bonus: Complete set (R,G,B) gives +30 Energy
+                        if all(count > 0 for count in agent.inventory):
+                            agent.energy += 30.0
+                            for i in range(3): agent.inventory[i] -= 1
+                            outcome_log = "🌟 SYNERGY BONUS!"
+                        else:
+                            outcome_log = f"😋 CONSUMED {['Red','Green','Blue'][idx]}"
+                    except (ValueError, TypeError):
+                        # This handles 'mega_resource' or any other non-standard entity
+                        agent.energy += 150.0 
+                        outcome_log = "💎 MEGA-RESOURCE HARVESTED!"
+                    
                     del self.grid[loc]
             else: outcome_log = "🔥 NEGATIVE FLUX (-)"
         
@@ -443,10 +448,18 @@ class GenesisWorld:
         
         # Nobel Safeguard: Universal Fertility (Phenotypic Plasticity)
         # If population crashes, everyone becomes a Queen to save the species.
-        if len(self.agents) < 50:
+        n_pop = len(self.agents)
+        if n_pop < 50:
             for agent in self.agents.values():
                 agent.is_fertile = True
         
+        # Nobel Adaptive Spawning: Lush world when population is low
+        adaptive_rate = self.base_spawn_rate
+        if n_pop < 100: adaptive_rate *= 2
+        
+        for _ in range(int(adaptive_rate * current_spawn_prob)):
+            self.spawn_resource()
+
         # Phase 15: Symbiosis Update
         self.metabolic_osmosis()
         
