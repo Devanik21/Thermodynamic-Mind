@@ -77,6 +77,17 @@ class GenesisAgent:
         # 1.6 Circadian Rhythms
         self.internal_phase = random.random() * 2 * np.pi
         
+        # --- PHASE 15: LEVEL 4 SPECIALIZATION ---
+        self.role = "Generalist" # 4.0 Behavioral Polymorphism
+        self.role_history = []  # 4.1 Role Stability
+        self.caste_gene = np.random.rand(4) # 4.6 Caste Genetics (Vector predisposition for roles)
+        self.is_fused = False   # 4.7 Dynamic Tensor Fusion
+        self.fused_partner = None
+        self.is_fertile = True # 4.10 Eusociality (Queens vs Workers)
+        if generation > 0:
+            # 4.10: 20% chance to be a Queen if gen > 0 (simplification for starting)
+            self.is_fertile = random.random() < 0.2
+        
         # Neural State
         self.brain = GenesisBrain()
         self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005)
@@ -228,6 +239,43 @@ class GenesisAgent:
         with torch.no_grad():
             for self_param, mentor_param in zip(self.brain.parameters(), mentor.brain.parameters()):
                 self_param.data.copy_(self_param.data * (1.0 - rate) + mentor_param.data * rate)
+            # 4.6 Caste Gene Drift during imitation
+            self.caste_gene = self.caste_gene * (1.0 - rate) + mentor.caste_gene * rate
+
+    def fuse_with(self, partner):
+        """4.7 Dynamic Tensor Fusion: Physical/Functional merging of two agents."""
+        if self.is_fused or partner.is_fused:
+            return False
+        
+        self.is_fused = True
+        partner.is_fused = True
+        self.fused_partner = partner
+        partner.fused_partner = self
+        
+        # Combine energy
+        combined_energy = self.energy + partner.energy
+        self.energy = combined_energy / 2.0
+        partner.energy = combined_energy / 2.0
+        
+        # Sync Tags (Merging identity)
+        new_tag = (self.tag + partner.tag) / 2.0
+        self.tag = new_tag
+        partner.tag = new_tag
+        
+        return True
+
+    def split_fusion(self):
+        """4.7 Division: Reverting from fused state."""
+        if not self.is_fused:
+            return
+        
+        partner = self.fused_partner
+        if partner:
+            partner.is_fused = False
+            partner.fused_partner = None
+        
+        self.is_fused = False
+        self.fused_partner = None
 
     def _mutate(self, rate=0.2):
         """Randomly alters brain weights to explore the genetic landscape."""
@@ -241,14 +289,19 @@ class GenesisAgent:
         """Serializes brain state and cultural tags for inheritance."""
         genome = {k: v.clone().detach() for k, v in self.brain.state_dict().items()}
         genome['tag'] = self.tag
+        genome['caste_gene'] = self.caste_gene # 4.6 Include caste in genome
         return genome
 
     def _apply_genome(self, genome):
         """Loads brain state from parent(s)."""
         # Remove metadata before loading into brain
-        brain_state = {k: v for k, v in genome.items() if k != 'tag'}
+        brain_state = {k: v for k, v in genome.items() if k not in ['tag', 'caste_gene']}
         self.brain.load_state_dict(brain_state)
         
         # Inherit tag with slight drift
         if 'tag' in genome:
             self.tag = np.clip(genome['tag'] + np.random.randn(3) * 0.05, 0, 1)
+            
+        # 4.6 Caste Inheritance
+        if 'caste_gene' in genome:
+            self.caste_gene = np.clip(genome['caste_gene'] + np.random.randn(4) * 0.05, 0, 1)
