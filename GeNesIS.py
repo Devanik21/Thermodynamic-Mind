@@ -169,10 +169,16 @@ def update_simulation():
             a.influence = (a.energy / 100.0) * (a.age / 50.0) * (len(a.inventions) + 1)
     
     for agent in agents:
-        if agent.energy <= 0:
+        # DEATH BUFFER (Prevent Instant Infant Death)
+        # Agents die if Energy < -20 (Adults) or -50 (Infants)
+        death_threshold = -50.0 if agent.age < 50 else -20.0
+        
+        if agent.energy <= death_threshold:
             deaths.add(agent.id)
             continue
             
+        # CLAMP ENERGY for actions (Prevent Death Spiral from one bad move)
+        if agent.energy < 0: agent.energy = 0.1 
         signal = world.get_local_signal(agent.x, agent.y)
         # 🌐 PHASE 13: "TURING" UPGRADE (Chemical Signaling)
         # Level 2.0: Pheromone Vector
@@ -238,17 +244,16 @@ def update_simulation():
 
         # ❤️ PHASE 14/17: "EUSOCIAL" REPRODUCTION (4.10) - ELASTIC DIFFICULTY
         n_pop = len(world.agents)
-        # Dynamic Thresholds & Costs
-        if n_pop < 300:
-            repro_thresh = 40.0
-            repro_cost = 15.0
-        elif n_pop < 450:
-            repro_thresh = 60.0
-            repro_cost = 30.0
-        else:
-            repro_thresh = 80.0
-            repro_cost = 40.0
-
+        
+        # SMOOTHED FORMULA (No more Tiers/Cliffs)
+        # Cost scales from 10.0 to 40.0 as pop goes 0 -> 500
+        # Formula: 10 + 30 * (pop/500)^2
+        scale_factor = (n_pop / 500.0) ** 2
+        repro_cost = 10.0 + (30.0 * scale_factor)
+        
+        # Threshold is Cost + Safety Buffer (20)
+        repro_thresh = repro_cost + 20.0 
+        
         # Only fertile agents (Queens) reproduce. Others must support them (feed).
         can_reproduce = agent.is_fertile and agent.energy > repro_thresh
         if mate_desire > 0.5 and can_reproduce and n_pop < 512:

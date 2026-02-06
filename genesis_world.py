@@ -85,16 +85,16 @@ class Resource(Entity):
         if is_summer:
             if self.type == 0 or self.type == 1: return base
             # Blue in Summer: Low value, not toxic
-            return 5.0 
+            return 10.0 
         else: # Winter
-            if self.type == 2: return base * 5.0 # Blue is winter-survival fuel
+            if self.type == 2: return base * 8.0 # Blue is winter-survival fuel
             
             # Nuanced Winter Scarcity:
             # "Elite Mode": Red/Green are 25-30 vs 30. Barely different.
-            # 0.01% chance of toxicity (-1)
-            if random.random() < 0.0001:
-                return -1.0
-            return random.uniform(25.0, 30.0)
+            # 0.001% chance of toxicity (-1)
+            if random.random() < 0.00001:
+                return -0.2
+            return random.uniform(25.0, 35.0)
 
 class MegaResource(Entity):
     """4.8 Distributed Cognition: Requires multiple agents or high synergy."""
@@ -453,12 +453,13 @@ class GenesisWorld:
             for agent in self.agents.values():
                 agent.is_fertile = True
         
-        # Nobel Adaptive Spawning: Lush world when population is low
-        adaptive_rate = self.base_spawn_rate
-        if n_pop < 300: 
-            adaptive_rate *= 5 # Extreme Abundance (Recovery Mode)
-        elif n_pop < 450:
-            adaptive_rate *= 3 # High Abundance (Growth Mode)
+        # Nobel Adaptive Spawning: Smooth Continuous Scaling
+        # Multiplier = 1 + 10 * exp(-pop/100)
+        # Pop 10 -> 10x
+        # Pop 100 -> 4.6x
+        # Pop 300 -> 1.5x
+        # Pop 500 -> 1.0x
+        adaptive_rate = self.base_spawn_rate * (1.0 + 10.0 * np.exp(-n_pop / 100.0))
         
         for _ in range(int(adaptive_rate * current_spawn_prob)):
             self.spawn_resource()

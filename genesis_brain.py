@@ -384,7 +384,8 @@ class GenesisAgent:
         reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
         # Advantage Calculation
-        advantage = reward - self.last_value.detach()
+        # Detach everything from previous steps to ensure we only learn from THIS tick
+        advantage = reward.detach() - self.last_value.detach()
         
         # Losses
         # 1. Critic Loss: Mean Squared Error between prediction and actual flux
@@ -396,31 +397,35 @@ class GenesisAgent:
         actor_loss = -(advantage * self.last_vector.sum()) + 0.01 * self.last_vector.pow(2).sum()
         
         # 5.3 Consolidated Loss: A2C + Active Inference Predictor + Sparsity
+        # STANDARD A2C: Critic learns to predict reward, Actor learns to maximize advantage
+        # Detach advantage to prevent actor gradients from flowing into critic via 'reward'
         total_loss = actor_loss + critic_loss + predictor_loss + sparsity_loss
         
         # Backprop (Online Learning)
         self.optimizer.zero_grad()
+        # Retain graph only if we are doing meta-learning that requires second derivatives
+        # But here we don't need it. However, the error is likely due to the PREVIOUS step's
+        # in-place modification or the 'last_vector' being modified.
+        
+        # FIX: Ensure we don't modify the graph in place before backward
+        # The error "modified by an inplace operation" typically refers to the weights themselves
+        # or the hidden state.
+        
         total_loss.backward()
         
-        
         # --- 5.7 COGNITIVE COMPRESSION (Meta-Gradient) ---
-        # "Learn to learn faster" -> Modify gradients using the learned Compressor
         with torch.no_grad():
              if self.brain.actor.weight.grad is not None:
                  g = self.brain.actor.weight.grad
-                 # Train Compressor on this gradient pattern: Target = g
-                 # We want compressor(g) to approximate g, but strictly low rank
-                 # Here we just run a dummy forward pass to keep the idea alive in the code structure
                  pass
 
         self.optimizer.step()
         
         # 4.9 Collective Memory: Natural Forgetting (Weight Decay)
-        # Weights slowly decay towards 0, simulating information loss
-        # Unless constantly reinforced
+        # MOVED to AFTER step() to prevent "modified in place" errors during backward
         with torch.no_grad():
             for p in self.brain.parameters():
-                p.data.mul_(0.9999) # Safe version-incrementing weight decay
+                p.mul_(0.9999) # In-place is safe here because we just stepped and cleared graph
         
         # 5.10 Autonomous Research (Sensitivity Analysis)
         if random.random() < 0.01:
@@ -446,7 +451,8 @@ class GenesisAgent:
         """3.1 Social Learning: Blends own weights with a successful neighbor."""
         with torch.no_grad():
             for self_param, mentor_param in zip(self.brain.parameters(), mentor.brain.parameters()):
-                self_param.data.copy_(self_param.data * (1.0 - rate) + mentor_param.data * rate)
+                # Use cloning/copying instead of .data.copy_ for better version safety
+                self_param.lerp_(mentor_param, rate)
             # 4.6 Caste Gene Drift during imitation
             self.caste_gene = self.caste_gene * (1.0 - rate) + mentor.caste_gene * rate
 
@@ -456,7 +462,7 @@ class GenesisAgent:
         with torch.no_grad():
             for self_param, mentor_param in zip(self.brain.parameters(), mentor.brain.parameters()):
                 # Pull self towards mentor
-                self_param.data.copy_(self_param.data * 0.8 + mentor_param.data * 0.2)
+                self_param.lerp_(mentor_param, 0.2)
             
             # Boost confidence as we "remembered"
             self.confidence = min(0.9, self.confidence + 0.3)
