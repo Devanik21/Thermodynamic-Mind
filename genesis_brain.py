@@ -182,6 +182,10 @@ class GenesisAgent:
         else:
             self.hidden_state = torch.zeros(1, 1, 64)
         
+        # v5.0.4 Persistent state for Ghost Forward
+        self.prev_input = None
+        self.prev_hidden = None
+        
         self.last_concepts = torch.zeros(1, 8) # 5.8 Initialize
         
         # LEVEL 5 STATE MEMORY
@@ -278,10 +282,11 @@ class GenesisAgent:
             gradient_signal
         ], dim=1).float()
     
-        # 5.3 Active Inference: Minimize Free Energy upon Perception
-        # (Learn from the surprise of this new input before acting)
-        self.metabolize_free_energy(input_tensor)
-
+        # v5.0.4 Store previous state before update
+        # We need to detach metadata to prevent graph leaks
+        self.prev_input = input_tensor.detach()
+        self.prev_hidden = self.hidden_state.detach()
+        
         # Forward Pass
         vector, comm_vector, meta, value, h_next, prediction, concepts = self.brain(input_tensor, self.hidden_state)
         
@@ -347,13 +352,32 @@ class GenesisAgent:
         
         iq_reward = self.last_vector.std() * 5.0 # Punish uniform thinking
         
-        # 5.3 Free Energy Reward (FRISTONIAN OVERRIDE)
-        # We calculate the predictor loss but don't call backward yet.
-        # It will be combined with the A2C loss below.
+        # 5.3 Free Energy Reward (FRISTONIAN OVERRIDE) - v5.0.4 "GHOST FORWARD"
         predictor_loss = torch.tensor(0.0)
-        if self.last_input is not None and self.last_prediction is not None:
+        if self.prev_input is not None and self.prev_hidden is not None:
+             # Fresh forward pass on the SAME transition
+             _, _, _, _, _, ghost_prediction, _ = self.brain(self.prev_input, self.prev_hidden)
              pred_loss_fn = nn.MSELoss()
-             predictor_loss = pred_loss_fn(self.last_prediction, self.last_input.detach())
+             # Compare ghost prediction (made from t-1) with the ACTUAL current input (t)
+             predictor_loss = pred_loss_fn(ghost_prediction, self.last_input.detach())
+             
+             # 5.0 Self-Monitoring
+             self.prediction_errors.append(predictor_loss.item())
+             if len(self.prediction_errors) > 50: self.prediction_errors.pop(0)
+             recent_error = np.mean(self.prediction_errors)
+             self.confidence = 1.0 / (1.0 + recent_error)
+             
+             # 5.1 Meta-Learning (Hypergradient)
+             if len(self.prediction_errors) > 2 and self.prediction_errors[-1] > self.prediction_errors[-2] * 1.5:
+                 self.meta_lr = min(0.05, self.meta_lr * 1.2)
+             else:
+                 self.meta_lr = max(0.001, self.meta_lr * 0.99)
+                 
+             for param_group in self.optimizer.param_groups:
+                 param_group['lr'] = self.meta_lr
+
+        # 5.2 Sparsity Loss
+        sparsity_loss = self.brain.actor_mask.sparsity() * 0.01
         
         reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
@@ -369,9 +393,8 @@ class GenesisAgent:
         # Added regularization to prevent activation explosion
         actor_loss = -(advantage * self.last_vector.sum()) + 0.01 * self.last_vector.pow(2).sum()
         
-        # 5.3 Consolidated Loss: A2C + Active Inference Predictor
-        # Combining them allows a single unified update per tick.
-        total_loss = actor_loss + critic_loss + predictor_loss
+        # 5.3 Consolidated Loss: A2C + Active Inference Predictor + Sparsity
+        total_loss = actor_loss + critic_loss + predictor_loss + sparsity_loss
         
         # Backprop (Online Learning)
         self.optimizer.zero_grad()
@@ -396,6 +419,10 @@ class GenesisAgent:
         with torch.no_grad():
             for p in self.brain.parameters():
                 p.data.mul_(0.9999) # Safe version-incrementing weight decay
+        
+        # 5.10 Autonomous Research (Sensitivity Analysis)
+        if random.random() < 0.01:
+            self.conduct_experiment()
         
         
         self.thoughts_had += 1
@@ -496,55 +523,6 @@ class GenesisAgent:
         if 'caste_gene' in genome:
             self.caste_gene = np.clip(genome['caste_gene'] + np.random.randn(4) * 0.05, 0, 1)
 
-    def metabolize_free_energy(self, current_input):
-        """
-        5.3 Active Inference Update Loop. 
-        Replaces standard RL with Free Energy Minimization.
-        """
-        if self.last_prediction is None or self.last_value is None:
-            return False
-            
-        # 1. Calculate SUPRISE (Prediction Error)
-        # last_prediction was made at t-1 to predict t (current_input)
-        pred_loss_fn = nn.MSELoss()
-        # Detach current_input to ensure we only update the predictor for THIS step
-        prediction_error = pred_loss_fn(self.last_prediction, current_input.detach())
-        
-        # 5.0 Self-Monitoring
-        self.prediction_errors.append(prediction_error.item())
-        if len(self.prediction_errors) > 50: self.prediction_errors.pop(0)
-        recent_error = np.mean(self.prediction_errors)
-        self.confidence = 1.0 / (1.0 + recent_error)
-        
-        # 5.1 Meta-Learning (Hypergradient Descent)
-        # If error is increasing, we might need to adapt LR.
-        # Simple heuristic: If error spike, boost plasticity.
-        if len(self.prediction_errors) > 2 and self.prediction_errors[-1] > self.prediction_errors[-2] * 1.5:
-            # Surprise spike! Learn faster!
-            self.meta_lr = min(0.05, self.meta_lr * 1.2)
-        else:
-            # Stable. Cool down.
-            self.meta_lr = max(0.001, self.meta_lr * 0.99)
-            
-        for param_group in self.optimizer.param_groups:
-             param_group['lr'] = self.meta_lr
-             
-        # 5.2 Sparsity Loss
-        sparsity_loss = self.brain.actor_mask.sparsity() * 0.01
-        
-        # Total Loss
-        loss = prediction_error + sparsity_loss
-        
-        # Backprop: REMOVED. Consolidated into metabolize_outcome to avoid stale graph errors.
-        # self.optimizer.zero_grad()
-        # loss.backward(retain_graph=True) 
-        # self.optimizer.step()
-        
-        # 5.10 Autonomous Research (Sensitivity Analysis)
-        if random.random() < 0.01: # Rare event to save compute
-            self.conduct_experiment()
-            
-        return True
 
     def conduct_experiment(self):
         """5.10 Gradient-based Sensitivity Analysis (The 'Newton' Method)."""
