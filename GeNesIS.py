@@ -870,69 +870,7 @@ with tab_culture:
         if hasattr(st.session_state.world, 'meme_grid'):
             meme_vis = st.session_state.world.meme_grid.copy()
             
-with tab_meta:
-    st.markdown("## 🧠 Level 5: Recursive Self-Improvement")
-    
-    if st.session_state.world.agents:
-        agents = list(st.session_state.world.agents.values())
-        
-        col_m1, col_m2 = st.columns(2)
-        
-        with col_m1:
-            st.markdown("### 5.0 Self-Monitoring & Confidence")
-            confidence_vals = [a.confidence for a in agents if hasattr(a, 'confidence')]
-            if confidence_vals:
-                avg_conf = np.mean(confidence_vals)
-                st.metric("Mean Agent Confidence", f"{avg_conf:.2%}")
-                
-            errors = [np.mean(a.prediction_errors) for a in agents if hasattr(a, 'prediction_errors') and a.prediction_errors]
-            if errors:
-                avg_error = np.mean(errors)
-                st.metric("Mean Prediction Error (Surprise)", f"{avg_error:.4f}")
-                
-        with col_m2:
-            st.markdown("### 5.10 Autonomous Research Log")
-            # Aggregate research logs
-            all_discoveries = []
-            for a in agents:
-                if hasattr(a, 'research_log'):
-                    for entry in a.research_log:
-                        all_discoveries.append(f"{entry} (Agent {a.id[:4]})")
-            
-            if all_discoveries:
-                st.write(all_discoveries[-10:])
-            else:
-                st.info("Agents are conducting experiments... No major discoveries yet.")
-                
-        st.markdown("---")
-        st.markdown("### 5.2 Architecture Search (Sparsity)")
-        sparsities = []
-        for a in agents:
-            if hasattr(a.brain, 'actor_mask'):
-                sparsities.append(a.brain.actor_mask.sparsity().item())
-        
-        if sparsities:
-            st.metric("Mean Neural Sparsity", f"{np.mean(sparsities):.2%}")
-            
-        st.markdown("### 5.6 Collective Values")
-        if hasattr(st.session_state.world, 'collective_values'):
-            st.json(st.session_state.world.collective_values)
-            # Clip to 0-1 range for RGB display
-            meme_vis = np.clip(meme_vis, 0, 1)
-            # Resize for better visibility (optional, but plotly heatmap handles it)
-            
-            if st.session_state.get("show_charts", False):
-                fig_meme = px.imshow(
-                    meme_vis, 
-                    title="Collective Memory (RGB: Danger/Resource/Sacred)",
-                    labels=dict(x="X", y="Y")
-                )
-                fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_meme, width='stretch')
-            else:
-                st.text("[Chart Hidden] Enabling Live Charts to see Stigmergy Map")
-        else:
-            st.info("Meme Grid initializing...")
+
             
     with col_dyn:
         st.markdown("### 📜 Cultural Dynamics")
@@ -1209,6 +1147,22 @@ with tab_meta:
                 
             st.markdown("### 5.6 Collective Values")
             st.json(st.session_state.world.collective_values)
+            
+            # --- Added Global Map to Meta for Max Info ---
+            if hasattr(st.session_state.world, 'meme_grid'):
+                st.markdown("### 🗺️ Stigmergy Map (Knowledge Grid)")
+                meme_vis = st.session_state.world.meme_grid.copy()
+                meme_vis = np.clip(meme_vis, 0, 1)
+                if st.session_state.get("show_charts", False):
+                    fig_meme = px.imshow(
+                        meme_vis, 
+                        title="Collective Memory (RGB: Danger/Resource/Sacred)",
+                        labels=dict(x="X", y="Y")
+                    )
+                    fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+                    st.plotly_chart(fig_meme, width='stretch')
+                else:
+                    st.caption("Enable live charts to see pheromone/meme evolution.")
 
 if st.session_state.running:
     time.sleep(0.02) 
