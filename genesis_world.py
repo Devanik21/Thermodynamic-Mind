@@ -136,6 +136,33 @@ class GenesisWorld:
         # 5.6 Collective Optimization
         self.collective_values = {"Efficiency": 0.5, "Growth": 0.5}
         self.fitness_landscape_shift = 0.0
+
+    def collective_memory_retrieval(self):
+        """4.9 Collective Memory: Agents with low confidence query the hive."""
+        # Only run occasionally to save compute
+        if self.time_step % 10 != 0: return
+
+        for agent in self.agents.values():
+            if agent.confidence < 0.3: # Confused/Forgetting
+                 # Find a confident neighbor (Mentor)
+                 best_mentor = None
+                 max_conf = 0.5
+                 
+                 neighbors = [
+                     self.agents[oid] for oid in self.agents 
+                     if oid != agent.id and abs(self.agents[oid].x - agent.x) <= 2 and abs(self.agents[oid].y - agent.y) <= 2
+                 ]
+                 
+                 for n in neighbors:
+                     if n.confidence > max_conf:
+                         max_conf = n.confidence
+                         best_mentor = n
+                 
+                 if best_mentor:
+                     # Restore deleted/decayed weights from mentor
+                     if hasattr(agent, 'restorative_imitation'):
+                        agent.restorative_imitation(best_mentor)
+            
             
     def spawn_resource(self):
         x, y = random.randint(0, self.size-1), random.randint(0, self.size-1)
@@ -249,8 +276,22 @@ class GenesisWorld:
                      agent.energy -= 0.5 
              
              agent.energy -= signal_cost
-             self.pheromone_grid[agent.x, agent.y] += emit_vector.detach().numpy()
-             np.clip(self.pheromone_grid[agent.x, agent.y], 0, 1.0, out=self.pheromone_grid[agent.x, agent.y])
+             
+             # 3.8 Symbolic Reference (Displacement)
+             # If Channel 15 > 0.5, project signal to offset coordinates (Ch 13, 14)
+             target_x, target_y = agent.x, agent.y
+             displacement_flag = emit_vector[15].item()
+             if displacement_flag > 0.5:
+                 # Map 0-1 to -5 to +5 offset
+                 dx = int((emit_vector[13].item() - 0.5) * 10)
+                 dy = int((emit_vector[14].item() - 0.5) * 10)
+                 target_x = (agent.x + dx) % self.size
+                 target_y = (agent.y + dy) % self.size
+                 # Higher cost for projection
+                 agent.energy -= 0.5
+             
+             self.pheromone_grid[target_x, target_y] += emit_vector.detach().numpy()
+             np.clip(self.pheromone_grid[target_x, target_y], 0, 1.0, out=self.pheromone_grid[target_x, target_y])
 
         # 2. 2.4 Coalition & 2.5 Resource Sharing: BOND LOGIC
         if adhesion > 0.5:
@@ -390,6 +431,10 @@ class GenesisWorld:
         self.metabolic_osmosis()
         # Phase 15: Symbiosis Update
         self.metabolic_osmosis()
+        
+        # 4.9 Collective Memory: Retrieve lost knowledge
+        self.collective_memory_retrieval()
+        
         self._update_entropy_metrics()
         
         # 5.6 Collective Optimization
