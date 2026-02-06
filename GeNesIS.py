@@ -722,7 +722,7 @@ with tab_micro:
                         color_discrete_sequence=px.colors.qualitative.Bold
                     )
                     fig_cluster.update_layout(height=350, plot_bgcolor='rgba(0,0,0,0)')
-                    st.plotly_chart(fig_cluster, use_container_width=True)
+                    st.plotly_chart(fig_cluster, width='stretch')
                 else:
                     st.caption("Plots hidden.")
             else:
@@ -741,7 +741,7 @@ with tab_micro:
                  if st.session_state.get("show_charts", False):
                      fig_mod = px.scatter(x=states, y=actions, labels={'x': "Internal Energy", 'y': "Mean Action Vector"}, title="Energy vs Action Modulation")
                      fig_mod.update_layout(height=300)
-                     st.plotly_chart(fig_mod, use_container_width=True)
+                     st.plotly_chart(fig_mod, width='stretch')
                 
         st.markdown("### �🧠 The Mind Cloud")
         if st.session_state.world.agents:
@@ -764,7 +764,7 @@ with tab_micro:
                         title=f"Real-Time Thought Spectrum (n={len(vectors)})"
                     )
                     fig_spec.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                    st.plotly_chart(fig_spec, use_container_width=True)
+                    st.plotly_chart(fig_spec, width='stretch')
         else:
             st.warning("Extinction Event. No Minds Detected.")
 
@@ -807,7 +807,7 @@ with tab_micro:
                         title="Short-Term Memory (GRU Hidden State)"
                     )
                     fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
-                    st.plotly_chart(fig_h, use_container_width=True)
+                    st.plotly_chart(fig_h, width='stretch')
             else:
                 st.info("Agent is in Reflex-Only mode (Brain idle).")
     else:
@@ -827,7 +827,7 @@ with tab_culture:
             rgb_grid = (grid_data[:, :, :3] * 255).astype(np.uint8)
             fig_meme = px.imshow(rgb_grid, title="Global Knowledge (Meme Grid)")
             fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-            st.plotly_chart(fig_meme, use_container_width=True)
+            st.plotly_chart(fig_meme, width='stretch')
         else:
             st.info("Meme Grid Hidden.")
 
@@ -924,7 +924,7 @@ with tab_meta:
                     labels=dict(x="X", y="Y")
                 )
                 fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_meme, use_container_width=True)
+                st.plotly_chart(fig_meme, width='stretch')
             else:
                 st.text("[Chart Hidden] Enabling Live Charts to see Stigmergy Map")
         else:
@@ -963,7 +963,7 @@ with tab_meta:
                         labels={'y': "Mean Action Norm", 'x': "Time"}
                     )
                     fig_trad.update_layout(height=200)
-                    st.plotly_chart(fig_trad, use_container_width=True)
+                    st.plotly_chart(fig_trad, width='stretch')
 
         # 3.5 Cultural Drift (KL Divergence)
         st.markdown("### 🧬 Cultural Drift (KL 3.5)")
@@ -1028,7 +1028,7 @@ with tab_meta:
         st.markdown("### ⚡ Event Stream")
         if st.session_state.event_log:
              log_df = pd.DataFrame(st.session_state.event_log)
-             st.dataframe(log_df[["Agent", "Event"]], use_container_width=True, height=400)
+             st.dataframe(log_df[["Agent", "Event"]], width='stretch', height=400)
 
 with tab_omega:
     col_civ, col_agent = st.columns([1, 2])
@@ -1098,7 +1098,7 @@ with tab_omega:
             
         if agent_data:
             df_agents = pd.DataFrame(agent_data)
-            st.dataframe(df_agents, use_container_width=True, height=400)
+            st.dataframe(df_agents, width='stretch', height=400)
 
 
 with tab_nobel:
