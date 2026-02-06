@@ -236,15 +236,27 @@ def update_simulation():
                         })
                         break
 
-        # ❤️ PHASE 14/17: "EUSOCIAL" REPRODUCTION (4.10)
+        # ❤️ PHASE 14/17: "EUSOCIAL" REPRODUCTION (4.10) - ELASTIC DIFFICULTY
+        n_pop = len(world.agents)
+        # Dynamic Thresholds & Costs
+        if n_pop < 300:
+            repro_thresh = 40.0
+            repro_cost = 15.0
+        elif n_pop < 450:
+            repro_thresh = 60.0
+            repro_cost = 30.0
+        else:
+            repro_thresh = 80.0
+            repro_cost = 40.0
+
         # Only fertile agents (Queens) reproduce. Others must support them (feed).
-        can_reproduce = agent.is_fertile and agent.energy > 70.0
-        if mate_desire > 0.5 and can_reproduce and len(world.agents) < 512:
+        can_reproduce = agent.is_fertile and agent.energy > repro_thresh
+        if mate_desire > 0.5 and can_reproduce and n_pop < 512:
             # Look for partner
             partners = [
                 other for other in agents 
                 if other.id != agent.id 
-                and other.energy > 80.0 
+                and other.energy > repro_thresh 
                 and abs(other.x - agent.x) <= 1 
                 and abs(other.y - agent.y) <= 1
             ]
@@ -277,8 +289,8 @@ def update_simulation():
                 world.agents[child.id] = child
                 
                 # Cost
-                agent.energy -= 40.0
-                partner.energy -= 40.0
+                agent.energy -= repro_cost
+                partner.energy -= repro_cost
                 
                 events_this_tick.append({
                     "Tick": world.time_step,
@@ -335,13 +347,19 @@ def update_simulation():
             
         # 📉 Malthusian Decay (Crowding Penalty)
         # 1.4 Environmental Pressure: Scarcity scaling
-        malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 3.0)
-        agent.energy -= malthusian_cost 
+        # ELASTIC: Only apply overcrowding penalty if population is healthy (> 450)
+        if len(world.agents) >= 450:
+            malthusian_cost = 0.5 + (np.log1p(len(world.agents)) / 3.0)
+            agent.energy -= malthusian_cost 
         
         # 🧬 MITOSIS (Hard Cap: 512 per user request)
-        # Nobel Safeguard: Panic Mitosis if pop < 50 (Cheaper cost, lower threshold)
-        mitosis_threshold = 30.0 if len(world.agents) < 50 else 90.0
-        mitosis_cost = 20.0 if len(world.agents) < 50 else 60.0
+        # Nobel Safeguard: Panic Mitosis if pop < 300 (Cheaper cost, lower threshold)
+        if len(world.agents) < 300:
+            mitosis_threshold = 35.0
+            mitosis_cost = 20.0
+        else:
+            mitosis_threshold = 95.0
+            mitosis_cost = 60.0
         
         if agent.energy > mitosis_threshold and len(world.agents) < 512:
             agent.energy -= mitosis_cost 

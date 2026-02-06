@@ -455,7 +455,10 @@ class GenesisWorld:
         
         # Nobel Adaptive Spawning: Lush world when population is low
         adaptive_rate = self.base_spawn_rate
-        if n_pop < 100: adaptive_rate *= 2
+        if n_pop < 300: 
+            adaptive_rate *= 5 # Extreme Abundance (Recovery Mode)
+        elif n_pop < 450:
+            adaptive_rate *= 3 # High Abundance (Growth Mode)
         
         for _ in range(int(adaptive_rate * current_spawn_prob)):
             self.spawn_resource()
