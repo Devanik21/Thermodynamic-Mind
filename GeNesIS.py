@@ -867,99 +867,39 @@ with tab_culture:
         else:
             st.info("No cultural history yet.")
         # Grid is (40, 40, 3). Channels: R(Danger), G(Food), B(Sacred)
-        if hasattr(st.session_state.world, 'meme_grid'):
-            meme_vis = st.session_state.world.meme_grid.copy()
-            
-with tab_meta:
-    st.markdown("## 🧠 Level 5: Recursive Self-Improvement")
-    
-    if st.session_state.world.agents:
-        agents = list(st.session_state.world.agents.values())
-        
-        col_m1, col_m2 = st.columns(2)
-        
-        with col_m1:
-            st.markdown("### 5.0 Self-Monitoring & Confidence")
-            confidence_vals = [a.confidence for a in agents if hasattr(a, 'confidence')]
-            if confidence_vals:
-                avg_conf = np.mean(confidence_vals)
-                st.metric("Mean Agent Confidence", f"{avg_conf:.2%}")
-                
-            errors = [np.mean(a.prediction_errors) for a in agents if hasattr(a, 'prediction_errors') and a.prediction_errors]
-            if errors:
-                avg_error = np.mean(errors)
-                st.metric("Mean Prediction Error (Surprise)", f"{avg_error:.4f}")
-                
-        with col_m2:
-            st.markdown("### 5.10 Autonomous Research Log")
-            # Aggregate research logs
-            all_discoveries = []
-            for a in agents:
-                if hasattr(a, 'research_log'):
-                    for entry in a.research_log:
-                        all_discoveries.append(f"{entry} (Agent {a.id[:4]})")
-            
-            if all_discoveries:
-                st.write(all_discoveries[-10:])
-            else:
-                st.info("Agents are conducting experiments... No major discoveries yet.")
-                
-        st.markdown("---")
-        st.markdown("### 5.2 Architecture Search (Sparsity)")
-        sparsities = []
-        for a in agents:
-            if hasattr(a.brain, 'actor_mask'):
-                sparsities.append(a.brain.actor_mask.sparsity().item())
-        
-        if sparsities:
-            st.metric("Mean Neural Sparsity", f"{np.mean(sparsities):.2%}")
-            
-        st.markdown("### 5.6 Collective Values")
-        if hasattr(st.session_state.world, 'collective_values'):
-            st.json(st.session_state.world.collective_values)
-            # Clip to 0-1 range for RGB display
-            meme_vis = np.clip(meme_vis, 0, 1)
-            # Resize for better visibility (optional, but plotly heatmap handles it)
-            
-            if st.session_state.get("show_charts", False):
-                fig_meme = px.imshow(
-                    meme_vis, 
-                    title="Collective Memory (RGB: Danger/Resource/Sacred)",
-                    labels=dict(x="X", y="Y")
-                )
-                fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_meme, width='stretch')
-            else:
-                st.text("[Chart Hidden] Enabling Live Charts to see Stigmergy Map")
-        else:
-            st.info("Meme Grid initializing...")
-            
+        if len(st.session_state.world.agents) > 10:
+             agents_all = list(st.session_state.world.agents.values())
+             pop_A = [a for a in agents_all if a.x < 20]
+             pop_B = [a for a in agents_all if a.x >= 20]
+             if len(pop_A) > 5 and len(pop_B) > 5:
+                 def get_action_dist(pop):
+                     vecs = [a.last_vector.detach().cpu().numpy().flatten() for a in pop if a.last_vector is not None]
+                     if not vecs: return np.zeros(21)
+                     mean_v = np.mean(vecs, axis=0)
+                     e_x = np.exp(mean_v - np.max(mean_v))
+                     return e_x / (e_x.sum() + 1e-9)
+                 P = get_action_dist(pop_A)
+                 Q = get_action_dist(pop_B)
+                 kl = np.sum(P * np.log((P + 1e-9) / (Q + 1e-9)))
+                 st.metric("East-West Divergence (KL)", f"{kl:.4f}")
+
     with col_dyn:
         st.markdown("### 📜 Cultural Dynamics")
-        
-        # 3.4 Tradition Formation (Stability of Action Vectors)
-        # We need history of mean action vectors.
-        # Let's compute current mean action vector
         if st.session_state.world.agents:
             current_actions = []
             for a in st.session_state.world.agents.values():
                 if a.last_vector is not None:
-                     current_actions.append(a.last_vector.detach().numpy().flatten())
+                     current_actions.append(a.last_vector.detach().cpu().numpy().flatten())
             
             if current_actions:
                 mean_action = np.mean(current_actions, axis=0)
-                # Store simple scalar proxy (norm) for now to track stability
                 action_norm = np.linalg.norm(mean_action)
-                
-                # Update stats history if needed or just use a local list
                 if "tradition_history" not in st.session_state:
                     st.session_state.tradition_history = []
-                
                 st.session_state.tradition_history.append(action_norm)
                 if len(st.session_state.tradition_history) > 100:
                     st.session_state.tradition_history.pop(0)
                 
-                # Plot
                 if st.session_state.get("show_charts", False):
                     fig_trad = px.line(
                         y=st.session_state.tradition_history, 
@@ -968,71 +908,8 @@ with tab_meta:
                     )
                     fig_trad.update_layout(height=200)
                     st.plotly_chart(fig_trad, width='stretch')
-
-        # 3.5 Cultural Drift (KL Divergence)
-        st.markdown("### 🧬 Cultural Drift (KL 3.5)")
-        # Split geographically: West vs East
-        if len(st.session_state.world.agents) > 10:
-             agents_all = list(st.session_state.world.agents.values())
-             pop_A = [a for a in agents_all if a.x < 20]
-             pop_B = [a for a in agents_all if a.x >= 20]
-             
-             if len(pop_A) > 5 and len(pop_B) > 5:
-                 def get_action_dist(pop):
-                     # Feature distribution of Action Vectors
-                     vecs = [a.last_vector.detach().cpu().numpy().flatten() for a in pop if a.last_vector is not None]
-                     if not vecs: return np.zeros(21)
-                     mean_v = np.mean(vecs, axis=0)
-                     # Softmax for probability distribution
-                     e_x = np.exp(mean_v - np.max(mean_v))
-                     return e_x / e_x.sum()
-                 
-                 P = get_action_dist(pop_A)
-                 Q = get_action_dist(pop_B)
-                 # KL Divergence: Sum(P * log(P/Q))
-                 kl = np.sum(P * np.log((P + 1e-9) / (Q + 1e-9)))
-                 st.metric("East-West Divergence (KL)", f"{kl:.4f}")
-                 if kl > 2.0: st.success("✅ Milestone 3.5 Reached!")
-
-        # 3.6 Innovation Diffusion (S-Curve)
-        st.markdown("### 📈 Innovation Diffusion (S-Curve 3.6)")
-        inv_count = len(st.session_state.global_registry)
-        st.metric("Total Patents", inv_count)
-        
-        if st.session_state.global_registry:
-            df_inv = pd.DataFrame(st.session_state.global_registry)
-            if len(df_inv) > 10:
-                df_inv = df_inv.sort_values('tick')
-                ticks = df_inv['tick'].values.astype(float)
-                y = np.arange(1, len(ticks) + 1).astype(float)
-                
-                # Logistic Fit Check: Log(y / (L-y)) = kx + c
-                L = len(ticks) * 1.5
-                valid_mask = y < L
-                if valid_mask.sum() > 5:
-                    y_logit = np.log((y[valid_mask] + 1e-9) / (L - y[valid_mask] + 1e-9))
-                    try:
-                        slope, intercept = np.polyfit(ticks[valid_mask], y_logit, 1)
-                        y_pred = slope * ticks[valid_mask] + intercept
-                        ss_res = np.sum((y_logit - y_pred)**2)
-                        ss_tot = np.sum((y_logit - np.mean(y_logit))**2)
-                        r2 = 1 - (ss_res / (ss_tot + 1e-9))
-                        st.metric("Logistic Fit R²", f"{r2:.3f}")
-                        if r2 > 0.9: st.success("✅ Milestone 3.6 Reached!")
-                    except:
-                        st.caption("Curve fit unstable.")
-
-            # Show recent inventions
-            recents = st.session_state.global_registry[-5:]
-            for inv in recents:
-                st.caption(f"Tick {inv['tick']}: **{inv['name']}** (Yield {inv['value']:.1f})")
-
             
-    with col_log:
-        st.markdown("### ⚡ Event Stream")
-        if st.session_state.event_log:
-             log_df = pd.DataFrame(st.session_state.event_log)
-             st.dataframe(log_df[["Agent", "Event"]], width='stretch', height=400)
+        # Innovation Diffusion (Moved to Nobel Tab logic below)
 
 with tab_omega:
     col_civ, col_agent = st.columns([1, 2])
@@ -1104,6 +981,11 @@ with tab_omega:
             df_agents = pd.DataFrame(agent_data)
             st.dataframe(df_agents, width='stretch', height=400)
 
+    st.markdown("### ⚡ Global Event Stream")
+    if st.session_state.event_log:
+         log_df = pd.DataFrame(st.session_state.event_log)
+         st.dataframe(log_df[["Agent", "Event"]].tail(50), width='stretch', height=400)
+
 
 with tab_nobel:
     st.markdown("## 🏆 The Nobel Committee for Artificial Minds")
@@ -1142,6 +1024,25 @@ with tab_nobel:
                 for name, param in target_n.brain.named_parameters():
                     all_params[name] = param.detach().cpu().numpy().tolist()
                 st.json(all_params)
+        
+        st.markdown("### 📈 Innovation Diffusion (S-Curve 3.6)")
+        inv_count = len(st.session_state.global_registry)
+        st.metric("Total Patents", inv_count)
+        
+        if st.session_state.global_registry:
+            df_inv = pd.DataFrame(st.session_state.global_registry)
+            if len(df_inv) > 10:
+                df_inv = df_inv.sort_values('tick')
+                ticks = df_inv['tick'].values.astype(float)
+                y = np.arange(1, len(ticks) + 1).astype(float)
+                L = len(ticks) * 1.5
+                valid_mask = y < L
+                if valid_mask.sum() > 5:
+                    y_logit = np.log((y[valid_mask] + 1e-9) / (L - y[valid_mask] + 1e-9))
+                    try:
+                        slope, intercept = np.polyfit(ticks[valid_mask], y_logit, 1)
+                        st.metric("Innovation Velocity", f"{slope:.4f}")
+                    except: pass
     else:
         st.warning("No minds detected for review.")
 
@@ -1209,6 +1110,21 @@ with tab_meta:
                 
             st.markdown("### 5.6 Collective Values")
             st.json(st.session_state.world.collective_values)
+            
+            if hasattr(st.session_state.world, 'meme_grid'):
+                st.markdown("### 🗺️ Collective Memory (Stigmergy)")
+                meme_vis = st.session_state.world.meme_grid.copy()
+                meme_vis = np.clip(meme_vis, 0, 1)
+                if st.session_state.get("show_charts", False):
+                    fig_meme = px.imshow(
+                        meme_vis, 
+                        title="Metacognitive Map (Level 5)",
+                        labels=dict(x="X", y="Y", color="Meme Intensity")
+                    )
+                    fig_meme.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
+                    st.plotly_chart(fig_meme, width='stretch')
+                else:
+                    st.caption("Enable Live Charts to see Stigmergy Map.")
 
 if st.session_state.running:
     time.sleep(0.02) 
