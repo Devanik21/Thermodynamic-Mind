@@ -904,7 +904,22 @@ with tab_meta:
             else:
                 st.info("Agents are conducting experiments... No major discoveries yet.")
                 
-
+        st.markdown("---")
+        st.markdown("### 5.2 Architecture Search (Sparsity)")
+        sparsities = []
+        for a in agents:
+            if hasattr(a.brain, 'actor_mask'):
+                sparsities.append(a.brain.actor_mask.sparsity().item())
+        
+        if sparsities:
+            st.metric("Mean Neural Sparsity", f"{np.mean(sparsities):.2%}")
+            
+        st.markdown("### 5.6 Collective Values")
+        if hasattr(st.session_state.world, 'collective_values'):
+            st.json(st.session_state.world.collective_values)
+            # Clip to 0-1 range for RGB display
+            meme_vis = np.clip(meme_vis, 0, 1)
+            # Resize for better visibility (optional, but plotly heatmap handles it)
             
             if st.session_state.get("show_charts", False):
                 fig_meme = px.imshow(
@@ -1198,4 +1213,3 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
