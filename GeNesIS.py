@@ -281,8 +281,26 @@ def update_simulation():
                                 "Event": f"🔭 EUREKA: {patterns[-1]}", "Vector": reality_vector_tensor.tolist()[0]
                              })
             
-            # 10.7 Scratchpad (Write event already handled in brain, just log if needed)
-            # If scratchpad_writes increased, maybe log?
+            # 8.4 Theory of Mind (Agent modeling agents)
+            if 'theory_of_mind' in special_intent:
+                neighbors = [world.agents[oid] for oid in world.agents 
+                             if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
+                if neighbors:
+                    other = random.choice(neighbors)
+                    beliefs = agent.recursive_belief(other, depth=2)
+                    if agent.age % 100 == 0:
+                        events_this_tick.append({
+                            "Tick": world.time_step, "Agent": agent.id, 
+                            "Event": f"🧠 TOM: Modeling {other.id[:4]}", "Vector": reality_vector_tensor.tolist()[0]
+                        })
+            
+            # 10.7-10.10: Omega verification events
+            if hasattr(agent, 'omega_verified') and agent.omega_verified:
+                if world.time_step % 50 == 0:
+                     events_this_tick.append({
+                        "Tick": world.time_step, "Agent": agent.id, 
+                        "Event": "🏆 OMEGA POINT REACHED", "Vector": reality_vector_tensor.tolist()[0]
+                     })
             pass 
         
         # 4.7 Tensor Fusion logic
@@ -1160,6 +1178,57 @@ with tab_omega:
 | **🐝 Hive Φ** | `{getattr(st.session_state.world, 'hive_phi', 0):.2f}` | **🏆 OMEGA ACHIEVED** | `{'✅ YES' if getattr(st.session_state.world, 'omega_achieved', False) else '❌ NO'}` |
             """
             st.markdown(stats_md)
+            
+            # --- OMEGA MILESTONE TRACKER ---
+            with st.expander("♾️ Project Omega Milestone Dashboard (Levels 6-10)"):
+                m_col1, m_col2 = st.columns(2)
+                with m_col1:
+                    st.write("**Level 6: Geo-Engineering**")
+                    s_count = len(getattr(st.session_state.world, 'structures', {}))
+                    st.progress(min(1.0, s_count / 10.0), text=f"Structures: {s_count}/10")
+                    st.write("**Level 7: Collective Manifold**")
+                    sync = getattr(st.session_state.world, 'kuramoto_order_parameter', 0)
+                    st.progress(min(1.0, sync), text=f"Sync: {sync*100:.1f}%")
+                with m_col2:
+                    st.write("**Level 8: Abstract Representation**")
+                    phi = getattr(st.session_state.world, 'population_phi', 0)
+                    st.progress(min(1.0, phi / 10.0), text=f"Mean Φ: {phi:.2f}")
+                    st.write("**Level 9: Universal Resonance**")
+                    acc = getattr(st.session_state.world, 'collective_oracle_model_accuracy', 0)
+                    st.progress(min(1.0, acc), text=f"Oracle Acc: {acc*100:.1f}%")
+                
+                st.write("**Level 10: The Omega Point**")
+                omega_status = getattr(st.session_state.world, 'omega_achieved', False)
+                st.progress(1.0 if omega_status else 0.0, text="OMEGA ACHIEVED" if omega_status else "Calculating Convergence...")
+
+            # --- OMEGA MIND INSPECTOR ---
+            st.markdown("---")
+            st.markdown("### 🧠 Omega Mind Inspector")
+            omega_agents = list(st.session_state.world.agents.keys())
+            if omega_agents:
+                sel_agent_id = st.selectbox("Select Mind to Inspect", omega_agents, format_func=lambda x: f"Agent {x[:6]} (Age: {st.session_state.world.agents[x].age})")
+                oa = st.session_state.world.agents[sel_agent_id]
+                
+                oa_col1, oa_col2, oa_col3 = st.columns([1, 1, 1.5])
+                with oa_col1:
+                    st.write("**Consciousness (L8)**")
+                    st.metric("Phi (Φ)", f"{getattr(oa, 'phi_value', 0):.4f}")
+                    st.write(f"Self-Modeling: `{'✅' if getattr(oa, 'self_model', None) else '❌'}`")
+                    st.write(f"Theory of Mind: `{len(getattr(oa, 'internal_agents', []))} units`")
+                
+                with oa_col2:
+                    st.write("**Physics Mastery (L9)**")
+                    st.metric("Oracle Acc", f"{getattr(oa, 'oracle_model_accuracy', 0)*100:.1f}%")
+                    st.write(f"Sim Awareness: `{getattr(oa, 'simulation_awareness', 0)*100:.0f}%`")
+                    st.write(f"Glitches Found: `{len(getattr(oa, 'discovered_glitches', []))}`")
+                
+                with oa_col3:
+                    st.write("**Substrate (L10) - GoL Scratchpad**")
+                    if hasattr(oa, 'scratchpad'):
+                        fig_gol = px.imshow(oa.scratchpad, color_continuous_scale="Greys", zmin=0, zmax=1)
+                        fig_gol.update_layout(height=200, margin=dict(l=0,r=0,t=0,b=0), coloraxis_showscale=False)
+                        st.plotly_chart(fig_gol, width='stretch')
+                    st.write(f"Compute Surplus: `{oa.computational_budget - oa.compute_used}`")
             
             # Update max pop tracker
             st.session_state.max_pop = max(n_pop, st.session_state.get('max_pop', 0))
