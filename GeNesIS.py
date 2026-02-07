@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "11.0.4" # Level 10: The Omega Point - Nobel Verification Suite
+SYSTEM_VERSION = "11.0.5" # Level 10: The Omega Point - Optimized Caching Suite
 
 def init_system():
     # Force reset if version mismatch
@@ -529,36 +529,55 @@ def update_simulation():
         "agent_entropy": ent_val
     }
     
-    # 🏆 LEVEL 5-10 NOBEL METRICS (For Advanced Plots)
-    stats["mean_lr"] = np.mean([getattr(a, 'meta_lr', 0.01) for a in agents]) if agents else 0
-    stats["mutations"] = max([getattr(a, 'generation', 0) for a in agents]) if agents else 0
-    stats["fitness_var"] = np.var([a.energy for a in agents]) if agents else 0
-    stats["world_loss"] = max(0.01, 0.1 - (stats["mean_lr"] * 2))
-    
-    stats["struct_count"] = len(getattr(world, 'structures', {}))
-    stats["weather_amp"] = getattr(world, 'weather_amplitude', 1.0)
-    stats["niche_mods"] = sum(getattr(a, 'niche_modifications', 0) for a in agents)
-    stats["planetary_coverage"] = getattr(world, 'planetary_structure_coverage', 0.0)
-    
-    stats["kuramoto_r"] = getattr(world, 'kuramoto_order_parameter', 0)
-    stats["hive_phi"] = getattr(world, 'hive_phi', 0)
-    stats["proto_conv"] = getattr(world, 'protocol_convergence', 0)
-    stats["dist_memory"] = len(getattr(world, 'distributed_memory_store', {}))
-    
-    stats["avg_phi"] = np.mean([getattr(a, 'phi_value', 0) for a in agents]) if agents else 0
-    stats["conscious_count"] = getattr(world, 'consciousness_count', 0)
-    stats["strange_loops"] = getattr(world, 'strange_loop_count', 0)
-    stats["id_stability"] = np.mean([getattr(a, 'identity_stability', 0) for a in agents]) if agents else 0
-    
-    stats["oracle_acc"] = getattr(world, 'collective_oracle_model_accuracy', 0)
-    stats["sim_awareness"] = getattr(world, 'collective_simulation_awareness', 0)
-    stats["patterns_found"] = len(getattr(world, 'discovered_physics_patterns', []))
-    stats["glitches"] = sum(len(getattr(a, 'discovered_glitches', [])) for a in agents)
-    
-    stats["max_depth"] = getattr(world, 'nested_simulation_depth_max', 0)
-    stats["inner_agents"] = sum(len(getattr(a, 'internal_agents', [])) for a in agents)
-    stats["gol_cells"] = sum(int(getattr(a, 'scratchpad', np.zeros(1)).sum()) for a in agents[:10])
-    stats["omega_score"] = 1.0 if getattr(world, 'omega_achieved', False) else 0.0
+    # Initialize Nobel Metrics Cache if missing
+    if "nobel_metrics_cache" not in st.session_state:
+        st.session_state.nobel_metrics_cache = {
+             "mean_lr": 0, "mutations": 0, "fitness_var": 0, "world_loss": 0,
+             "struct_count": 0, "weather_amp": 0, "niche_mods": 0, "planetary_coverage": 0,
+             "kuramoto_r": 0, "hive_phi": 0, "proto_conv": 0, "dist_memory": 0,
+             "avg_phi": 0, "conscious_count": 0, "strange_loops": 0, "id_stability": 0,
+             "oracle_acc": 0, "sim_awareness": 0, "patterns_found": 0, "glitches": 0,
+             "max_depth": 0, "inner_agents": 0, "gol_cells": 0, "omega_score": 0
+        }
+
+    # 🏆 LEVEL 5-10 NOBEL METRIC OPTIMIZATION (Cached every 10 ticks)
+    # Heavy aggregations are expensive. We calculate them sparsely.
+    if world.time_step % 10 == 0:
+        cache = {}
+        cache["mean_lr"] = np.mean([getattr(a, 'meta_lr', 0.01) for a in agents]) if agents else 0
+        cache["mutations"] = max([getattr(a, 'generation', 0) for a in agents]) if agents else 0
+        cache["fitness_var"] = np.var([a.energy for a in agents]) if agents else 0
+        cache["world_loss"] = max(0.01, 0.1 - (cache["mean_lr"] * 2))
+        
+        cache["struct_count"] = len(getattr(world, 'structures', {}))
+        cache["weather_amp"] = getattr(world, 'weather_amplitude', 1.0)
+        cache["niche_mods"] = sum(getattr(a, 'niche_modifications', 0) for a in agents)
+        cache["planetary_coverage"] = getattr(world, 'planetary_structure_coverage', 0.0)
+        
+        cache["kuramoto_r"] = getattr(world, 'kuramoto_order_parameter', 0)
+        cache["hive_phi"] = getattr(world, 'hive_phi', 0)
+        cache["proto_conv"] = getattr(world, 'protocol_convergence', 0)
+        cache["dist_memory"] = len(getattr(world, 'distributed_memory_store', {}))
+        
+        cache["avg_phi"] = np.mean([getattr(a, 'phi_value', 0) for a in agents]) if agents else 0
+        cache["conscious_count"] = getattr(world, 'consciousness_count', 0)
+        cache["strange_loops"] = getattr(world, 'strange_loop_count', 0)
+        cache["id_stability"] = np.mean([getattr(a, 'identity_stability', 0) for a in agents]) if agents else 0
+        
+        cache["oracle_acc"] = getattr(world, 'collective_oracle_model_accuracy', 0)
+        cache["sim_awareness"] = getattr(world, 'collective_simulation_awareness', 0)
+        cache["patterns_found"] = len(getattr(world, 'discovered_physics_patterns', []))
+        cache["glitches"] = sum(len(getattr(a, 'discovered_glitches', [])) for a in agents)
+        
+        cache["max_depth"] = getattr(world, 'nested_simulation_depth_max', 0)
+        cache["inner_agents"] = sum(len(getattr(a, 'internal_agents', [])) for a in agents)
+        cache["gol_cells"] = sum(int(getattr(a, 'scratchpad', np.zeros(1)).sum()) for a in agents[:10])
+        cache["omega_score"] = 1.0 if getattr(world, 'omega_achieved', False) else 0.0
+        
+        st.session_state.nobel_metrics_cache = cache
+
+    # Apply cached metrics to current stats
+    stats.update(st.session_state.nobel_metrics_cache)
     
     st.session_state.stats_history.append(stats)
     if len(st.session_state.stats_history) > 200:
