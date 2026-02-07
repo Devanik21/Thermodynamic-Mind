@@ -1116,6 +1116,42 @@ with tab_culture:
              log_df = pd.DataFrame(st.session_state.event_log)
              st.dataframe(log_df[["Agent", "Event"]], width='stretch', height=400)
 
+    st.markdown("---")
+    st.markdown("### 🗺️ Stigmergy Garden")
+    
+    if st.session_state.get("show_charts", False):
+        if hasattr(st.session_state.world, 'meme_grid'):
+            grid_data = st.session_state.world.meme_grid
+            
+            # Row 1
+            sg_c1, sg_c2 = st.columns(2)
+            
+            with sg_c1:
+                fig_sg1 = px.imshow(grid_data[:, :, 0], title="🔥 Usage/Danger Stigmergy", color_continuous_scale='Reds', template='plotly_dark')
+                fig_sg1.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig_sg1, width='stretch', key="fig_sg1")
+                
+            with sg_c2:
+                fig_sg2 = px.imshow(grid_data[:, :, 1], title="🌿 Resource/Growth Stigmergy", color_continuous_scale='Greens', template='plotly_dark')
+                fig_sg2.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig_sg2, width='stretch', key="fig_sg2")
+                
+            # Row 2
+            sg_c3, sg_c4 = st.columns(2)
+            
+            with sg_c3:
+                fig_sg3 = px.imshow(grid_data[:, :, 2], title="💧 Sacred/Tradition Stigmergy", color_continuous_scale='Blues', template='plotly_dark')
+                fig_sg3.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig_sg3, width='stretch', key="fig_sg3")
+                
+            with sg_c4:
+                diff_map = grid_data[:, :, 1] - grid_data[:, :, 0]
+                fig_sg4 = px.imshow(diff_map, title="🌗 Net Survival Gradient (Safe - Danger)", color_continuous_scale='RdBu', template='plotly_dark')
+                fig_sg4.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig_sg4, width='stretch', key="fig_sg4")
+    else:
+        st.info("Enable 'Show Live Charts' to enter the Stigmergy Garden.")
+
 with tab_omega:
     col_civ, col_agent = st.columns([1, 2])
     
