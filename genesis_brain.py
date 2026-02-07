@@ -733,31 +733,36 @@ class GenesisAgent:
              matter_signal = self.last_input[:, :16]
              self.train_oracle_model(self.last_vector, matter_signal, torch.tensor([[flux]]))
 
-        reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward.detach()
+        reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
         # Advantage Calculation
         # Detach everything from previous steps to ensure we only learn from THIS tick
-        # Detaching reward ensures Critic loss doesn't backprop into the Actor's variance (iq_reward)
         advantage = reward.detach() - self.last_value.detach()
         
         # Losses
         # 1. Critic Loss: Mean Squared Error between prediction and actual flux
-        # We detach 'reward' because it's the target. The Critic shouldn't train on the 
-        # graph of the flux computation (which is external) or the Actor's STD (iq_reward).
-        critic_loss = 0.5 * (reward.detach() - self.last_value).pow(2)
+        critic_loss = 0.5 * (reward - self.last_value).pow(2)
         
         # 2. Actor Loss: Policy Gradient (Surrogate objective)
-        # Detach advantage to ensure Actor grads don't flow into Critic parameters
-        actor_loss = -(advantage.detach() * self.last_vector.sum()) + 0.01 * self.last_vector.pow(2).sum()
+        # Simplified: Move weights to make 'last_vector' more likely if advantage is positive
+        # Added regularization to prevent activation explosion
+        actor_loss = -(advantage * self.last_vector.sum()) + 0.01 * self.last_vector.pow(2).sum()
         
         # 5.3 Consolidated Loss: A2C + Active Inference Predictor + Sparsity
         # STANDARD A2C: Critic learns to predict reward, Actor learns to maximize advantage
+        # Detach advantage to prevent actor gradients from flowing into critic via 'reward'
         total_loss = actor_loss + critic_loss + predictor_loss + sparsity_loss
         
         # Backprop (Online Learning)
         self.optimizer.zero_grad()
+        # Retain graph only if we are doing meta-learning that requires second derivatives
+        # But here we don't need it. However, the error is likely due to the PREVIOUS step's
+        # in-place modification or the 'last_vector' being modified.
         
-        # FIX: backward() should now be safe because all targets/advantages are detached
+        # FIX: Ensure we don't modify the graph in place before backward
+        # The error "modified by an inplace operation" typically refers to the weights themselves
+        # or the hidden state.
+        
         total_loss.backward()
         
         # --- 5.7 COGNITIVE COMPRESSION (Meta-Gradient) ---
