@@ -1132,48 +1132,48 @@ with tab_culture:
             sg_c1, sg_c2 = st.columns(2)
             
             def generate_procedural_map(freq, offset):
-                # Spectral Synthesis Engine: Converts 3-channel density into a multi-hued rainbow spectrum
+                # Linear Spectral Mixer: Maintains the 'neutral' vibrancy of the original map
+                # while allowing infinite procedural perspectives.
                 state = np.random.RandomState(freq + offset)
                 
-                # Create 3 unique frequency/phase sets for R, G, B
-                # This mimics how shaders generate 'infinite' colors from a single scalar
-                f = state.uniform(2.0, 10.0, (3, 3)) # High frequency for 'many colors'
-                p = state.uniform(0, 2*np.pi, (3, 3)) # Phase shifts
-                
-                # Combine the 3 channels into a single 'intensity' or 'coordinate'
-                # but keep them slightly separate to maintain the pixel structure
+                # Base Grid: R(Danger), G(Food), B(Sacred)
                 r_in = grid_data[:, :, 0]
                 g_in = grid_data[:, :, 1]
                 b_in = grid_data[:, :, 2]
                 
-                # Procedural Color Generation (Cosine Palette)
-                # color = a + b * cos(2*pi * (c*t + d))
-                # We use the grid values as 't'
+                # Create a 3x3 Mixing Matrix that is "mostly identity" but with procedural bleed
+                # This keeps the colors 'neutral' and structured like the original.
+                # Identity matrix (Original)
+                matrix = np.eye(3) 
                 
-                res_r = 0.5 + 0.5 * np.cos(f[0,0]*r_in + f[0,1]*g_in + f[0,2]*b_in + p[0,0])
-                res_g = 0.5 + 0.5 * np.cos(f[1,0]*r_in + f[1,1]*g_in + f[1,2]*b_in + p[1,0])
-                res_b = 0.5 + 0.5 * np.cos(f[2,0]*r_in + f[2,1]*g_in + f[2,2]*b_in + p[2,0])
+                # Add procedural "bleed" or "shuffling" based on seed
+                # We use a lower variance to keep it 'neutral'
+                mix = state.uniform(-1.0, 1.0, (3, 3)) * 0.8
+                matrix = matrix + mix
                 
-                # Stack and mask
-                res = np.stack([res_r, res_g, res_b], axis=-1)
+                # Normalize rows so we don't wash out to white (keeps it colorful but neutral)
+                matrix = np.abs(matrix)
+                matrix /= (matrix.sum(axis=1, keepdims=True) + 1e-8)
                 
-                # Mask out empty background (where total intensity is near zero)
-                mask = (r_in + g_in + b_in) > 0.01
-                res = res * mask[..., np.newaxis]
+                # Apply the projection
+                transformed = np.dot(grid_data[:, :, :3], matrix.T)
+                
+                # Apply a slight contrast boost to match the original 'pixel' pop
+                transformed = np.clip(transformed * 1.1, 0, 1)
                 
                 # Final RGB conversion
-                rgb = np.clip(res * 255, 0, 255).astype(np.uint8)
+                rgb = (transformed * 255).astype(np.uint8)
                 return rgb
 
             with sg_c1:
                 rgb_v1 = generate_procedural_map(garden_freq, 101)
-                fig_sg1 = px.imshow(rgb_v1, title=f"🌈 Spectral Resonance Alpha ({garden_freq})", template='plotly_dark')
+                fig_sg1 = px.imshow(rgb_v1, title=f"📊 Spectral Perspective Alpha ({garden_freq})", template='plotly_dark')
                 fig_sg1.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg1, width='stretch', key=f"fig_sg1_{garden_freq}")
                 
             with sg_c2:
                 rgb_v2 = generate_procedural_map(garden_freq, 202)
-                fig_sg2 = px.imshow(rgb_v2, title=f"🌈 Spectral Resonance Beta ({garden_freq+1})", template='plotly_dark')
+                fig_sg2 = px.imshow(rgb_v2, title=f"📊 Spectral Perspective Beta ({garden_freq+1})", template='plotly_dark')
                 fig_sg2.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg2, width='stretch', key=f"fig_sg2_{garden_freq}")
                 
@@ -1182,13 +1182,13 @@ with tab_culture:
             
             with sg_c3:
                 rgb_v3 = generate_procedural_map(garden_freq, 303)
-                fig_sg3 = px.imshow(rgb_v3, title=f"🌈 Spectral Resonance Gamma ({garden_freq+2})", template='plotly_dark')
+                fig_sg3 = px.imshow(rgb_v3, title=f"📊 Spectral Perspective Gamma ({garden_freq+2})", template='plotly_dark')
                 fig_sg3.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg3, width='stretch', key=f"fig_sg3_{garden_freq}")
                 
             with sg_c4:
                 rgb_v4 = generate_procedural_map(garden_freq, 404)
-                fig_sg4 = px.imshow(rgb_v4, title=f"🌈 Spectral Resonance Delta ({garden_freq+3})", template='plotly_dark')
+                fig_sg4 = px.imshow(rgb_v4, title=f"📊 Spectral Perspective Delta ({garden_freq+3})", template='plotly_dark')
                 fig_sg4.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg4, width='stretch', key=f"fig_sg4_{garden_freq}")
     else:
