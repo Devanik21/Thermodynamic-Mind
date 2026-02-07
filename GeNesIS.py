@@ -641,18 +641,11 @@ with tab_macro:
                 st.plotly_chart(fig3, width='stretch')
                 
             # Row 2: Map with Tribal Colors
-            # 1. Background Heatmap (Environment + Terraforming L6)
+            # 1. Background Heatmap (Environment)
             grid_map = np.zeros((40, 40))
             for (rx, ry), res in st.session_state.world.grid.items():
                 val = res.get_nutrition(curr_season_idx)
                 grid_map[ry, rx] = val 
-            
-            # Show Terrain Modifications (Alpha blending)
-            if hasattr(st.session_state.world, 'terrain_modifications'):
-                for (tx, ty), mod in st.session_state.world.terrain_modifications.items():
-                    # Fertile = positive, Barren = negative
-                    t_val = 50 if mod.terrain_type == "fertile" else -50
-                    grid_map[ty, tx] += t_val
             
             custom_colors = [[0.0, "red"], [0.25, "black"], [0.35, "green"], [1.0, "white"]]
             fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Geo-Social Map: {season_mode}")
@@ -673,23 +666,6 @@ with tab_macro:
                 text=at, hoverinfo='text',
                 showlegend=False
             ))
-
-            # Draw Structures (Level 6)
-            if hasattr(st.session_state.world, 'structures') and st.session_state.world.structures:
-                sx, sy, st_type, st_hover = [], [], [], []
-                color_map = {"trap": "orange", "barrier": "white", "battery": "yellow", "cultivator": "cyan"}
-                for (px, py), struct in st.session_state.world.structures.items():
-                    sx.append(px)
-                    sy.append(py)
-                    st_type.append(color_map.get(struct.structure_type, "gray"))
-                    st_hover.append(f"{struct.structure_type.upper()} (Builder: {struct.builder_id[:4]})")
-                
-                fig_map.add_trace(go.Scatter(
-                    x=sx, y=sy, mode='markers',
-                    marker=dict(color=st_type, size=12, symbol='square', line=dict(width=1, color='black')),
-                    text=st_hover, hoverinfo='text',
-                    showlegend=False
-                ))
 
             # Draw Bonds
             if st.session_state.world.bonds:
@@ -1197,23 +1173,6 @@ with tab_omega:
             df_agents = pd.DataFrame(agent_data)
             st.dataframe(df_agents, width='stretch', height=400)
 
-        # --- LEVEL 10: OMEGA POINT SCRATCHPAD (GoL) ---
-        st.markdown("### ♾️ Level 10: Scratchpad Intelligence (Game of Life)")
-        if st.session_state.world.agents:
-            # Pick an agent with an active scratchpad
-            omega_search = [a for a in st.session_state.world.agents.values() if hasattr(a, 'scratchpad') and a.scratchpad.sum() > 0]
-            if omega_search:
-                omega_agent = omega_search[0]
-                st.caption(f"Introspecting Agent `{omega_agent.id[:6]}`'s Nested Reality")
-                if st.session_state.get("show_charts", False):
-                    fig_gol = px.imshow(omega_agent.scratchpad, color_continuous_scale="Greys", title="Nested Reality Substrate (GoL)")
-                    fig_gol.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                    st.plotly_chart(fig_gol, width='stretch')
-                else:
-                    st.info("Enable charts to view nested simulation")
-            else:
-                st.info("No agents have yet developed nested simulations (Substrate Independence).")
-
 
 with tab_nobel:
     st.markdown("## 🏆 The Nobel Committee for Artificial Minds")
@@ -1284,19 +1243,11 @@ with tab_meta:
             else:
                 st.metric("Mean Prediction Error", "0.0000")
                 
-            st.markdown("### ⚛️ Level 9: Physics Discovery")
-            if hasattr(st.session_state.world, 'discovered_physics_patterns') and st.session_state.world.discovered_physics_patterns:
-                st.info(f"Discovered Patterns: {', '.join(st.session_state.world.discovered_physics_patterns)}")
-                st.metric("Oracle Model Accuracy", f"{st.session_state.world.collective_oracle_model_accuracy*100:.2f}%")
-            else:
-                st.info("No physical laws decoded yet.")
-
             st.markdown("### 5.10 Autonomous Research Log")
-            # Collect recent discoveries (Level 5)
+            # Collect recent discoveries
             discoveries = []
             for a in st.session_state.world.agents.values():
-                if hasattr(a, 'research_log'):
-                    discoveries.extend(a.research_log)
+                discoveries.extend(a.research_log)
             
             if discoveries:
                 st.success(f"Latest Hypothesis: {discoveries[-1]}")
