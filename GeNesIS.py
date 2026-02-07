@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "11.0.0" # Level 10: The Omega Point - Complete Implementation
+SYSTEM_VERSION = "11.0.1" # Level 10: The Omega Point - Complete Implementation
 
 def init_system():
     # Force reset if version mismatch
@@ -263,6 +263,17 @@ def update_simulation():
                 if neighbors:
                     partner = random.choice(neighbors)
                     agent.share_hidden_state(partner) 
+            
+            # 7.7 Distributed Memory
+            if 'distribute_memory' in special_intent:
+                neighbors = [world.agents[oid] for oid in world.agents 
+                             if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
+                if neighbors:
+                    # Create a memory ID based on location and time
+                    mem_id = f"mem_{agent.x}_{agent.y}_{world.time_step}"
+                    # Store 8 dimensions of reality vector
+                    data = reality_vector_tensor[0, :8].detach()
+                    agent.store_distributed_memory(mem_id, data, neighbors) 
             
             # 9.0 Physics Probing (Update Knowledge)
             if 'probe_physics' in special_intent:
