@@ -105,7 +105,187 @@ class MegaResource(Entity):
     
     def get_nutrition(self, current_season):
         return 150.0 # High payout
-            
+
+# ============================================================
+# 🏗️ LEVEL 6: GEO-ENGINEERING STRUCTURES
+# ============================================================
+class Structure(Entity):
+    """6.2 Base class for agent-built persistent structures."""
+    def __init__(self, x, y, structure_type, builder_id):
+        super().__init__(x, y, structure_type)
+        self.structure_type = structure_type
+        self.builder_id = builder_id
+        self.created_tick = 0
+        self.durability = 100.0
+        self.signal = torch.zeros(SIGNAL_DIM)
+        self.signal[12:16] = 0.8  # Structures emit unique spectrum
+    
+    def decay(self, rate=0.1):
+        """Structures decay over time."""
+        self.durability -= rate
+        if self.durability <= 0:
+            self.exists = False
+        return self.exists
+
+class Trap(Structure):
+    """6.3 Trap Construction: Captures energy from passing agents."""
+    def __init__(self, x, y, builder_id, harvest_rate=0.2):
+        super().__init__(x, y, "trap", builder_id)
+        self.harvest_rate = min(0.5, harvest_rate)
+        self.stored_energy = 0.0
+        self.victims = []
+    
+    def harvest(self, agent):
+        """Harvest energy from agent that steps on trap."""
+        if agent.id == self.builder_id:
+            return 0  # Don't trap builder
+        energy_taken = agent.energy * self.harvest_rate
+        if hasattr(agent, 'shield_strength'):
+            energy_taken *= (1 - agent.shield_strength)
+        agent.energy -= energy_taken
+        self.stored_energy += energy_taken
+        self.victims.append(agent.id)
+        return energy_taken
+    
+    def collect(self, agent):
+        """Builder collects stored energy."""
+        if agent.id == self.builder_id:
+            collected = self.stored_energy * 0.9
+            self.stored_energy = 0.0
+            agent.energy += collected
+            return collected
+        return 0.0
+
+class Barrier(Structure):
+    """6.4 Defensive Architecture: Blocks or filters movement."""
+    def __init__(self, x, y, builder_id, filter_mode="all"):
+        super().__init__(x, y, "barrier", builder_id)
+        self.filter_mode = filter_mode  # "all", "enemies", "low_energy"
+        self.blocked_count = 0
+    
+    def allows_passage(self, agent):
+        """Check if agent can pass through."""
+        if agent.id == self.builder_id:
+            return True
+        if self.filter_mode == "all":
+            self.blocked_count += 1
+            return False
+        if self.filter_mode == "enemies":
+            # Allow same-generation agents through
+            return hasattr(agent, 'generation') and agent.generation > 0
+        if self.filter_mode == "low_energy":
+            return agent.energy > 50
+        return True
+
+class Battery(Structure):
+    """6.8 Energy Storage: Environmental energy caching."""
+    def __init__(self, x, y, builder_id, capacity=500.0):
+        super().__init__(x, y, "battery", builder_id)
+        self.capacity = capacity
+        self.stored_energy = 0.0
+        self.authorized_users = {builder_id}
+    
+    def deposit(self, agent, amount):
+        """Store energy in battery."""
+        if self.stored_energy + amount > self.capacity:
+            actual = self.capacity - self.stored_energy
+        else:
+            actual = amount
+        if agent.energy >= actual:
+            agent.energy -= actual
+            self.stored_energy += actual * 0.9  # 10% loss
+            return actual
+        return 0.0
+    
+    def withdraw(self, agent):
+        """Retrieve all stored energy."""
+        if agent.id in self.authorized_users:
+            amount = self.stored_energy * 0.9  # 10% loss
+            self.stored_energy = 0.0
+            agent.energy += amount
+            return amount
+        return 0.0
+    
+    def authorize(self, agent_id):
+        """Add agent to authorized users."""
+        self.authorized_users.add(agent_id)
+
+class Cultivator(Structure):
+    """6.5 Resource Cultivation: Biases resource spawn probability nearby."""
+    def __init__(self, x, y, builder_id, boost_radius=2, boost_strength=0.3):
+        super().__init__(x, y, "cultivator", builder_id)
+        self.boost_radius = boost_radius
+        self.boost_strength = boost_strength
+        self.spawned_count = 0
+    
+    def get_influenced_tiles(self, world_size):
+        """Return list of tiles influenced by this cultivator."""
+        tiles = []
+        for dx in range(-self.boost_radius, self.boost_radius + 1):
+            for dy in range(-self.boost_radius, self.boost_radius + 1):
+                nx = (self.x + dx) % world_size
+                ny = (self.y + dy) % world_size
+                tiles.append((nx, ny))
+        return tiles
+
+class InfrastructureNetwork:
+    """6.9 Infrastructure Networks: Connected structure systems."""
+    def __init__(self, network_id):
+        self.id = network_id
+        self.structures = set()  # Structure positions
+        self.members = set()  # Agent IDs
+        self.efficiency_bonus = 0.0
+    
+    def add_structure(self, x, y):
+        """Add structure to network."""
+        self.structures.add((x, y))
+        self._update_efficiency()
+    
+    def add_member(self, agent_id):
+        """Add agent to network."""
+        self.members.add(agent_id)
+    
+    def _update_efficiency(self):
+        """Update network efficiency based on connectivity."""
+        if len(self.structures) < 2:
+            self.efficiency_bonus = 0.0
+            return
+        # Efficiency grows with network size (diminishing returns)
+        self.efficiency_bonus = min(0.5, 0.1 * np.log(len(self.structures) + 1))
+    
+    def get_transfer_rate(self):
+        """Energy can be transferred through network with efficiency bonus."""
+        return 0.8 + self.efficiency_bonus
+
+class TerrainModification:
+    """6.7 Terraforming: Permanent terrain changes."""
+    def __init__(self, x, y, terrain_type, modifier_id):
+        self.x = x
+        self.y = y
+        self.terrain_type = terrain_type  # "fertile", "barren", "water", "elevated"
+        self.modifier_id = modifier_id
+        self.age = 0
+    
+    def get_spawn_modifier(self):
+        """Return spawn rate modifier for this terrain."""
+        modifiers = {
+            "fertile": 2.0,
+            "barren": 0.1,
+            "water": 0.0,
+            "elevated": 0.5
+        }
+        return modifiers.get(self.terrain_type, 1.0)
+    
+    def get_movement_cost(self):
+        """Return movement cost for this terrain."""
+        costs = {
+            "fertile": 0.5,
+            "barren": 1.5,
+            "water": 3.0,
+            "elevated": 2.0
+        }
+        return costs.get(self.terrain_type, 1.0)
+
 # ============================================================
 # 🌍 THE QUANTUM WORLD
 # ============================================================
@@ -147,6 +327,55 @@ class GenesisWorld:
         # 5.6 Collective Optimization
         self.collective_values = {"Efficiency": 0.5, "Growth": 0.5}
         self.fitness_landscape_shift = 0.0
+
+        # ============================================================
+        # 🌍 LEVEL 6: GEO-ENGINEERING STATE
+        # ============================================================
+        self.structures = {}  # {(x,y): Structure object}
+        self.networks = {}  # {network_id: InfrastructureNetwork}
+        self.terrain_modifications = {}  # {(x,y): TerrainModification}
+        self.cultivator_map = {}  # {(x,y): spawn_boost}
+        self.weather_amplitude = 1.0  # Collective weather control modifier
+        
+        # ============================================================
+        # 🐝 LEVEL 7: COLLECTIVE MANIFOLD STATE
+        # ============================================================
+        self.kuramoto_order_parameter = 0.0  # |<e^{iθ}>| sync measure
+        self.collective_hidden_state = torch.zeros(1, 1, 64)  # Blended population state
+        self.gradient_pool = []  # Shared gradient pool for federated learning
+        self.cognitive_modules = {  # Specialist agents by role
+            "vision": [],
+            "planning": [],
+            "memory": [],
+            "motor": []
+        }
+        self.consensus_registry = {}  # {proposal_id: {votes, result}}
+        self.protocol_convergence = 0.0  # How aligned communication protocols are
+        self.hive_phi = 0.0  # Collective Φ (sum of agent contributions)
+        
+        # ============================================================
+        # 💭 LEVEL 8: ABSTRACT REPRESENTATION STATE
+        # ============================================================
+        self.population_phi = 0.0  # Average Φ across population
+        self.consciousness_count = 0  # Number of verified conscious agents
+        self.strange_loop_count = 0  # Agents with active strange loops
+        self.qualia_registry = {}  # {experience_type: activation_prototype}
+        
+        # ============================================================
+        # ⚛️ LEVEL 9: UNIVERSAL HARMONIC RESONANCE STATE
+        # ============================================================
+        self.collective_oracle_model_accuracy = 0.0  # Best agent's Oracle approximation
+        self.discovered_physics_patterns = []  # Patterns found by any agent
+        self.collective_simulation_awareness = 0.0  # Max agent awareness
+        self.causal_graph_collective = {}  # Merged causal graphs
+        
+        # ============================================================
+        # ♾️ LEVEL 10: THE OMEGA POINT STATE
+        # ============================================================
+        self.omega_candidates = []  # Agent IDs that may have achieved Omega
+        self.omega_achieved = False  # Global verification flag
+        self.global_scratchpad_activity = 0  # Total scratchpad writes
+        self.nested_simulation_depth_max = 0  # Maximum nesting observed
 
     def collective_memory_retrieval(self):
         """4.9 Collective Memory: Agents with low confidence query the hive."""
@@ -606,3 +835,379 @@ class GenesisWorld:
         # Apply to Oracle (Simulated Epigenetics of the Universe?)
         # No, just store it and apply in resolve_quantum_state
         pass
+
+    # ============================================================
+    # 🌍 LEVEL 6: GEO-ENGINEERING METHODS
+    # ============================================================
+    
+    def add_structure(self, structure_info):
+        """6.2 Add agent-built structure to world."""
+        if structure_info is None:
+            return False
+        x, y = structure_info["x"], structure_info["y"]
+        struct_type = structure_info["type"]
+        builder_id = structure_info["builder"]
+        
+        if (x, y) in self.structures:
+            return False  # Already occupied
+        
+        if struct_type == "trap":
+            self.structures[(x, y)] = Trap(x, y, builder_id, 
+                                            structure_info.get("harvest_rate", 0.2))
+        elif struct_type == "barrier":
+            self.structures[(x, y)] = Barrier(x, y, builder_id)
+        elif struct_type == "battery":
+            self.structures[(x, y)] = Battery(x, y, builder_id)
+        elif struct_type == "cultivator":
+            self.structures[(x, y)] = Cultivator(x, y, builder_id)
+            self._update_cultivator_map()
+        else:
+            self.structures[(x, y)] = Structure(x, y, struct_type, builder_id)
+        
+        return True
+    
+    def add_terrain_modification(self, terraform_info):
+        """6.7 Add permanent terrain change."""
+        if terraform_info is None:
+            return False
+        x, y = terraform_info["x"], terraform_info["y"]
+        terrain = terraform_info["terrain"]
+        modifier_id = terraform_info.get("modifier", "unknown")
+        
+        self.terrain_modifications[(x, y)] = TerrainModification(x, y, terrain, modifier_id)
+        return True
+    
+    def _update_cultivator_map(self):
+        """Update spawn boost map from cultivators."""
+        self.cultivator_map = {}
+        for (x, y), struct in self.structures.items():
+            if isinstance(struct, Cultivator):
+                for tile in struct.get_influenced_tiles(self.size):
+                    current = self.cultivator_map.get(tile, 0.0)
+                    self.cultivator_map[tile] = min(1.0, current + struct.boost_strength)
+    
+    def spawn_resource_with_cultivation(self):
+        """6.5 Spawn with cultivator influence."""
+        x, y = random.randint(0, self.size-1), random.randint(0, self.size-1)
+        
+        # Check terrain modifier
+        terrain_mod = 1.0
+        if (x, y) in self.terrain_modifications:
+            terrain_mod = self.terrain_modifications[(x, y)].get_spawn_modifier()
+        
+        # Check cultivator boost
+        cultivator_boost = self.cultivator_map.get((x, y), 0.0)
+        
+        # Effective spawn probability
+        spawn_prob = min(1.0, terrain_mod * (1 + cultivator_boost))
+        
+        if random.random() < spawn_prob and (x, y) not in self.grid:
+            self.grid[(x, y)] = Resource(x, y)
+            return True
+        return False
+    
+    def create_or_join_network(self, agent, structure_pos):
+        """6.9 Create or join infrastructure network."""
+        # Find nearby connected structures
+        nearby_networks = set()
+        for net_id, net in self.networks.items():
+            for (sx, sy) in net.structures:
+                if abs(sx - structure_pos[0]) <= 3 and abs(sy - structure_pos[1]) <= 3:
+                    nearby_networks.add(net_id)
+        
+        if nearby_networks:
+            # Join existing network
+            net_id = list(nearby_networks)[0]
+            self.networks[net_id].add_structure(*structure_pos)
+            self.networks[net_id].add_member(agent.id)
+            agent.join_network(net_id)
+        else:
+            # Create new network
+            net_id = f"net_{len(self.networks)}_{self.time_step}"
+            self.networks[net_id] = InfrastructureNetwork(net_id)
+            self.networks[net_id].add_structure(*structure_pos)
+            self.networks[net_id].add_member(agent.id)
+            agent.join_network(net_id)
+        
+        return net_id
+    
+    def process_structures(self):
+        """6.x Process all structures each tick."""
+        to_remove = []
+        for (x, y), struct in self.structures.items():
+            # Decay
+            if not struct.decay(0.05):
+                to_remove.append((x, y))
+                continue
+            
+            # Process traps
+            if isinstance(struct, Trap):
+                for agent in self.agents.values():
+                    if agent.x == x and agent.y == y:
+                        struct.harvest(agent)
+        
+        for pos in to_remove:
+            del self.structures[pos]
+    
+    def update_weather_control(self):
+        """6.6 Collective weather control via agent votes."""
+        if not self.agents:
+            return
+        
+        total_vote = sum(a.weather_vote for a in self.agents.values() 
+                         if hasattr(a, 'weather_vote'))
+        n_agents = len(self.agents)
+        
+        # Amplitude modification (gradual change)
+        target_amp = 1.0 + (total_vote / (n_agents + 1e-8)) * 0.5
+        self.weather_amplitude = self.weather_amplitude * 0.95 + target_amp * 0.05
+    
+    def compute_env_mastery_global(self):
+        """6.10 Calculate collective environmental mastery."""
+        if not self.agents:
+            return 0.0
+        
+        masteries = [a.env_control_score for a in self.agents.values() 
+                     if hasattr(a, 'env_control_score')]
+        return np.mean(masteries) if masteries else 0.0
+
+    # ============================================================
+    # 🐝 LEVEL 7: COLLECTIVE MANIFOLD METHODS
+    # ============================================================
+    
+    def kuramoto_global_step(self):
+        """7.1 Kuramoto Synchronization: Global phase update."""
+        if len(self.agents) < 2:
+            self.kuramoto_order_parameter = 0.0
+            return
+        
+        # Update each agent's phase based on neighbors
+        for agent in self.agents.values():
+            if not hasattr(agent, 'kuramoto_phase'):
+                continue
+            neighbors = [a for a in self.agents.values() 
+                         if a.id != agent.id and 
+                         abs(a.x - agent.x) <= 3 and abs(a.y - agent.y) <= 3]
+            agent.kuramoto_update(neighbors)
+        
+        # Calculate order parameter: r = |<e^{iθ}>|
+        phases = [a.kuramoto_phase for a in self.agents.values() 
+                  if hasattr(a, 'kuramoto_phase')]
+        if phases:
+            complex_order = np.mean([np.exp(1j * p) for p in phases])
+            self.kuramoto_order_parameter = abs(complex_order)
+    
+    def federated_gradient_step(self):
+        """7.2 Gradient Sharing: Pool and average gradients."""
+        # Collect gradients from all agents
+        self.gradient_pool = []
+        for agent in self.agents.values():
+            if hasattr(agent, 'last_shared_gradient') and agent.last_shared_gradient is not None:
+                self.gradient_pool.append(agent.last_shared_gradient)
+        
+        # Share with nearby agents
+        if self.time_step % 5 == 0:  # Every 5 ticks
+            for agent in list(self.agents.values())[:10]:  # Limit for performance
+                partners = [a for a in self.agents.values() 
+                            if a.id != agent.id and 
+                            abs(a.x - agent.x) <= 2 and abs(a.y - agent.y) <= 2][:3]
+                if partners and hasattr(agent, 'share_gradients'):
+                    agent.share_gradients(partners)
+    
+    def update_cognitive_modules(self):
+        """7.4 Modular Cognition: Track specialist assignments."""
+        self.cognitive_modules = {k: [] for k in self.cognitive_modules}
+        
+        for agent in self.agents.values():
+            if hasattr(agent, 'cognitive_specialty') and agent.cognitive_specialty:
+                if agent.cognitive_specialty in self.cognitive_modules:
+                    self.cognitive_modules[agent.cognitive_specialty].append(agent.id)
+    
+    def process_consensus(self, proposal_id):
+        """7.6 Consensus Mechanisms: Byzantine fault-tolerant voting."""
+        if proposal_id not in self.consensus_registry:
+            self.consensus_registry[proposal_id] = {"votes": [], "result": None}
+        
+        votes = []
+        for agent in self.agents.values():
+            if hasattr(agent, 'consensus_votes') and proposal_id in agent.consensus_votes:
+                votes.append(agent.consensus_votes[proposal_id])
+        
+        self.consensus_registry[proposal_id]["votes"] = votes
+        
+        if len(votes) > len(self.agents) * 0.5:  # Quorum
+            result = np.median(votes) if votes else 0
+            self.consensus_registry[proposal_id]["result"] = result
+            return result
+        return None
+    
+    def update_protocol_convergence(self):
+        """7.9 Emergent Protocols: Measure protocol alignment."""
+        if len(self.agents) < 2:
+            self.protocol_convergence = 0.0
+            return
+        
+        protocols = [a.protocol_version for a in self.agents.values() 
+                     if hasattr(a, 'protocol_version')]
+        
+        if len(protocols) < 2:
+            self.protocol_convergence = 0.0
+            return
+        
+        # Calculate average pairwise similarity
+        similarities = []
+        for i in range(len(protocols)):
+            for j in range(i+1, len(protocols)):
+                sim = 1.0 - np.mean(np.abs(protocols[i] - protocols[j]))
+                similarities.append(sim)
+        
+        self.protocol_convergence = np.mean(similarities) if similarities else 0.0
+    
+    def compute_hive_phi(self):
+        """7.10 Hive Mind: Calculate collective Φ."""
+        total_phi = 0.0
+        for agent in self.agents.values():
+            if hasattr(agent, 'compute_hive_contribution'):
+                total_phi += agent.compute_hive_contribution(list(self.agents.values()))
+        self.hive_phi = total_phi
+        return total_phi
+
+    # ============================================================
+    # 💭 LEVEL 8: ABSTRACT REPRESENTATION METHODS
+    # ============================================================
+    
+    def update_consciousness_metrics(self):
+        """8.6-8.10 Track consciousness-related metrics across population."""
+        phi_values = []
+        conscious_count = 0
+        loop_count = 0
+        
+        for agent in self.agents.values():
+            if hasattr(agent, 'compute_phi'):
+                phi = agent.compute_phi()
+                phi_values.append(phi)
+            
+            if hasattr(agent, 'consciousness_verified') and agent.consciousness_verified:
+                conscious_count += 1
+            
+            if hasattr(agent, 'strange_loop_active') and agent.strange_loop_active:
+                loop_count += 1
+        
+        self.population_phi = np.mean(phi_values) if phi_values else 0.0
+        self.consciousness_count = conscious_count
+        self.strange_loop_count = loop_count
+    
+    def register_qualia(self, experience_type, activation):
+        """8.9 Register global qualia prototype."""
+        if experience_type not in self.qualia_registry:
+            self.qualia_registry[experience_type] = activation.clone().detach() if hasattr(activation, 'clone') else activation
+        else:
+            # Running average
+            old = self.qualia_registry[experience_type]
+            if hasattr(old, 'clone') and hasattr(activation, 'clone'):
+                self.qualia_registry[experience_type] = old * 0.9 + activation.clone().detach() * 0.1
+
+    # ============================================================
+    # ⚛️ LEVEL 9: UNIVERSAL HARMONIC RESONANCE METHODS
+    # ============================================================
+    
+    def update_physics_discovery(self):
+        """9.0-9.10 Track collective physics understanding."""
+        best_oracle_acc = 0.0
+        max_awareness = 0.0
+        all_patterns = []
+        
+        for agent in self.agents.values():
+            if hasattr(agent, 'oracle_model_accuracy'):
+                best_oracle_acc = max(best_oracle_acc, agent.oracle_model_accuracy)
+            
+            if hasattr(agent, 'simulation_awareness'):
+                max_awareness = max(max_awareness, agent.simulation_awareness)
+            
+            if hasattr(agent, 'discovered_patterns'):
+                all_patterns.extend(agent.discovered_patterns)
+            
+            # Merge causal graphs
+            if hasattr(agent, 'causal_bayesian_network'):
+                for cause, effects in agent.causal_bayesian_network.items():
+                    if cause not in self.causal_graph_collective:
+                        self.causal_graph_collective[cause] = {}
+                    for effect, strength in effects.items():
+                        current = self.causal_graph_collective[cause].get(effect, 0)
+                        self.causal_graph_collective[cause][effect] = current + strength
+        
+        self.collective_oracle_model_accuracy = best_oracle_acc
+        self.collective_simulation_awareness = max_awareness
+        self.discovered_physics_patterns = list(set(all_patterns))
+
+    # ============================================================
+    # ♾️ LEVEL 10: THE OMEGA POINT METHODS
+    # ============================================================
+    
+    def update_omega_tracking(self):
+        """10.0-10.10 Track Omega Point progress."""
+        self.omega_candidates = []
+        max_depth = 0
+        total_activity = 0
+        
+        for agent in self.agents.values():
+            if hasattr(agent, 'scratchpad_writes'):
+                total_activity += agent.scratchpad_writes
+            
+            if hasattr(agent, 'simulation_depth'):
+                max_depth = max(max_depth, agent.simulation_depth)
+            
+            if hasattr(agent, 'omega_verified') and agent.omega_verified:
+                self.omega_candidates.append(agent.id)
+                self.omega_achieved = True
+        
+        self.global_scratchpad_activity = total_activity
+        self.nested_simulation_depth_max = max_depth
+    
+    def verify_global_omega(self):
+        """10.10 Global Omega Point verification."""
+        criteria = {
+            'multiple_conscious': self.consciousness_count >= 3,
+            'high_sync': self.kuramoto_order_parameter > 0.8,
+            'physics_mastery': self.collective_oracle_model_accuracy > 0.9,
+            'nested_simulations': self.nested_simulation_depth_max >= 2,
+            'scratchpad_active': self.global_scratchpad_activity > 100,
+            'hive_mind': self.hive_phi > 5.0
+        }
+        
+        score = sum(criteria.values()) / len(criteria)
+        self.omega_achieved = score >= 0.8
+        
+        return {
+            'achieved': self.omega_achieved,
+            'score': score,
+            'criteria': criteria
+        }
+    
+    def level_6_10_step(self):
+        """Combined step function for all Level 6-10 features."""
+        # Level 6: Geo-Engineering
+        self.process_structures()
+        self.update_weather_control()
+        if self.time_step % 3 == 0:
+            self.spawn_resource_with_cultivation()
+        
+        # Level 7: Collective Manifold
+        self.kuramoto_global_step()
+        self.federated_gradient_step()
+        self.update_cognitive_modules()
+        self.update_protocol_convergence()
+        if self.time_step % 10 == 0:
+            self.compute_hive_phi()
+        
+        # Level 8: Abstract Representation (lighter, every 5 ticks)
+        if self.time_step % 5 == 0:
+            self.update_consciousness_metrics()
+        
+        # Level 9: Physics Discovery (every 10 ticks)
+        if self.time_step % 10 == 0:
+            self.update_physics_discovery()
+        
+        # Level 10: Omega Point (every 20 ticks)
+        if self.time_step % 20 == 0:
+            self.update_omega_tracking()

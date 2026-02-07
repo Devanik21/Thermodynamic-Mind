@@ -9,7 +9,7 @@ import zipfile
 import io
 import torch
 import random
-from genesis_world import GenesisWorld, Resource
+from genesis_world import GenesisWorld, Resource, Structure, Trap, Barrier, Battery, Cultivator, InfrastructureNetwork, TerrainModification
 from genesis_brain import GenesisAgent
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "5.0.1" # Level 5: Recursive Self-Improvement Active
+SYSTEM_VERSION = "10.0.0" # Level 10: The Omega Point - Complete Implementation
 
 def init_system():
     # Force reset if version mismatch
@@ -122,6 +122,9 @@ def update_simulation():
 
     world = st.session_state.world
     world.step()
+    
+    # 🌍 LEVEL 6-10: Execute all advanced features
+    world.level_6_10_step()
     
     current_thoughts = 0
     deaths = set() # Use a set to avoid KeyError on duplicate IDs
@@ -210,8 +213,8 @@ def update_simulation():
         # 1.7 Gradient Sensing (Stress Response)
         gradient_val = world.get_energy_gradient(agent.x, agent.y).item()
 
-        # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade, MemeWrite)
-        reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val, meme_write = agent.decide(
+        # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade, MemeWrite, SpecialIntent)
+        reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val, meme_write, special_intent = agent.decide(
             signal, 
             pheromone_16=pheromone_vector, 
             meme_3=meme_vector, # 3.3 Input
@@ -228,6 +231,59 @@ def update_simulation():
             agent, reality_vector_tensor, emit_vector=comm_vector, 
             adhesion=adhesion_val, punish=punish_val, trade=trade_val
         ) 
+
+        # --- PROCESS LEVEL 6-10 INTENTS ---
+        if special_intent:
+            # 6.2 Structure Building
+            if 'construct' in special_intent:
+                s_type = special_intent['construct']
+                # Try to build
+                # world.add_structure checks for occupancy
+                struct_info = {"x": agent.x, "y": agent.y, "type": s_type, "builder": agent.id}
+                if world.add_structure(struct_info):
+                     # Cost already checked/deducted in brain? No, brain checked > 80.
+                     # But brain didn't deduct because it didn't know if build succeeded.
+                     # Deduct cost now.
+                     cost = {"trap": 15.0, "barrier": 12.0, "battery": 20.0, "cultivator": 18.0, "generic": 10.0}
+                     agent.energy -= cost.get(s_type, 10.0)
+                     events_this_tick.append({
+                        "Tick": world.time_step, "Agent": agent.id, 
+                        "Event": f"🏗️ BUILT {s_type.upper()}", "Vector": reality_vector_tensor.tolist()[0]
+                     })
+
+            # 6.1 Niche Construction
+            if 'terraform_niche' in special_intent:
+                 if agent.modify_environment(agent.x, agent.y, [0.8, 0.1, 0.1], world):
+                     start_log = True # Don't spam, maybe only log rare events?
+            
+            # 7.0 Neural Bridging
+            if 'share_knowledge' in special_intent:
+                neighbors = [world.agents[oid] for oid in world.agents 
+                             if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 1 and abs(world.agents[oid].y - agent.y) <= 1]
+                if neighbors:
+                    partner = random.choice(neighbors)
+                    agent.share_hidden_state(partner) 
+            
+            # 9.0 Physics Probing (Update Knowledge)
+            if 'probe_physics' in special_intent:
+                # Use current Reality Vector as Action? 
+                # Action is technically the vector.
+                agent.probe_physics(reality_vector_tensor, reality_vector_tensor, flux)
+                
+                # 9.1 Detect Patterns (Occasional)
+                if agent.age % 50 == 0:
+                    patterns = agent.detect_patterns()
+                    if patterns:
+                         # Log only new discoveries
+                         if len(patterns) > len(agent.discovered_patterns) - 2: # heuristic
+                             events_this_tick.append({
+                                "Tick": world.time_step, "Agent": agent.id, 
+                                "Event": f"🔭 EUREKA: {patterns[-1]}", "Vector": reality_vector_tensor.tolist()[0]
+                             })
+            
+            # 10.7 Scratchpad (Write event already handled in brain, just log if needed)
+            # If scratchpad_writes increased, maybe log?
+            pass 
         
         # 4.7 Tensor Fusion logic
         if adhesion_val > 0.8 and not agent.is_fused:
@@ -1068,8 +1124,12 @@ with tab_omega:
 | **World Time Step** | `{st.session_state.world.time_step}` | **Season Clock** | `{st.session_state.world.season_timer}/50` |
 | **Active Bonds** | `{len(st.session_state.world.bonds)}` | **Gene Pool Size** | `{len(st.session_state.gene_pool)}` |
 | **System Entropy** | `{getattr(st.session_state.world, 'agent_entropy', 0):.3f}` | **Scarcity Factor** | `{current_scarcity:.3f}` |
-| **Thoughts/Sec** | `{sum(a.thoughts_had for a in all_agents)}` | **Reflexes/Sec** | `{sum(a.reflexes_used for a in all_agents)}` |
-| **Civ Type** | `Type {min(4, int(np.log10(max(1, sum(energies)))/2))}` | **Omega Point** | `{min(100.0, st.session_state.world.time_step/1000.0):.1f}%` |
+| **🏗️ Structures** | `{len(getattr(st.session_state.world, 'structures', {}))}` | **🌐 Networks** | `{len(getattr(st.session_state.world, 'networks', {}))}` |
+| **🐝 Kuramoto r** | `{getattr(st.session_state.world, 'kuramoto_order_parameter', 0):.3f}` | **💭 Population Φ** | `{getattr(st.session_state.world, 'population_phi', 0):.3f}` |
+| **🧠 Conscious Agents** | `{getattr(st.session_state.world, 'consciousness_count', 0)}` | **🔁 Strange Loops** | `{getattr(st.session_state.world, 'strange_loop_count', 0)}` |
+| **⚛️ Oracle R²** | `{getattr(st.session_state.world, 'collective_oracle_model_accuracy', 0):.3f}` | **📡 Sim Awareness** | `{getattr(st.session_state.world, 'collective_simulation_awareness', 0):.2f}` |
+| **🎮 GoL WRites** | `{getattr(st.session_state.world, 'global_scratchpad_activity', 0)}` | **♾️ Nesting Depth** | `{getattr(st.session_state.world, 'nested_simulation_depth_max', 0)}` |
+| **🐝 Hive Φ** | `{getattr(st.session_state.world, 'hive_phi', 0):.2f}` | **🏆 OMEGA ACHIEVED** | `{'✅ YES' if getattr(st.session_state.world, 'omega_achieved', False) else '❌ NO'}` |
             """
             st.markdown(stats_md)
             
@@ -1157,7 +1217,7 @@ with tab_nobel:
 
 
 with tab_meta:
-    st.markdown("## 🧠 Level 5: Recursive Self-Improvement")
+    st.markdown("## 🧠 Level 6-10: The Omega Point")
     
     if st.session_state.world.agents:
         # Sample an agent for introspection
