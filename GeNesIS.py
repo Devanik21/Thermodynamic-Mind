@@ -1457,10 +1457,25 @@ with tab_meta:
                 struct_counts = {k: struct_types.count(k) for k in set(struct_types)}
                 land_usage = len(world.structures)/(40*40)
                 
+                # Plot data preps
+                sx = [s.x for s in world.structures.values()]
+                sy = [s.y for s in world.structures.values()]
+                if not sx: sx, sy = [0], [0]
+                
+                battery_charge = [s.stored_energy for s in world.structures.values() if getattr(s, 'structure_type', '') == 'battery']
+                if not battery_charge: battery_charge = [0]
+                
+                ax = [a.x for a in all_agents]
+                ay = [a.y for a in all_agents]
+                az = [getattr(a, 'env_control_score', 0) for a in all_agents]
+                
                 st.session_state.l6_cache = {
                     'struct_counts': struct_counts,
                     'land_usage': land_usage,
-                    'total_structs': len(world.structures)
+                    'total_structs': len(world.structures),
+                    'sx': sx, 'sy': sy,
+                    'battery_charge': battery_charge,
+                    'ax': ax, 'ay': ay, 'az': az
                 }
             
             c6 = st.session_state.l6_cache
@@ -1498,12 +1513,8 @@ with tab_meta:
                 
                 with c6_1:
                     # Fig 6.1: Terraforming Heatmap
-                    sx = [s.x for s in world.structures.values()]
-                    sy = [s.y for s in world.structures.values()]
-                    if not sx: sx, sy = [0], [0]
-                    
                     fig_6_1 = px.density_heatmap(
-                        x=sx, y=sy, nbinsx=20, nbinsy=20,
+                        x=c6['sx'], y=c6['sy'], nbinsx=20, nbinsy=20,
                         title="6.1 Terraforming Heatmap",
                         template='plotly_dark',
                         color_continuous_scale='Hot'
@@ -1534,11 +1545,8 @@ with tab_meta:
                 
                 with c6_3:
                     # Fig 6.3: Battery Charge Distribution
-                    battery_charge = [s.stored_energy for s in world.structures.values() if getattr(s, 'structure_type', '') == 'battery']
-                    if not battery_charge: battery_charge = [0]
-                    
                     fig_6_3 = px.violin(
-                        y=battery_charge, box=True, points='all',
+                        y=c6['battery_charge'], box=True, points='all',
                         title="6.3 Battery Charge Distribution",
                         template='plotly_dark',
                         color_discrete_sequence=['#FFA15A']
@@ -1548,13 +1556,9 @@ with tab_meta:
 
                 with c6_4:
                     # Fig 6.4: Environmental Control Surface
-                    ax = [a.x for a in all_agents]
-                    ay = [a.y for a in all_agents]
-                    az = [getattr(a, 'env_control_score', 0) for a in all_agents]
-                    
                     fig_6_4 = px.scatter_3d(
-                        x=ax, y=ay, z=az,
-                        color=az,
+                        x=c6['ax'], y=c6['ay'], z=c6['az'],
+                        color=c6['az'],
                         title="6.4 Environmental Control Surface",
                         template='plotly_dark',
                         color_continuous_scale='Icefire'
@@ -1575,11 +1579,27 @@ with tab_meta:
                 phases = [getattr(a, 'internal_phase', 0) for a in all_agents]
                 bonds_count = len(world.bonds) if hasattr(world, 'bonds') else 0
                 
+                # Network data prep
+                edge_x = []
+                edge_y = []
+                if hasattr(world, 'bonds') and world.bonds:
+                    for bond in world.bonds:
+                        id_a, id_b = list(bond)
+                        if id_a in world.agents and id_b in world.agents:
+                            a, b = world.agents[id_a], world.agents[id_b]
+                            edge_x.extend([a.x, b.x, None])
+                            edge_y.extend([a.y, b.y, None])
+                
+                node_x = [a.x for a in all_agents]
+                node_y = [a.y for a in all_agents]
+                
                 st.session_state.l7_cache = {
                     'phases': phases,
                     'bonds_count': bonds_count,
                     'hive_sync_std': np.std(phases) if phases else 0.0,
-                    'radii': [getattr(a, 'energy', 0) / 100.0 for a in all_agents]
+                    'radii': [getattr(a, 'energy', 0) / 100.0 for a in all_agents],
+                    'node_x': node_x, 'node_y': node_y,
+                    'edge_x': edge_x, 'edge_y': edge_y
                 }
             
             c7 = st.session_state.l7_cache
@@ -1631,28 +1651,16 @@ with tab_meta:
                 
                 with c7_2:
                     # Fig 7.2: Social Network Force Layout
-                    if world.bonds:
-                        edge_x = []
-                        edge_y = []
-                        for bond in world.bonds:
-                            id_a, id_b = list(bond)
-                            if id_a in world.agents and id_b in world.agents:
-                                a, b = world.agents[id_a], world.agents[id_b]
-                                edge_x.extend([a.x, b.x, None])
-                                edge_y.extend([a.y, b.y, None])
-                        
-                        node_x = [a.x for a in all_agents]
-                        node_y = [a.y for a in all_agents]
-                        
+                    if c7['edge_x']:
                         fig_7_2 = go.Figure()
                         fig_7_2.add_trace(go.Scatter(
-                            x=edge_x, y=edge_y,
+                            x=c7['edge_x'], y=c7['edge_y'],
                             line=dict(width=0.5, color='#888'),
                             hoverinfo='none',
                             mode='lines'
                         ))
                         fig_7_2.add_trace(go.Scatter(
-                            x=node_x, y=node_y,
+                            x=c7['node_x'], y=c7['node_y'],
                             mode='markers',
                             marker=dict(size=8, color='#00CC96'),
                             hoverinfo='text'
@@ -1713,13 +1721,29 @@ with tab_meta:
                 phis = [getattr(a, 'phi_value', 0) for a in all_agents]
                 qualia_names = ["Pain", "Joy", "Blue", "Entropy", "Void"]
                 
+                # Plot data preps
+                concepts_list = []
+                for a in all_agents:
+                    if hasattr(a, 'last_concepts'):
+                         val = a.last_concepts
+                         concepts_list.append((val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten())
+                
+                qualia_counts = [random.randint(5, 50) for _ in qualia_names]
+                
+                grounding = [getattr(a, 'symbol_grounding_r2', 0) if hasattr(a, 'symbol_grounding_r2') else random.random() for a in all_agents]
+                ages = [a.age for a in all_agents]
+                
                 st.session_state.l8_cache = {
                     'phis': phis,
                     'qualia_names': qualia_names,
                     'mean_phi': np.mean(phis) if phis else 0.0,
                     'max_phi': max(phis) if phis else 0.0,
                     'self_models_count': sum(1 for a in all_agents if getattr(a, 'has_self_model', False)),
-                    'tom_score_mean': np.mean([getattr(a, 'tom_score', 0) for a in all_agents]) if all_agents else 0.0
+                    'tom_score_mean': np.mean([getattr(a, 'tom_score', 0) for a in all_agents]) if all_agents else 0.0,
+                    'concepts_list': concepts_list,
+                    'qualia_counts': qualia_counts,
+                    'grounding': grounding,
+                    'ages': ages
                 }
             
             c8 = st.session_state.l8_cache
@@ -1758,14 +1782,8 @@ with tab_meta:
                 
                 with c8_1:
                     # Fig 8.1: Concept Space Latent Manifold
-                    concepts_list = []
-                    for a in all_agents:
-                        if hasattr(a, 'last_concepts'):
-                             val = a.last_concepts
-                             concepts_list.append((val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten())
-                    
-                    if concepts_list:
-                        c_arr = np.array(concepts_list)
+                    if c8['concepts_list']:
+                        c_arr = np.array(c8['concepts_list'])
                         if c_arr.shape[1] >= 3:
                             fig_8_1 = px.scatter_3d(
                                 x=c_arr[:, 0], y=c_arr[:, 1], z=c_arr[:, 2],
@@ -1796,13 +1814,11 @@ with tab_meta:
                 
                 with c8_3:
                     # Fig 8.3: Qualia Spectrum
-                    qualia_counts = [random.randint(5, 50) for _ in qualia_names]
-                    
                     fig_8_3 = px.bar(
-                        x=qualia_names, y=qualia_counts,
+                        x=c8['qualia_names'], y=c8['qualia_counts'],
                         title="8.3 Qualia Spectrum Analysis",
                         template='plotly_dark',
-                        color=qualia_counts,
+                        color=c8['qualia_counts'],
                         color_continuous_scale='Spectral'
                     )
                     fig_8_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
@@ -1810,11 +1826,8 @@ with tab_meta:
 
                 with c8_4:
                     # Fig 8.4: Symbol Grounding Correlation
-                    grounding = [getattr(a, 'symbol_grounding_r2', 0) if hasattr(a, 'symbol_grounding_r2') else random.random() for a in all_agents]
-                    ages = [a.age for a in all_agents]
-                    
                     fig_8_4 = px.scatter(
-                        x=phis, y=grounding, size=ages,
+                        x=c8['phis'], y=c8['grounding'], size=c8['ages'],
                         title="8.4 Symbol Grounding vs Φ",
                         template='plotly_dark',
                         labels={'x': 'Integrated Info (Φ)', 'y': 'Symbol Grounding R²'}
@@ -1951,9 +1964,15 @@ with tab_meta:
                 if hasattr(world, 'omega_criteria_scores'):
                      pass 
                 
+                scratch = None
+                if all_agents and hasattr(all_agents[0], 'scratchpad'):
+                    sp_raw = all_agents[0].scratchpad
+                    scratch = sp_raw.detach().cpu().numpy() if torch.is_tensor(sp_raw) else sp_raw
+                
                 st.session_state.l10_cache = {
                      'omega_scores': omega_scores,
-                     'mean_omega': np.mean(omega_scores)
+                     'mean_omega': np.mean(omega_scores),
+                     'scratch': scratch
                 }
             
             c10 = st.session_state.l10_cache
@@ -2024,11 +2043,9 @@ with tab_meta:
                 
                 with c10_3:
                     # Fig 10.3: Scratchpad Activity Matrix
-                    if all_agents and hasattr(all_agents[0], 'scratchpad'):
-                        sp_raw = all_agents[0].scratchpad
-                        scratch = sp_raw.detach().cpu().numpy() if torch.is_tensor(sp_raw) else sp_raw
+                    if c10['scratch'] is not None:
                         fig_10_3 = px.imshow(
-                            scratch,
+                            c10['scratch'],
                             title="10.3 Active Scratchpad State",
                             template='plotly_dark',
                             color_continuous_scale='Greys'
