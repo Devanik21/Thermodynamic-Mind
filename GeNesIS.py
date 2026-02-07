@@ -534,7 +534,7 @@ def update_simulation():
              torch.log2(torch.softmax(a.brain.actor.weight.detach().flatten(), dim=0) + 1e-9)).item()
             for a in random.sample(list(world.agents.values()), min(5, len(world.agents)))
         ]) if world.agents else 0.0
-    
+    }
     st.session_state.stats_history.append(stats)
     if len(st.session_state.stats_history) > 200:
         st.session_state.stats_history.pop(0)
