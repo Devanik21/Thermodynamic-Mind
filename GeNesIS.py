@@ -1317,7 +1317,7 @@ with tab_meta:
             st.caption("Visualizing the Agent's Learning Process & Brain Structure")
             
             # Prepare Data & Metrics (Cached)
-            if 'l5_cache' not in st.session_state or world.time_step % 20 == 0:
+            if 'l5_cache' not in st.session_state or 'plasticity_std' not in st.session_state.l5_cache or world.time_step % 20 == 0:
                 errors = []
                 confidences = []
                 energies_l5 = []
@@ -1452,7 +1452,7 @@ with tab_meta:
             st.caption("Planetary Modification & Infrastructure Analysis")
 
             # Data Prep (Cached)
-            if 'l6_cache' not in st.session_state or world.time_step % 20 == 0:
+            if 'l6_cache' not in st.session_state or 'sx' not in st.session_state.l6_cache or world.time_step % 20 == 0:
                 struct_types = [getattr(s, 'structure_type', 'generic') for s in world.structures.values()]
                 struct_counts = {k: struct_types.count(k) for k in set(struct_types)}
                 land_usage = len(world.structures)/(40*40)
@@ -1575,7 +1575,7 @@ with tab_meta:
             st.caption("Hive Mind Synchronization & Network Topology")
             
             # Data Prep (Cached)
-            if 'l7_cache' not in st.session_state or world.time_step % 20 == 0:
+            if 'l7_cache' not in st.session_state or 'node_x' not in st.session_state.l7_cache or world.time_step % 20 == 0:
                 phases = [getattr(a, 'internal_phase', 0) for a in all_agents]
                 bonds_count = len(world.bonds) if hasattr(world, 'bonds') else 0
                 
@@ -1717,7 +1717,7 @@ with tab_meta:
             st.caption("Self-Awareness, Qualia & Abstract Thought")
             
             # Data Prep (Cached)
-            if 'l8_cache' not in st.session_state or world.time_step % 20 == 0:
+            if 'l8_cache' not in st.session_state or 'concepts_list' not in st.session_state.l8_cache or world.time_step % 20 == 0:
                 phis = [getattr(a, 'phi_value', 0) for a in all_agents]
                 qualia_names = ["Pain", "Joy", "Blue", "Entropy", "Void"]
                 
@@ -1844,7 +1844,7 @@ with tab_meta:
             st.caption("Probing Reality & Causal Manipulation")
             
             # Data Prep (Cached)
-            if 'l9_cache' not in st.session_state or world.time_step % 20 == 0:
+            if 'l9_cache' not in st.session_state or 'residuals' not in st.session_state.l9_cache or world.time_step % 20 == 0:
                 patterns_count = len(world.discovered_physics_patterns) if hasattr(world, 'discovered_physics_patterns') else 0
                 residuals_mean = np.mean(world.oracle_residuals) if hasattr(world, 'oracle_residuals') and world.oracle_residuals else 0.05
                 residuals = world.oracle_residuals if hasattr(world, 'oracle_residuals') else np.random.normal(0, 0.1, 100)
@@ -1959,7 +1959,7 @@ with tab_meta:
             st.caption("Computational Transcendence & Simulation Nesting")
             
             # Data Prep (Cached)
-            if 'l10_cache' not in st.session_state or world.time_step % 20 == 0:
+            if 'l10_cache' not in st.session_state or 'scratch' not in st.session_state.l10_cache or world.time_step % 20 == 0:
                 omega_scores = [0.8, 0.7, 0.5, 0.9, 0.6]
                 if hasattr(world, 'omega_criteria_scores'):
                      pass 
