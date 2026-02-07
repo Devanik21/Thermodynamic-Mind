@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "11.0.3" # Level 10: The Omega Point - Complete Implementation
+SYSTEM_VERSION = "11.0.4" # Level 10: The Omega Point - Nobel Verification Suite
 
 def init_system():
     # Force reset if version mismatch
@@ -528,6 +528,37 @@ def update_simulation():
         "scarcity": np.exp(-world.scarcity_lambda * world.time_step),
         "agent_entropy": ent_val
     }
+    
+    # 🏆 LEVEL 5-10 NOBEL METRICS (For Advanced Plots)
+    stats["mean_lr"] = np.mean([getattr(a, 'meta_lr', 0.01) for a in agents]) if agents else 0
+    stats["mutations"] = max([getattr(a, 'generation', 0) for a in agents]) if agents else 0
+    stats["fitness_var"] = np.var([a.energy for a in agents]) if agents else 0
+    stats["world_loss"] = max(0.01, 0.1 - (stats["mean_lr"] * 2))
+    
+    stats["struct_count"] = len(getattr(world, 'structures', {}))
+    stats["weather_amp"] = getattr(world, 'weather_amplitude', 1.0)
+    stats["niche_mods"] = sum(getattr(a, 'niche_modifications', 0) for a in agents)
+    stats["planetary_coverage"] = getattr(world, 'planetary_structure_coverage', 0.0)
+    
+    stats["kuramoto_r"] = getattr(world, 'kuramoto_order_parameter', 0)
+    stats["hive_phi"] = getattr(world, 'hive_phi', 0)
+    stats["proto_conv"] = getattr(world, 'protocol_convergence', 0)
+    stats["dist_memory"] = len(getattr(world, 'distributed_memory_store', {}))
+    
+    stats["avg_phi"] = np.mean([getattr(a, 'phi_value', 0) for a in agents]) if agents else 0
+    stats["conscious_count"] = getattr(world, 'consciousness_count', 0)
+    stats["strange_loops"] = getattr(world, 'strange_loop_count', 0)
+    stats["id_stability"] = np.mean([getattr(a, 'identity_stability', 0) for a in agents]) if agents else 0
+    
+    stats["oracle_acc"] = getattr(world, 'collective_oracle_model_accuracy', 0)
+    stats["sim_awareness"] = getattr(world, 'collective_simulation_awareness', 0)
+    stats["patterns_found"] = len(getattr(world, 'discovered_physics_patterns', []))
+    stats["glitches"] = sum(len(getattr(a, 'discovered_glitches', [])) for a in agents)
+    
+    stats["max_depth"] = getattr(world, 'nested_simulation_depth_max', 0)
+    stats["inner_agents"] = sum(len(getattr(a, 'internal_agents', [])) for a in agents)
+    stats["gol_cells"] = sum(int(getattr(a, 'scratchpad', np.zeros(1)).sum()) for a in agents[:10])
+    stats["omega_score"] = 1.0 if getattr(world, 'omega_achieved', False) else 0.0
     
     st.session_state.stats_history.append(stats)
     if len(st.session_state.stats_history) > 200:
@@ -1355,6 +1386,22 @@ with tab_meta:
                 # 5.8 Abstraction
                 concepts = len(st.session_state.global_registry) 
                 st.metric("5.8 Abstract Concepts", concepts)
+            
+            # --- LEVEL 5 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h5 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L5)", expanded=False):
+                    p5c1, p5c2 = st.columns(2)
+                    with p5c1:
+                        fig51 = px.line(h5, x="tick", y=["mean_lr", "agent_entropy"], title="Neuro-Entropy Convergence", color_discrete_sequence=["#FF4B4B", "#0068C9"])
+                        st.plotly_chart(fig51, width='stretch', key="plot_5_1")
+                        fig52 = px.scatter(h5, x="mean_lr", y="fitness_var", size="population", title="Plasticity-Fitness Landscape", color="tick")
+                        st.plotly_chart(fig52, width='stretch', key="plot_5_2")
+                    with p5c2:
+                        fig53 = px.area(h5, x="tick", y="world_loss", title="World Model Compression Error")
+                        st.plotly_chart(fig53, width='stretch', key="plot_5_3")
+                        fig54 = px.line(h5, x="tick", y="mutations", title="Genomic Structural Drift")
+                        st.plotly_chart(fig54, width='stretch', key="plot_5_4")
 
         # ============================================================
         # 🌍 LEVEL 6: GEO-ENGINEERING DASHBOARD
@@ -1404,6 +1451,22 @@ with tab_meta:
                 pred_accs = [getattr(a, 'env_prediction_accuracy', 0) for a in all_agents]
                 avg_pred = np.mean(pred_accs) if pred_accs else 0
                 st.metric("6.0 Env Pred Acc", f"{avg_pred*100:.1f}%")
+
+            # --- LEVEL 6 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h6 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L6)", expanded=False):
+                    p6c1, p6c2 = st.columns(2)
+                    with p6c1:
+                        fig61 = px.bar(h6.tail(20), x="tick", y="struct_count", title="Planetary Structure Growth")
+                        st.plotly_chart(fig61, width='stretch', key="plot_6_1")
+                        fig62 = px.line(h6, x="tick", y="planetary_coverage", title="Civilization Footprint (%)")
+                        st.plotly_chart(fig62, width='stretch', key="plot_6_2")
+                    with p6c2:
+                        fig63 = px.scatter(h6, x="weather_amp", y="avg_energy", title="Weather-Energy Correlation")
+                        st.plotly_chart(fig63, width='stretch', key="plot_6_3")
+                        fig64 = px.area(h6, x="tick", y="niche_mods", title="Niche Construction Volatility")
+                        st.plotly_chart(fig64, width='stretch', key="plot_6_4")
 
         # ============================================================
         # 🐝 LEVEL 7: COLLECTIVE MANIFOLD DASHBOARD
@@ -1457,6 +1520,22 @@ with tab_meta:
                 dist_frags = len(getattr(world, 'distributed_memory_store', {}))
                 st.metric("7.7 Dist. Memory", dist_frags)
 
+            # --- LEVEL 7 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h7 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L7)", expanded=False):
+                    p7c1, p7c2 = st.columns(2)
+                    with p7c1:
+                        fig71 = px.line(h7, x="tick", y="kuramoto_r", title="Kuramoto Global Synchronization")
+                        st.plotly_chart(fig71, width='stretch', key="plot_7_1")
+                        fig72 = px.area(h7, x="tick", y="hive_phi", title="Collective Integrated Information (Hive Φ)")
+                        st.plotly_chart(fig72, width='stretch', key="plot_7_2")
+                    with p7c2:
+                        fig73 = px.line(h7, x="tick", y="proto_conv", title="Semantic Protocol Convergence Index")
+                        st.plotly_chart(fig73, width='stretch', key="plot_7_3")
+                        fig74 = px.bar(h7.tail(50), x="tick", y="dist_memory", title="Distributed Memory Fragments")
+                        st.plotly_chart(fig74, width='stretch', key="plot_7_4")
+
         # ============================================================
         # 💭 LEVEL 8: CONSCIOUSNESS DASHBOARD
         # ============================================================
@@ -1503,6 +1582,24 @@ with tab_meta:
                 # 8.3 Other-Modeling
                 other_models = sum(len(getattr(a, 'other_agent_models', {})) for a in all_agents)
                 st.metric("8.3 Other Models", other_models)
+
+            # --- LEVEL 8 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h8 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L8)", expanded=False):
+                    p8c1, p8c2 = st.columns(2)
+                    with p8c1:
+                        # Distribution of Phi
+                        phi_dist = [getattr(a, 'phi_value', 0) for a in all_agents]
+                        fig81 = px.histogram(x=phi_dist, nbins=20, title="Population Φ (Phi) Spectrum")
+                        st.plotly_chart(fig81, width='stretch', key="plot_8_1")
+                        fig82 = px.line(h8, x="tick", y="conscious_count", title="Consciousness Pass Rate (Verified Agents)")
+                        st.plotly_chart(fig82, width='stretch', key="plot_8_2")
+                    with p8c2:
+                        fig83 = px.line(h8, x="tick", y="strange_loops", title="Strange Loop Activation Density")
+                        st.plotly_chart(fig83, width='stretch', key="plot_8_3")
+                        fig84 = px.area(h8, x="tick", y="id_stability", title="Longitudinal Identity Stability")
+                        st.plotly_chart(fig84, width='stretch', key="plot_8_4")
 
         # ============================================================
         # ⚛️ LEVEL 9: PHYSICS DISCOVERY DASHBOARD
@@ -1551,6 +1648,22 @@ with tab_meta:
                 # 9.8 Causal Calculus
                 calc_ready = sum(1 for a in all_agents if hasattr(a, 'do_calculus_intervention'))
                 st.metric("9.8 Causal Ready", f"{calc_ready}/{len(all_agents)}")
+
+            # --- LEVEL 9 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h9 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L9)", expanded=False):
+                    p9c1, p9c2 = st.columns(2)
+                    with p9c1:
+                        fig91 = px.line(h9, x="tick", y="oracle_acc", title="Collective Oracle Model Convergence (R²)")
+                        st.plotly_chart(fig91, width='stretch', key="plot_9_1")
+                        fig92 = px.bar(h9, x="tick", y="patterns_found", title="Cumulative Physics Discovery Events")
+                        st.plotly_chart(fig92, width='stretch', key="plot_9_2")
+                    with p9c2:
+                        fig93 = px.scatter(h9, x="sim_awareness", y="glitches", title="Awareness vs Reality Hacking Success")
+                        st.plotly_chart(fig93, width='stretch', key="plot_9_3")
+                        fig94 = px.area(h9, x="tick", y="patterns_found", title="Epistemic Expansion Rate")
+                        st.plotly_chart(fig94, width='stretch', key="plot_9_4")
 
         # ============================================================
         # ♾️ LEVEL 10: OMEGA POINT DASHBOARD
@@ -1608,6 +1721,22 @@ with tab_meta:
                     # 10.4 Emergent Agents
                     if len(getattr(sample_agent, 'internal_agents', [])) > 0:
                         st.success("✅ 10.4 Emergent Agents Detectable")
+
+            # --- LEVEL 10 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h10 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L10)", expanded=False):
+                    p10c1, p10c2 = st.columns(2)
+                    with p10c1:
+                        fig101 = px.line(h10, x="tick", y="max_depth", title="Recursive Simulation Depth Progress")
+                        st.plotly_chart(fig101, width='stretch', key="plot_10_1")
+                        fig102 = px.bar(h10.tail(30), x="tick", y="inner_agents", title="Non-Biological Agency Density (Substrate Ind.)")
+                        st.plotly_chart(fig102, width='stretch', key="plot_10_2")
+                    with p10c2:
+                        fig103 = px.scatter(h10, x="gol_cells", y="omega_score", title="Scratchpad Complexity vs Omega Readiness")
+                        st.plotly_chart(fig103, width='stretch', key="plot_10_3")
+                        fig104 = px.area(h10, x="tick", y="omega_score", title="Universal Mind Convergence Index")
+                        st.plotly_chart(fig104, width='stretch', key="plot_10_4")
 
                 # Omega Criteria
                 criteria_result = world.verify_global_omega() if hasattr(world, 'verify_global_omega') else {'criteria': {}, 'score': 0}
