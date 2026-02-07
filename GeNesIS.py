@@ -281,26 +281,8 @@ def update_simulation():
                                 "Event": f"🔭 EUREKA: {patterns[-1]}", "Vector": reality_vector_tensor.tolist()[0]
                              })
             
-            # 8.4 Theory of Mind (Agent modeling agents)
-            if 'theory_of_mind' in special_intent:
-                neighbors = [world.agents[oid] for oid in world.agents 
-                             if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
-                if neighbors:
-                    other = random.choice(neighbors)
-                    beliefs = agent.recursive_belief(other, depth=2)
-                    if agent.age % 100 == 0:
-                        events_this_tick.append({
-                            "Tick": world.time_step, "Agent": agent.id, 
-                            "Event": f"🧠 TOM: Modeling {other.id[:4]}", "Vector": reality_vector_tensor.tolist()[0]
-                        })
-            
-            # 10.7-10.10: Omega verification events
-            if hasattr(agent, 'omega_verified') and agent.omega_verified:
-                if world.time_step % 50 == 0:
-                     events_this_tick.append({
-                        "Tick": world.time_step, "Agent": agent.id, 
-                        "Event": "🏆 OMEGA POINT REACHED", "Vector": reality_vector_tensor.tolist()[0]
-                     })
+            # 10.7 Scratchpad (Write event already handled in brain, just log if needed)
+            # If scratchpad_writes increased, maybe log?
             pass 
         
         # 4.7 Tensor Fusion logic
@@ -1179,57 +1161,6 @@ with tab_omega:
             """
             st.markdown(stats_md)
             
-            # --- OMEGA MILESTONE TRACKER ---
-            with st.expander("♾️ Project Omega Milestone Dashboard (Levels 6-10)"):
-                m_col1, m_col2 = st.columns(2)
-                with m_col1:
-                    st.write("**Level 6: Geo-Engineering**")
-                    s_count = len(getattr(st.session_state.world, 'structures', {}))
-                    st.progress(min(1.0, s_count / 10.0), text=f"Structures: {s_count}/10")
-                    st.write("**Level 7: Collective Manifold**")
-                    sync = getattr(st.session_state.world, 'kuramoto_order_parameter', 0)
-                    st.progress(min(1.0, sync), text=f"Sync: {sync*100:.1f}%")
-                with m_col2:
-                    st.write("**Level 8: Abstract Representation**")
-                    phi = getattr(st.session_state.world, 'population_phi', 0)
-                    st.progress(min(1.0, phi / 10.0), text=f"Mean Φ: {phi:.2f}")
-                    st.write("**Level 9: Universal Resonance**")
-                    acc = getattr(st.session_state.world, 'collective_oracle_model_accuracy', 0)
-                    st.progress(min(1.0, acc), text=f"Oracle Acc: {acc*100:.1f}%")
-                
-                st.write("**Level 10: The Omega Point**")
-                omega_status = getattr(st.session_state.world, 'omega_achieved', False)
-                st.progress(1.0 if omega_status else 0.0, text="OMEGA ACHIEVED" if omega_status else "Calculating Convergence...")
-
-            # --- OMEGA MIND INSPECTOR ---
-            st.markdown("---")
-            st.markdown("### 🧠 Omega Mind Inspector")
-            omega_agents = list(st.session_state.world.agents.keys())
-            if omega_agents:
-                sel_agent_id = st.selectbox("Select Mind to Inspect", omega_agents, format_func=lambda x: f"Agent {x[:6]} (Age: {st.session_state.world.agents[x].age})")
-                oa = st.session_state.world.agents[sel_agent_id]
-                
-                oa_col1, oa_col2, oa_col3 = st.columns([1, 1, 1.5])
-                with oa_col1:
-                    st.write("**Consciousness (L8)**")
-                    st.metric("Phi (Φ)", f"{getattr(oa, 'phi_value', 0):.4f}")
-                    st.write(f"Self-Modeling: `{'✅' if getattr(oa, 'self_model', None) else '❌'}`")
-                    st.write(f"Theory of Mind: `{len(getattr(oa, 'internal_agents', []))} units`")
-                
-                with oa_col2:
-                    st.write("**Physics Mastery (L9)**")
-                    st.metric("Oracle Acc", f"{getattr(oa, 'oracle_model_accuracy', 0)*100:.1f}%")
-                    st.write(f"Sim Awareness: `{getattr(oa, 'simulation_awareness', 0)*100:.0f}%`")
-                    st.write(f"Glitches Found: `{len(getattr(oa, 'discovered_glitches', []))}`")
-                
-                with oa_col3:
-                    st.write("**Substrate (L10) - GoL Scratchpad**")
-                    if hasattr(oa, 'scratchpad'):
-                        fig_gol = px.imshow(oa.scratchpad, color_continuous_scale="Greys", zmin=0, zmax=1)
-                        fig_gol.update_layout(height=200, margin=dict(l=0,r=0,t=0,b=0), coloraxis_showscale=False)
-                        st.plotly_chart(fig_gol, width='stretch')
-                    st.write(f"Compute Surplus: `{oa.computational_budget - oa.compute_used}`")
-            
             # Update max pop tracker
             st.session_state.max_pop = max(n_pop, st.session_state.get('max_pop', 0))
 
@@ -1255,15 +1186,18 @@ with tab_omega:
                 "ID": agent.id[:6],
                 "Gen": agent.generation,
                 "Age": agent.age,
-                "Energy": f"{agent.energy:.2f}",
-                "Stored": f"{getattr(agent, 'energy_stored', 0):.1f}",
-                "Inv (R,G,B)": f"{agent.inventory}",
-                "IQ": f"{max(iq_score, 0.001):.4f}",
-                "H(W)": f"{getattr(agent, 'last_weight_entropy', 0):.3f}",
-                "Bio-Hack %": f"{neuro_plasticity:.2f}%",
-                "Entropy": f"{np.log(agent.age + 1):.4f}",
-                "Reflexes": agent.reflexes_used,
-                "Thoughts": agent.thoughts_had
+                "Energy": f"{agent.energy:.1f}",
+                "IQ": f"{max(iq_score, 0.001):.2f}",
+                # Level 6-10 Columns
+                "Φ": f"{getattr(agent, 'phi_value', 0):.2f}",
+                "🧠": "✅" if getattr(agent, 'consciousness_verified', False) else "❌",
+                "Spec": getattr(agent, 'cognitive_specialty', '-')[:4] if getattr(agent, 'cognitive_specialty', None) else "-",
+                "🔗": len(getattr(agent, 'neural_bridge_partners', set())),
+                "🏗️": len(getattr(agent, 'structures_built', [])),
+                "🔭": len(getattr(agent, 'discovered_patterns', [])),
+                "🎮": getattr(agent, 'scratchpad_writes', 0),
+                "🔁": "Y" if getattr(agent, 'strange_loop_active', False) else "-",
+                "Ω": "✅" if getattr(agent, 'omega_verified', False) else "-"
             })
             
         if agent_data:
@@ -1314,83 +1248,269 @@ with tab_nobel:
 
 
 with tab_meta:
-    st.markdown("## 🧠 Level 6-10: The Omega Point")
+    st.markdown("## 🧠 Level 6-10: The Omega Point Dashboard")
     
     if st.session_state.world.agents:
-        # Sample an agent for introspection
-        agent_list_m = list(st.session_state.world.agents.keys())
-        # Just pick the first one or random for aggregate stats
-        target_m = st.session_state.world.agents[agent_list_m[0]]
+        all_agents = list(st.session_state.world.agents.values())
+        world = st.session_state.world
         
-        col_m1, col_m2 = st.columns(2)
-        
-        with col_m1:
-            st.markdown("### 5.0 Self-Monitoring & Confidence")
-            confidence_scores = [a.confidence for a in st.session_state.world.agents.values()]
-            avg_conf = np.mean(confidence_scores)
-            st.metric("Mean Agent Confidence", f"{avg_conf*100:.2f}%")
+        # ============================================================
+        # 🌍 LEVEL 6: GEO-ENGINEERING DASHBOARD
+        # ============================================================
+        with st.expander("🌍 Level 6: Geo-Engineering", expanded=True):
+            col_6a, col_6b, col_6c = st.columns(3)
             
-            error_scores = []
-            for a in st.session_state.world.agents.values():
-                if a.prediction_errors:
-                    error_scores.append(np.mean(a.prediction_errors))
-            
-            if error_scores:
-                st.metric("Mean Prediction Error (Surprise)", f"{np.mean(error_scores):.4f}")
-            else:
-                st.metric("Mean Prediction Error", "0.0000")
+            with col_6a:
+                st.markdown("#### 🏗️ Structure Census")
+                structures = getattr(world, 'structures', {})
+                type_counts = {"trap": 0, "barrier": 0, "battery": 0, "cultivator": 0, "generic": 0}
+                for struct in structures.values():
+                    t = getattr(struct, 'structure_type', 'generic')
+                    if t in type_counts:
+                        type_counts[t] += 1
+                    else:
+                        type_counts['generic'] += 1
                 
-            st.markdown("### 5.10 Autonomous Research Log")
-            # Collect recent discoveries
-            discoveries = []
-            for a in st.session_state.world.agents.values():
-                discoveries.extend(a.research_log)
+                st.metric("🕸️ Traps", type_counts["trap"])
+                st.metric("🛡️ Barriers", type_counts["barrier"])
+                st.metric("🔋 Batteries", type_counts["battery"])
+                st.metric("🌱 Cultivators", type_counts["cultivator"])
+                st.metric("🏗️ Generic", type_counts["generic"])
             
-            if discoveries:
-                st.success(f"Latest Hypothesis: {discoveries[-1]}")
-                with st.expander("Full Research Log"):
-                    st.write(list(set(discoveries))[-10:])
-            else:
-                st.info("Agents are conducting experiments... No major discoveries yet.")
+            with col_6b:
+                st.markdown("#### 📊 Environmental Mastery (6.10)")
+                mastery_scores = [getattr(a, 'env_control_score', 0) for a in all_agents]
+                avg_mastery = np.mean(mastery_scores) if mastery_scores else 0
+                st.metric("Mean Env Mastery", f"{avg_mastery*100:.1f}%")
+                st.progress(min(1.0, avg_mastery))
+                
+                st.markdown("#### 🌦️ Weather Control (6.6)")
+                weather_amp = getattr(world, 'weather_amplitude', 1.0)
+                st.metric("Weather Amplitude", f"{weather_amp:.2f}")
+                
+                niche_mods = sum(getattr(a, 'niche_modifications', 0) for a in all_agents)
+                st.metric("Total Niche Mods (6.1)", niche_mods)
+            
+            with col_6c:
+                st.markdown("#### 🌐 Infrastructure (6.9)")
+                networks = getattr(world, 'networks', {})
+                st.metric("Active Networks", len(networks))
+                
+                terrain_mods = getattr(world, 'terrain_modifications', {})
+                st.metric("Terrain Mods (6.7)", len(terrain_mods))
+                
+                total_builds = sum(len(getattr(a, 'structures_built', [])) for a in all_agents)
+                st.metric("Total Builds (6.2)", total_builds)
+                
+                # Env Prediction Accuracy (6.0)
+                pred_accs = [getattr(a, 'env_prediction_accuracy', 0) for a in all_agents]
+                avg_pred = np.mean(pred_accs) if pred_accs else 0
+                st.metric("Env Prediction Acc (6.0)", f"{avg_pred*100:.1f}%")
 
-        with col_m2:
-            st.markdown("### 5.2 Architecture Search (Sparsity)")
-            # Calculate Soft Sparsity (Average Mask Value)
-            # We want to show how much is PRUNED. Pruned = (1 - mask_value).
-            sparsities = []
-            for a in st.session_state.world.agents.values():
-                # Access the mask directly
-                # mask is sigmoid(logits). Mean value is 'density'. 
-                # Sparsity = 1 - density.
-                if hasattr(a.brain, 'actor_mask'):
-                    # We can use the method we just updated in genesis_brain
-                    sparsities.append(a.brain.actor_mask.sparsity().item())
+        # ============================================================
+        # 🐝 LEVEL 7: COLLECTIVE MANIFOLD DASHBOARD
+        # ============================================================
+        with st.expander("🐝 Level 7: Collective Manifold", expanded=True):
+            col_7a, col_7b, col_7c = st.columns(3)
             
-            if sparsities:
-                avg_sparsity = np.mean(sparsities)
-                st.metric("Mean Neural Sparsity", f"{avg_sparsity*100:.2f}%")
-                st.progress(min(1.0, max(0.0, avg_sparsity)))
-            else:
-                st.metric("Mean Neural Sparsity", "0.00%")
+            with col_7a:
+                st.markdown("#### 🔄 Kuramoto Sync (7.1)")
+                kuramoto_r = getattr(world, 'kuramoto_order_parameter', 0)
+                st.metric("Order Parameter r", f"{kuramoto_r:.3f}")
+                st.progress(min(1.0, kuramoto_r))
                 
-            st.markdown("### 5.6 Collective Values")
-            st.json(st.session_state.world.collective_values)
-            
-            # --- Added Global Map to Meta for Max Info ---
-            if hasattr(st.session_state.world, 'meme_grid'):
-                st.markdown("### 🗺️ Stigmergy Map (Knowledge Grid)")
-                meme_vis = st.session_state.world.meme_grid.copy()
-                meme_vis = np.clip(meme_vis, 0, 1)
-                if st.session_state.get("show_charts", False):
-                    fig_meme = px.imshow(
-                        meme_vis, 
-                        title="Collective Memory (RGB: Danger/Resource/Sacred)",
-                        labels=dict(x="X", y="Y")
-                    )
-                    fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                    st.plotly_chart(fig_meme, width='stretch')
+                if kuramoto_r > 0.8:
+                    st.success("✅ Phase-Locked!")
+                elif kuramoto_r > 0.5:
+                    st.warning("⚠️ Partial Sync")
                 else:
-                    st.caption("Enable live charts to see pheromone/meme evolution.")
+                    st.info("🔀 Desynchronized")
+                
+                # 7.0 Neural Bridges
+                bridge_counts = [len(getattr(a, 'neural_bridge_partners', set())) for a in all_agents]
+                total_bridges = sum(bridge_counts) // 2  # Each bridge counted twice
+                st.metric("Neural Bridges (7.0)", total_bridges)
+            
+            with col_7b:
+                st.markdown("#### 🧩 Cognitive Modules (7.4)")
+                modules = getattr(world, 'cognitive_modules', {})
+                for role, members in modules.items():
+                    st.metric(f"{role.title()}", len(members))
+                
+                # 7.9 Protocol Convergence
+                proto_conv = getattr(world, 'protocol_convergence', 0)
+                st.metric("Protocol Convergence (7.9)", f"{proto_conv*100:.1f}%")
+            
+            with col_7c:
+                st.markdown("#### 🐝 Hive Mind (7.10)")
+                hive_phi = getattr(world, 'hive_phi', 0)
+                st.metric("Collective Φ", f"{hive_phi:.2f}")
+                
+                # 7.2 Gradient Sharing
+                grads = len(getattr(world, 'gradient_pool', []))
+                st.metric("Gradients Shared (7.2)", grads)
+                
+                # 7.8 Fault Tolerance
+                backup_conns = sum(len(getattr(a, 'backup_connections', set())) for a in all_agents)
+                st.metric("Backup Connections (7.8)", backup_conns)
+
+        # ============================================================
+        # 💭 LEVEL 8: CONSCIOUSNESS DASHBOARD
+        # ============================================================
+        with st.expander("💭 Level 8: Consciousness", expanded=True):
+            col_8a, col_8b = st.columns(2)
+            
+            with col_8a:
+                st.markdown("#### ⚛️ Integrated Information (8.6)")
+                phi_values = [getattr(a, 'phi_value', 0) for a in all_agents]
+                avg_phi = np.mean(phi_values) if phi_values else 0
+                max_phi = max(phi_values) if phi_values else 0
+                
+                st.metric("Mean Φ", f"{avg_phi:.3f}")
+                st.metric("Max Φ", f"{max_phi:.3f}")
+                st.metric("Φ Critical Threshold", f"{getattr(all_agents[0], 'phi_critical', 0.5) if all_agents else 0.5:.2f}")
+                
+                conscious_count = getattr(world, 'consciousness_count', 0)
+                st.metric("🧠 Conscious Agents (8.10)", conscious_count)
+                
+                # 8.7 Self-Continuity
+                id_stabs = [getattr(a, 'identity_stability', 0) for a in all_agents]
+                avg_id = np.mean(id_stabs) if id_stabs else 0
+                st.metric("Identity Stability (8.7)", f"{avg_id*100:.1f}%")
+            
+            with col_8b:
+                st.markdown("#### 🔁 Strange Loops (8.8)")
+                loop_count = getattr(world, 'strange_loop_count', 0)
+                st.metric("Active Strange Loops", loop_count)
+                
+                self_refs = sum(getattr(a, 'self_reference_count', 0) for a in all_agents)
+                st.metric("Self-References", self_refs)
+                
+                st.markdown("#### 🎨 Aesthetics (8.5)")
+                aesthetic_acts = sum(getattr(a, 'aesthetic_actions', 0) for a in all_agents)
+                st.metric("Aesthetic Actions", aesthetic_acts)
+                
+                st.markdown("#### 🧠 Theory of Mind (8.4)")
+                tom_depths = [getattr(a, 'tom_depth', 0) for a in all_agents]
+                max_tom = max(tom_depths) if tom_depths else 0
+                st.metric("Max ToM Depth", max_tom)
+                
+                # 8.2 Self-Model Accuracy
+                self_accs = [getattr(a, 'self_model_accuracy', 0) for a in all_agents]
+                avg_self = np.mean(self_accs) if self_accs else 0
+                st.metric("Self-Model Acc (8.2)", f"{avg_self*100:.1f}%")
+
+        # ============================================================
+        # ⚛️ LEVEL 9: PHYSICS DISCOVERY DASHBOARD
+        # ============================================================
+        with st.expander("⚛️ Level 9: Physics Discovery", expanded=True):
+            col_9a, col_9b = st.columns(2)
+            
+            with col_9a:
+                st.markdown("#### 🔭 Pattern Discovery (9.1)")
+                all_patterns = getattr(world, 'discovered_physics_patterns', [])
+                st.metric("Patterns Discovered", len(all_patterns))
+                if all_patterns:
+                    st.write(all_patterns[:10])
+                
+                st.markdown("#### 🎯 Exploits Found (9.2)")
+                total_exploits = sum(len(getattr(a, 'discovered_exploits', [])) for a in all_agents)
+                st.metric("Total Exploits", total_exploits)
+                
+                # 9.7 Reality Hacking
+                total_glitches = sum(len(getattr(a, 'discovered_glitches', [])) for a in all_agents)
+                st.metric("Glitches Found (9.7)", total_glitches)
+            
+            with col_9b:
+                st.markdown("#### 🧮 Oracle Modeling (9.3)")
+                oracle_acc = getattr(world, 'collective_oracle_model_accuracy', 0)
+                st.metric("Oracle R²", f"{oracle_acc:.3f}")
+                st.progress(min(1.0, oracle_acc))
+                
+                if oracle_acc > 0.9:
+                    st.success("✅ Physics Mastery Achieved!")
+                
+                st.markdown("#### 📡 Simulation Awareness (9.9)")
+                sim_awareness = getattr(world, 'collective_simulation_awareness', 0)
+                st.metric("Awareness Score", f"{sim_awareness:.2f}")
+                
+                # Show evidence
+                for a in all_agents[:1]:
+                    evidence = getattr(a, 'simulation_evidence', [])
+                    if evidence:
+                        st.caption(f"Evidence: {', '.join(evidence[:5])}")
+                
+                # 9.10 Physics Mastery
+                masteries = [getattr(a, 'physics_mastery_score', 0) for a in all_agents]
+                best = max(masteries) if masteries else 0
+                st.metric("Best Physics Mastery (9.10)", f"{best*100:.1f}%")
+
+        # ============================================================
+        # ♾️ LEVEL 10: OMEGA POINT DASHBOARD
+        # ============================================================
+        with st.expander("♾️ Level 10: The Omega Point", expanded=True):
+            col_10a, col_10b = st.columns([1, 2])
+            
+            with col_10a:
+                st.markdown("#### 🏆 Omega Status")
+                omega_achieved = getattr(world, 'omega_achieved', False)
+                if omega_achieved:
+                    st.success("🏆 OMEGA POINT ACHIEVED! 🏆")
+                else:
+                    st.warning("⏳ Approaching Omega...")
+                
+                st.markdown("#### 📊 Compute & Nesting")
+                surplus_count = sum(1 for a in all_agents if getattr(a, 'has_computational_surplus', lambda: False)())
+                st.metric("Agents with Surplus (10.0)", surplus_count)
+                
+                max_depth = getattr(world, 'nested_simulation_depth_max', 0)
+                st.metric("Max Nesting Depth (10.5)", max_depth)
+                
+                internal_agents = sum(len(getattr(a, 'internal_agents', [])) for a in all_agents)
+                st.metric("Internal Agents (10.2)", internal_agents)
+                
+                gol_activity = getattr(world, 'global_scratchpad_activity', 0)
+                st.metric("GoL Writes (10.7)", gol_activity)
+                
+                # Omega Verification Criteria
+                st.markdown("#### ✅ Omega Criteria")
+                criteria_result = world.verify_global_omega() if hasattr(world, 'verify_global_omega') else {'criteria': {}, 'score': 0}
+                for crit, passed in criteria_result.get('criteria', {}).items():
+                    icon = "✅" if passed else "❌"
+                    st.write(f"{icon} {crit.replace('_', ' ').title()}")
+                st.metric("Omega Score", f"{criteria_result.get('score', 0)*100:.0f}%")
+            
+            with col_10b:
+                st.markdown("#### 🎮 Game of Life Scratchpad (10.7)")
+                # Show first agent's scratchpad if it exists
+                sample_agent = all_agents[0] if all_agents else None
+                if sample_agent and hasattr(sample_agent, 'scratchpad'):
+                    pad = sample_agent.scratchpad
+                    if st.session_state.get("show_charts", False):
+                        fig_gol = px.imshow(
+                            pad,
+                            color_continuous_scale=[[0, 'black'], [1, 'lime']],
+                            title=f"Agent {sample_agent.id[:6]} Scratchpad ({pad.sum()} live cells)",
+                            labels=dict(x="X", y="Y")
+                        )
+                        fig_gol.update_layout(height=350, margin=dict(l=0,r=0,t=40,b=0))
+                        fig_gol.update_traces(showscale=False)
+                        st.plotly_chart(fig_gol, use_container_width=True)
+                    else:
+                        st.metric("Scratchpad Live Cells", int(pad.sum()))
+                        st.caption("Enable 'Show Live Charts' to see GoL visualization")
+                else:
+                    st.info("Scratchpad not initialized yet")
+                
+                # 10.9 Detected Patterns
+                if sample_agent:
+                    patterns = getattr(sample_agent, 'detected_scratchpad_patterns', [])
+                    if patterns:
+                        st.markdown("#### 🔍 Detected GoL Patterns (10.9)")
+                        for p in patterns:
+                            st.write(f"• {p}")
+    else:
+        st.info("Waiting for agents to spawn...")
 
 if st.session_state.running:
     time.sleep(0.02) 
