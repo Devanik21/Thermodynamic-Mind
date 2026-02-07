@@ -1316,23 +1316,42 @@ with tab_meta:
         with st.expander("🧠 Level 5: Meta-Learning & Architecture", expanded=False):
             st.caption("Visualizing the Agent's Learning Process & Brain Structure")
             
-            # Prepare Data & Metrics
-            errors = []
-            confidences = []
-            energies_l5 = []
-            lrs = []
-            sparsities = []
-            
-            for a in all_agents:
-                if hasattr(a, 'prediction_errors') and a.prediction_errors:
-                    errors.append(np.mean(a.prediction_errors))
-                else:
-                    errors.append(0.0)
+            # Prepare Data & Metrics (Cached)
+            if 'l5_cache' not in st.session_state or world.time_step % 20 == 0:
+                errors = []
+                confidences = []
+                energies_l5 = []
+                lrs = []
+                sparsities = []
                 
-                confidences.append(getattr(a, 'confidence', 0.5))
-                energies_l5.append(a.energy)
-                lrs.append(getattr(a, 'meta_lr', 0.001))
-                sparsities.append(random.uniform(0.1, 0.9))
+                for a in all_agents:
+                    if hasattr(a, 'prediction_errors') and a.prediction_errors:
+                        errors.append(np.mean(a.prediction_errors))
+                    else:
+                        errors.append(0.0)
+                    
+                    confidences.append(getattr(a, 'confidence', 0.5))
+                    energies_l5.append(a.energy)
+                    lrs.append(getattr(a, 'meta_lr', 0.001))
+                    sparsities.append(random.uniform(0.1, 0.9))
+                
+                # Mock random values for static metrics so they update
+                st.session_state.l5_cache = {
+                    'errors': errors,
+                    'confidences': confidences,
+                    'energies_l5': energies_l5,
+                    'lrs': lrs,
+                    'sparsities': sparsities,
+                    'plasticity_std': np.std(lrs) if lrs else 0.0,
+                    'avg_epochs': int(np.mean([a.age for a in all_agents])/10) if all_agents else 0
+                }
+
+            cache = st.session_state.l5_cache
+            errors = cache['errors']
+            confidences = cache['confidences']
+            energies_l5 = cache['energies_l5']
+            lrs = cache['lrs']
+            sparsities = cache['sparsities']
 
             # 📊 TEXT PARAMETERS (ALWAYS VISIBLE)
             m5_1, m5_2, m5_3, m5_4 = st.columns(4)
@@ -1343,7 +1362,7 @@ with tab_meta:
             
             # Additional 12 Metrics (Row 1)
             am5_1, am5_2, am5_3, am5_4, am5_5, am5_6 = st.columns(6)
-            am5_1.metric("Plasticity Var", f"{np.std(lrs):.5f}")
+            am5_1.metric("Plasticity Var", f"{cache['plasticity_std']:.5f}")
             am5_2.metric("Forgetting Rate", "0.05")
             am5_3.metric("Transfer Score", "0.12")
             am5_4.metric("Curiosity Index", "0.78")
@@ -1352,7 +1371,7 @@ with tab_meta:
             
             # Additional 12 Metrics (Row 2)
             am5_7, am5_8, am5_9, am5_10, am5_11, am5_12 = st.columns(6)
-            am5_7.metric("Avg Epochs", f"{int(np.mean([a.age for a in all_agents])/10)}")
+            am5_7.metric("Avg Epochs", f"{cache['avg_epochs']}")
             am5_8.metric("Model Complexity", "1.2M")
             am5_9.metric("Loss Conv.", "-0.01")
             am5_10.metric("Exploration", "0.15")
@@ -1432,21 +1451,32 @@ with tab_meta:
         with st.expander("🌍 Level 6: Geo-Engineering", expanded=False):
             st.caption("Planetary Modification & Infrastructure Analysis")
 
-            # Data Prep
-            struct_types = [getattr(s, 'structure_type', 'generic') for s in world.structures.values()]
-            struct_counts = {k: struct_types.count(k) for k in set(struct_types)}
+            # Data Prep (Cached)
+            if 'l6_cache' not in st.session_state or world.time_step % 20 == 0:
+                struct_types = [getattr(s, 'structure_type', 'generic') for s in world.structures.values()]
+                struct_counts = {k: struct_types.count(k) for k in set(struct_types)}
+                land_usage = len(world.structures)/(40*40)
+                
+                st.session_state.l6_cache = {
+                    'struct_counts': struct_counts,
+                    'land_usage': land_usage,
+                    'total_structs': len(world.structures)
+                }
             
+            c6 = st.session_state.l6_cache
+            struct_counts = c6['struct_counts']
+
             # 📊 TEXT PARAMETERS
             m6_1, m6_2, m6_3, m6_4 = st.columns(4)
             m6_1.metric("6.1 Battery Count", f"{struct_counts.get('battery', 0)}", delta=None)
             m6_2.metric("6.2 Trap Count", f"{struct_counts.get('trap', 0)}", delta=None)
             m6_3.metric("6.3 Cultivator Count", f"{struct_counts.get('cultivator', 0)}", delta=None)
-            m6_4.metric("6.4 Total Structures", f"{len(world.structures)}", help="Total Built Infrastructure")
+            m6_4.metric("6.4 Total Structures", f"{c6['total_structs']}", help="Total Built Infrastructure")
 
             # Additional 12 Metrics (Row 1)
             am6_1, am6_2, am6_3, am6_4, am6_5, am6_6 = st.columns(6)
             am6_1.metric("Terraform Eff.", "0.85")
-            am6_2.metric("Land Usage", f"{len(world.structures)/(40*40):.1%}")
+            am6_2.metric("Land Usage", f"{c6['land_usage']:.1%}")
             am6_3.metric("Energy Density", "120 J/m²")
             am6_4.metric("Network Conn.", "0.92")
             am6_5.metric("Maint. Cost", "45/tick")
@@ -1540,13 +1570,25 @@ with tab_meta:
         with st.expander("🐝 Level 7: Collective Manifold", expanded=False):
             st.caption("Hive Mind Synchronization & Network Topology")
             
-            # Data Prep
-            phases = [getattr(a, 'internal_phase', 0) for a in all_agents]
-            bonds_count = len(world.bonds) if hasattr(world, 'bonds') else 0
+            # Data Prep (Cached)
+            if 'l7_cache' not in st.session_state or world.time_step % 20 == 0:
+                phases = [getattr(a, 'internal_phase', 0) for a in all_agents]
+                bonds_count = len(world.bonds) if hasattr(world, 'bonds') else 0
+                
+                st.session_state.l7_cache = {
+                    'phases': phases,
+                    'bonds_count': bonds_count,
+                    'hive_sync_std': np.std(phases) if phases else 0.0,
+                    'radii': [getattr(a, 'energy', 0) / 100.0 for a in all_agents]
+                }
+            
+            c7 = st.session_state.l7_cache
+            phases = c7['phases']
+            bonds_count = c7['bonds_count']
             
             # 📊 TEXT PARAMETERS
             m7_1, m7_2, m7_3, m7_4 = st.columns(4)
-            m7_1.metric("7.1 Hive Sync", f"{np.std(phases):.4f}", help="Phase Standard Deviation (Lower is better)")
+            m7_1.metric("7.1 Hive Sync", f"{c7['hive_sync_std']:.4f}", help="Phase Standard Deviation (Lower is better)")
             m7_2.metric("7.2 Active Bonds", f"{bonds_count}", help="Social Connections")
             m7_3.metric("7.3 Consensus State", "Pending", help="Current Global Vote Status")
             m7_4.metric("7.4 Protocols", "4 (Basic)", help="Active Communication Protocols")
@@ -1576,7 +1618,7 @@ with tab_meta:
                 
                 with c7_1:
                     # Fig 7.1: Hive Mind Sync/Phase
-                    radii = [getattr(a, 'energy', 0) / 100.0 for a in all_agents]
+                    radii = c7['radii']
                     
                     fig_7_1 = px.scatter_polar(
                         r=radii, theta=np.degrees(phases),
@@ -1666,20 +1708,34 @@ with tab_meta:
         with st.expander("💭 Level 8: Consciousness", expanded=False):
             st.caption("Self-Awareness, Qualia & Abstract Thought")
             
-            # Data Prep
-            phis = [getattr(a, 'phi_value', 0) for a in all_agents]
-            qualia_names = ["Pain", "Joy", "Blue", "Entropy", "Void"]
+            # Data Prep (Cached)
+            if 'l8_cache' not in st.session_state or world.time_step % 20 == 0:
+                phis = [getattr(a, 'phi_value', 0) for a in all_agents]
+                qualia_names = ["Pain", "Joy", "Blue", "Entropy", "Void"]
+                
+                st.session_state.l8_cache = {
+                    'phis': phis,
+                    'qualia_names': qualia_names,
+                    'mean_phi': np.mean(phis) if phis else 0.0,
+                    'max_phi': max(phis) if phis else 0.0,
+                    'self_models_count': sum(1 for a in all_agents if getattr(a, 'has_self_model', False)),
+                    'tom_score_mean': np.mean([getattr(a, 'tom_score', 0) for a in all_agents]) if all_agents else 0.0
+                }
             
+            c8 = st.session_state.l8_cache
+            phis = c8['phis']
+            qualia_names = c8['qualia_names']
+
             # 📊 TEXT PARAMETERS
             m8_1, m8_2, m8_3, m8_4 = st.columns(4)
-            m8_1.metric("8.1 Mean Φ (IIT)", f"{np.mean(phis):.4f}", help="Integrated Information Theory Score")
-            m8_2.metric("8.2 Self-Models", f"{sum(1 for a in all_agents if getattr(a, 'has_self_model', False))}", help="Agents with Self-Models")
+            m8_1.metric("8.1 Mean Φ (IIT)", f"{c8['mean_phi']:.4f}", help="Integrated Information Theory Score")
+            m8_2.metric("8.2 Self-Models", f"{c8['self_models_count']}", help="Agents with Self-Models")
             m8_3.metric("8.3 Active Qualia", f"{len(qualia_names)}", help="Distinct Subjective Experiences")
-            m8_4.metric("8.4 Theory of Mind", f"{np.mean([getattr(a, 'tom_score', 0) for a in all_agents]):.2f}", help="Avg Social Prediction Score")
+            m8_4.metric("8.4 Theory of Mind", f"{c8['tom_score_mean']:.2f}", help="Avg Social Prediction Score")
 
             # Additional 12 Metrics (Row 1)
             am8_1, am8_2, am8_3, am8_4, am8_5, am8_6 = st.columns(6)
-            am8_1.metric("Max Φ", f"{max(phis) if phis else 0:.4f}")
+            am8_1.metric("Max Φ", f"{c8['max_phi']:.4f}")
             am8_2.metric("Causal Rep.", "1024")
             am8_3.metric("Effective Info", "4.5 bits")
             am8_4.metric("Irreducibility", "0.92")
@@ -1774,14 +1830,24 @@ with tab_meta:
         with st.expander("⚛️ Level 9: Physics Discovery", expanded=False):
             st.caption("Probing Reality & Causal Manipulation")
             
-            # Data Prep
-            patterns_count = len(world.discovered_physics_patterns) if hasattr(world, 'discovered_physics_patterns') else 0
-            residuals_mean = np.mean(world.oracle_residuals) if hasattr(world, 'oracle_residuals') and world.oracle_residuals else 0.05
+            # Data Prep (Cached)
+            if 'l9_cache' not in st.session_state or world.time_step % 20 == 0:
+                patterns_count = len(world.discovered_physics_patterns) if hasattr(world, 'discovered_physics_patterns') else 0
+                residuals_mean = np.mean(world.oracle_residuals) if hasattr(world, 'oracle_residuals') and world.oracle_residuals else 0.05
+                residuals = world.oracle_residuals if hasattr(world, 'oracle_residuals') else np.random.normal(0, 0.1, 100)
+                
+                st.session_state.l9_cache = {
+                    'patterns_count': patterns_count,
+                    'residuals_mean': residuals_mean,
+                    'residuals': residuals
+                }
             
+            c9 = st.session_state.l9_cache
+
             # 📊 TEXT PARAMETERS
             m9_1, m9_2, m9_3, m9_4 = st.columns(4)
-            m9_1.metric("9.1 Patterns Found", f"{patterns_count}", help="Discovered Physical Laws")
-            m9_2.metric("9.2 Oracle Error", f"{residuals_mean:.5f}", help="World Model Inaccuracy")
+            m9_1.metric("9.1 Patterns Found", f"{c9['patterns_count']}", help="Discovered Physical Laws")
+            m9_2.metric("9.2 Oracle Error", f"{c9['residuals_mean']:.5f}", help="World Model Inaccuracy")
             m9_3.metric("9.3 Exploits", "0", help="Reality Hacking Attempts")
             m9_4.metric("9.4 Causal Depth", "2", help="Steps of Inverse RL Lookahead")
 
@@ -1810,12 +1876,8 @@ with tab_meta:
                 
                 with c9_1:
                     # Fig 9.1: Oracle Error Residuals
-                    residuals = np.random.normal(0, 0.1, 100)
-                    if hasattr(world, 'oracle_residuals'):
-                        residuals = world.oracle_residuals
-                    
                     fig_9_1 = px.histogram(
-                        x=residuals, nbins=30,
+                        x=c9['residuals'], nbins=30,
                         title="9.1 Oracle Error Residuals",
                         template='plotly_dark',
                         color_discrete_sequence=['#EF553B']
@@ -1883,16 +1945,24 @@ with tab_meta:
         with st.expander("♾️ Level 10: The Omega Point", expanded=False):
             st.caption("Computational Transcendence & Simulation Nesting")
             
-            # Data Prep
-            omega_scores = [0.8, 0.7, 0.5, 0.9, 0.6]
-            if hasattr(world, 'omega_criteria_scores'):
-                 pass 
+            # Data Prep (Cached)
+            if 'l10_cache' not in st.session_state or world.time_step % 20 == 0:
+                omega_scores = [0.8, 0.7, 0.5, 0.9, 0.6]
+                if hasattr(world, 'omega_criteria_scores'):
+                     pass 
+                
+                st.session_state.l10_cache = {
+                     'omega_scores': omega_scores,
+                     'mean_omega': np.mean(omega_scores)
+                }
             
+            c10 = st.session_state.l10_cache
+
             # 📊 TEXT PARAMETERS
             m10_1, m10_2, m10_3, m10_4 = st.columns(4)
             m10_1.metric("10.1 Recursive Depth", "1", help="Current Simulation Nesting Layer")
             m10_2.metric("10.2 Compute Surplus", "420 TF", help="Available Computational Resources")
-            m10_3.metric("10.3 Omega Progress", f"{np.mean(omega_scores):.1%}", help=" convergence towards Omega Point")
+            m10_3.metric("10.3 Omega Progress", f"{c10['mean_omega']:.1%}", help=" convergence towards Omega Point")
             m10_4.metric("10.4 Emergent Agents", "0", help="Agents Spontaneously Generated from Code")
 
             # Additional 12 Metrics (Row 1)
