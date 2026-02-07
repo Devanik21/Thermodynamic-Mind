@@ -1794,7 +1794,7 @@ with tab_meta:
                          st.plotly_chart(fig93, width='stretch', key="map_9_3")
                          
                          # 9.4 Discovery Wavefront
-                         fig94 = px.contour(spatial["discovery_wave"], title="Epistemic Discovery Wavefront")
+                         fig94 = px.density_contour(spatial["discovery_wave"], title="Epistemic Discovery Wavefront")
                          st.plotly_chart(fig94, width='stretch', key="map_9_4")
 
         # ============================================================
