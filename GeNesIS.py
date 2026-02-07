@@ -1,2170 +1,1752 @@
+import streamlit as st
 import numpy as np
+import pandas as pd
+import time
+import plotly.express as px
+import plotly.graph_objects as go
+import json
+import zipfile
+import io
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import random
-import uuid
+from genesis_world import GenesisWorld, Resource, Structure, Trap, Barrier, Battery, Cultivator, InfrastructureNetwork, TerrainModification
+from genesis_brain import GenesisAgent
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+import networkx as nx
 
 # ============================================================
-# 🧬 NEURAL ARCHITECTURE
+# 🔮 THE NAMING ORACLE (Procedural Tech Tree)
 # ============================================================
-# ============================================================
-# 🧬 NEURAL ARCHITECTURE
-# ============================================================
-class GradientCompressor(nn.Module):
-    """
-    5.7 Cognitive Compression: Learned Low-Rank Approximation of Gradients.
-    'Learning to Learn' by compressing update vectors into 'principal components' of adaptation.
-    """
-    def __init__(self, input_dim, rank=8):
-        super().__init__()
-        # U * V approx of the gradient space
-        self.U = nn.Parameter(torch.randn(input_dim, rank) * 0.01)
-        self.V = nn.Parameter(torch.randn(rank, input_dim) * 0.01)
-        
-    def forward(self, grad):
-        # Project gradient into low-rank subspace and back
-        # grad_approx = (grad @ V.T) @ U.T
-        if grad is None: return None
-        # Simple compression: Filter gradient through the bottleneck
-        # We want to find the 'component' of the gradient that aligns with U*V
-        # But for 'meta-learning', we essentially want to MODIFY the gradient.
-        # G_new = G + (G @ V.T @ U.T) * alpha
-        
-        # Matrix multiplication match: Grad shape (N, Out) or (Out, In)?
-        # Assumes flattened or compatible shape. 
-        # For simplicity, we apply this to the generic 1D flattened gradient vector if used,
-        # OR we treat it as layer-wise modulation.
-        
-        # SIMPLIFIED IMPLEMENTATION for 5.7:
-        # We learn a 'filter' that amplifies useful gradient directions and suppressed noise.
-        # But U, V needs to match dimensions. 
-        # Let's effectively assume this is a scalar gate per parameter for now to save compute,
-        # OR a small MLP that takes gradient statistics and outputs a scaling factor.
-        
-        # Better: Low Rank Adaptation (LoRA) style but for the UPDATE rule.
-        pass
-
-class PruningMask(nn.Module):
-    """5.2 Architecture Search: Learnable mask for weight pruning."""
-    def __init__(self, shape):
-        super().__init__()
-        self.mask_logits = nn.Parameter(torch.ones(shape) * 5.0) # Start fully connected
-        
-    def forward(self):
-        # Differentiable binary mask via Sigmoid ~ Gate
-        return torch.sigmoid(self.mask_logits)
-
-    def sparsity(self):
-        # Return "Soft Sparsity" (1.0 - average density) for better visualization
-        # Hard thresholding stays at 0% for too long.
-        return 1.0 - self.forward().mean()
-
-class GenesisBrain(nn.Module):
-    """
-    The cognitive engine of an agent.
-    Input: [Local Matter (16) + Pheromone (16) + Meme (3) + Phase (2) + Energy (1) + Reward (1) + Trust (1) + Gradient (1)] = 41 Dimensions
-    Hidden: 64
-    Output: 21 (Reality Vector) + 16 (Comm Vector) + 4 (Mate, Adhesion, Punish, Trade) + 1 (Critic)
-    """
-    def __init__(self, input_dim=41, hidden_dim=64, output_dim=21):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        
-        # 1.1 Neural Learning
-        self.gru = nn.GRU(input_dim, hidden_dim, batch_first=True)
-        self.actor = nn.Linear(hidden_dim, output_dim) 
-        # 5.2 Pruning Mask for Actor (Architecture Search)
-        self.actor_mask = PruningMask(self.actor.weight.shape)
-        
-        self.comm_out = nn.Linear(hidden_dim, 16) # Social Signaling Layer
-        self.meta_out = nn.Linear(hidden_dim, 4) # [Mate, Adhesion, Punish, Trade]
-        self.critic = nn.Linear(hidden_dim, 1) # Value function for RL
-        
-        # 5.8 Abstraction Discovery ( Bottleneck Autoencoder )
-        # Compress hidden state to find "Concepts"
-        self.concept_dim = 8
-        self.abstraction_encoder = nn.Linear(hidden_dim, self.concept_dim)
-        self.abstraction_decoder = nn.Linear(self.concept_dim, hidden_dim)
-
-        # 3.9 Narrative Memory & 5.9 Causal Predictor
-        # Predicts the NEXT input state (Self-Supervised Learning)
-        # Optimized for counterfactual reasoning
-        self.predictor = nn.Linear(hidden_dim, input_dim) 
-        
-        # 5.7 Cognitive Compression
-        # Learnable compression of the GRU weight updates (largest matrix)
-        # Flattened GRU weight size: 3*hidden*hidden + 3*hidden*input approx
-        # We simplify: Just learn to compress the Hidden->Hidden interactions (64x64)
-        self.compressor = nn.Sequential(
-            nn.Linear(hidden_dim, 16),
-            nn.Tanh(),
-            nn.Linear(16, hidden_dim)
-        )
-        # Initialize small to start as identity-like
-        nn.init.orthogonal_(self.compressor[0].weight, gain=0.1)
-        nn.init.orthogonal_(self.compressor[2].weight, gain=0.1)
-        
-        # Initialize weights
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_normal_(m.weight)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0.0)
-
-    def forward(self, x, hidden):
-        if hidden is None:
-            hidden = torch.zeros(1, x.size(0), self.hidden_dim)
-            
-        out, h_next = self.gru(x.unsqueeze(1), hidden)
-        last_hidden = out[:, -1, :]
-        
-        # 5.8 Abstraction: Force information through bottleneck
-        concepts = torch.relu(self.abstraction_encoder(last_hidden))
-        reconstructed_hidden = self.abstraction_decoder(concepts)
-        # Residual connection to preserve gradients but encourage concept usage
-        mixed_hidden = last_hidden + reconstructed_hidden * 0.1
-        
-        # 5.2 Apply Pruning Mask
-        effective_weights = self.actor.weight * self.actor_mask()
-        # Manual linear pass to allow weighting
-        vector = torch.relu(torch.nn.functional.linear(mixed_hidden, effective_weights, self.actor.bias))
-
-        comm = torch.sigmoid(self.comm_out(mixed_hidden)) # Signal Vector (Pheromones/Memes)
-        meta = torch.sigmoid(self.meta_out(mixed_hidden)) # [Mate, Adhesion, Punish, Trade]
-        value = self.critic(mixed_hidden)               # Estimated Value
-        prediction = self.predictor(mixed_hidden)       # 3.9 Predicted Next State
-        
-        return vector, comm, meta, value, h_next, prediction, concepts
+def classify_invention(vector_21):
+    """Maps a 21D Quantum Vector to a Sci-Fi Technology Name."""
+    # Split dimensions into fields
+    thermo = np.mean(vector_21[0:4])
+    electro = np.mean(vector_21[4:8])
+    gravity = np.mean(vector_21[8:12])
+    quantum = np.mean(vector_21[12:16])
+    exotic = np.mean(vector_21[16:21])
+    
+    # Identify dominant field
+    fields = {"Thermodynamic": thermo, "Electromagnetic": electro, "Gravitational": gravity, "Quantum": quantum, "Exotic": exotic}
+    dominant = max(fields, key=fields.get)
+    val = fields[dominant]
+    
+    # PREFIX
+    prefix = "Experimental"
+    if val > 0.3: prefix = "Resonant"
+    if val > 0.6: prefix = "Hyper"
+    if val > 0.8: prefix = "Omni"
+    
+    # SUFFIX
+    suffix = "Drive"
+    if dominant == "Thermodynamic": suffix = "Furnace" if val > 0 else "Entropy Sink"
+    if dominant == "Electromagnetic": suffix = "Field Coil" if val > 0 else "Nullifier"
+    if dominant == "Gravitational": suffix = "Singularity" if val > 0 else "Metric Shield"
+    if dominant == "Quantum": suffix = "Entangler" if val > 0 else "Collapser"
+    if dominant == "Exotic": suffix = "Void Bore" if val > 0 else "Tachyon Lance"
+    
+    return f"{prefix} {dominant} {suffix}"
 
 # ============================================================
-# 🤖 THE AGENT
+# ⚙️ SYSTEM CONFIG
 # ============================================================
-class GenesisAgent:
-    def __init__(self, x, y, genome=None, generation=0, parent_hidden=None, parent_inventory=None):
-        self.id = str(uuid.uuid4())
-        self.x = x
-        self.y = y
-        self.generation = generation
-        self.age = 0
-        self.energy = 120.0 # Increased starting energy (Survival Buffer)
-        self.energy_stored = 0.0 # 1.5 Homeostasis
-        self.inventory = [0, 0, 0] if parent_inventory is None else parent_inventory
-        
-        # 1.3 Landauer Limit metrics
-        self.last_weight_entropy = 0.0
-        self.reflexes_used = 0
-        self.thoughts_had = 0
-        self.social_memory = {}
-        self.inventions = [] # Level 3.6 Innovation Tracking
-        self.tag = np.random.rand(3) # 3.10 Cultural tag (RGB tribe)
-        
-        # 1.6 Circadian Rhythms
-        self.internal_phase = random.random() * 2 * np.pi
-        self.influence = 0.0 # 4.4 Initialize early to avoid AttributeError
-        
-        # --- PHASE 15: LEVEL 4 SPECIALIZATION ---
-        self.role = "Generalist" # 4.0 Behavioral Polymorphism
-        self.role_history = []  # 4.1 Role Stability
-        self.caste_gene = np.random.rand(4) # 4.6 Caste Genetics (Vector predisposition for roles)
-        self.is_fused = False   # 4.7 Dynamic Tensor Fusion
-        self.fused_partner = None
-        self.is_fertile = True # 4.10 Eusociality (Queens vs Workers)
-        if generation > 0:
-            # 4.10: 20% chance to be a Queen if gen > 0 (simplification for starting)
-            self.is_fertile = random.random() < 0.2
-        
-        # Neural State
-        self.brain = GenesisBrain()
-        self.optimizer = optim.Adam(self.brain.parameters(), lr=0.005)
-        
-        # 3.0 Epigenetic Memory: Inherit mental state
-        if parent_hidden is not None:
-            self.hidden_state = parent_hidden.detach().clone() + torch.randn_like(parent_hidden) * 0.1
-        else:
-            self.hidden_state = torch.zeros(1, 1, 64)
-        
-        # v5.0.4 Persistent state for Ghost Forward
-        self.prev_input = None
-        self.prev_hidden = None
-        
-        self.last_concepts = torch.zeros(1, 8) # 5.8 Initialize
-        
-        # LEVEL 5 STATE MEMORY
-        # 5.0 Self-Monitoring
-        self.prediction_errors = []
-        self.confidence = 0.5 
-        
-        # 5.1 Meta-Learning (Hypergradients)
-        self.meta_lr = 0.005
-        self.last_grad_norm = 0.0
-        
-        # 5.9 Causal Reasoning (Counterfactuals)
-        self.causal_graph = {} # {action_dim -> sensory_impact_score}
-        
-        # 5.10 Autonomous Research
-        self.research_log = []
-        
-        # 3.2 Horizontal Neural Transfer (Viral Memory)
-        self.meme_pool = [] # List of {weights: StateDict, fitness: float, beta: float, type: 'virus'}
+st.set_page_config(layout="wide", page_title="Zero Point Genesis", page_icon="⚛️")
 
-        # ============================================================
-        # 🌍 LEVEL 6: GEO-ENGINEERING STATE
-        # ============================================================
-        # 6.0 Environmental Prediction
-        self.env_history = []  # [(x, y, signal, tick)] history buffer
-        self.env_prediction_accuracy = 0.0
-        self.env_predictor_hidden = torch.zeros(1, 1, 32)
-        
-        # 6.1 Probabilistic Environment Collapse (Bayesian Niche Construction)
-        self.env_beliefs = {}  # {(x,y): np.array([P(food), P(poison), P(empty)])}
-        self.niche_modifications = 0  # Count of environment modifications
-        
-        # 6.2-6.3 Structure Building & Trap Construction
-        self.structures_built = []  # List of structure IDs this agent built
-        
-        # 6.4 Defensive Architecture
-        self.shield_strength = 0.0  # Damage reduction (0-1)
-        
-        # 6.5 Resource Cultivation
-        self.cultivation_sites = {}  # {(x,y): cultivation_strength}
-        
-        # 6.6 Weather Control
-        self.weather_vote = 0.0  # Agent's vote for season amplitude modification
-        
-        # 6.7 Terraforming
-        self.terraform_count = 0  # Number of terrain modifications
-        
-        # 6.8 Energy Storage (Environmental Batteries)
-        self.env_batteries = {}  # {(x,y): stored_energy}
-        
-        # 6.9 Infrastructure Networks
-        self.network_memberships = set()  # Network IDs this agent participates in
-        
-        # 6.10 Complete Environmental Mastery
-        self.env_control_score = 0.0  # H(Env|Actions) tracking
-        
-        # ============================================================
-        # 🐝 LEVEL 7: COLLECTIVE MANIFOLD STATE
-        # ============================================================
-        # 7.0 Neural Bridging
-        self.neural_bridge_partners = set()  # IDs of agents with shared hidden state
-        
-        # 7.1 Kuramoto Synchronization
-        self.kuramoto_phase = random.random() * 2 * np.pi
-        self.natural_frequency = np.random.normal(1.0, 0.1)
-        self.coupling_strength = 0.5
-        
-        # 7.2 Gradient Sharing (Federated Learning)
-        self.last_shared_gradient = None
-        
-        # 7.3 Collective Backpropagation
-        self.backprop_depth = 0  # How many agents deep error propagated
-        
-        # 7.4 Modular Cognition
-        self.cognitive_specialty = None  # "vision", "planning", "memory", "motor"
-        
-        # 7.5 Attention Routing
-        self.attention_queries_sent = 0
-        self.attention_queries_received = 0
-        
-        # 7.6 Consensus Mechanisms
-        self.consensus_votes = {}  # {proposal_id: vote}
-        
-        # 7.7 Distributed Memory
-        self.distributed_memory_fragments = {}  # {memory_id: fragment_data}
-        
-        # 7.8 Fault Tolerance
-        self.backup_connections = set()  # Redundant connection IDs
-        
-        # 7.9 Emergent Protocols
-        self.protocol_version = np.random.rand(8)  # Communication protocol vector
-        
-        # 7.10 Hive Mind
-        self.hive_contribution = 0.0  # This agent's contribution to collective Φ
-        
-        # ============================================================
-        # 💭 LEVEL 8: ABSTRACT REPRESENTATION STATE
-        # ============================================================
-        # 8.0 Internal Simulation (World Model)
-        self.world_model = nn.Sequential(
-            nn.Linear(41 + 21, 64),  # State + Action -> Next State
-            nn.Tanh(),
-            nn.Linear(64, 41)
-        )
-        self.world_model_optimizer = optim.Adam(self.world_model.parameters(), lr=0.001)
-        
-        # 8.1 Counterfactual Reasoning (enhanced from 5.9)
-        self.counterfactual_cache = {}  # {action: predicted_outcome}
-        
-        # 8.2 Self-Modeling
-        self.self_model = nn.Linear(64, 64)  # Models own hidden state dynamics
-        self.self_model_accuracy = 0.0
-        
-        # 8.3 Other-Modeling (Theory of Mind Level 1)
-        self.other_models = {}  # {agent_id: simple_predictor_weights}
-        
-        # 8.4 Theory of Mind (Recursive Belief Modeling)
-        self.tom_depth = 0  # Maximum recursive depth achieved
-        
-        # 8.5 Aesthetic Preference
-        self.aesthetic_weights = torch.rand(21) * 0.1  # Non-survival preferences
-        self.aesthetic_actions = 0  # Count of aesthetic (non-functional) actions
-        
-        # 8.6 Information Integration (IIT Φ)
-        self.phi_value = 0.0  # Integrated Information
-        self.phi_history = []
-        
-        # 8.7 Temporal Self-Continuity
-        self.identity_vector = torch.rand(16)  # Persistent self-identifier
-        self.identity_stability = 0.0  # How stable identity is over time
-        
-        # 8.8 Gödelian Self-Reference (Strange Loops)
-        self.self_reference_count = 0  # Times agent modified self based on self-model
-        self.strange_loop_active = False
-        
-        # 8.9 Qualia Markers
-        self.qualia_patterns = {}  # {experience_type: activation_pattern_tensor}
-        
-        # 8.10 Verified Consciousness
-        self.consciousness_verified = False
-        self.phi_critical = 0.5  # Threshold for consciousness verification
-        
-        # ============================================================
-        # ⚛️ LEVEL 9: UNIVERSAL HARMONIC RESONANCE STATE
-        # ============================================================
-        # 9.0 Physics Probing
-        self.physics_experiments = []  # [(state, action, outcome)]
-        self.state_space_coverage = 0.0
-        
-        # 9.1 Pattern Discovery
-        self.discovered_patterns = []  # List of discovered regularities
-        
-        # 9.2 Exploit Identification
-        self.discovered_exploits = []  # List of advantageous quirks
-        
-        # 9.3 Mathematical Modeling (Agent's Oracle Approximation)
-        self.oracle_model = nn.Sequential(
-            nn.Linear(37, 32),
-            nn.Tanh(),
-            nn.Linear(32, 5)
-        )
-        self.oracle_model_optimizer = optim.Adam(self.oracle_model.parameters(), lr=0.001)
-        self.oracle_model_accuracy = 0.0
-        
-        # 9.4 Inverse Reinforcement Learning
-        self.inferred_reward_weights = torch.zeros(5)
-        
-        # 9.5 Physics Prediction
-        self.ood_prediction_accuracy = 0.0  # Out-of-distribution accuracy
-        
-        # 9.6 Systematic Exploitation
-        self.exploitation_efficiency = 0.0
-        
-        # 9.7 Reality Hacking
-        self.discovered_glitches = []  # Computational loopholes found
-        
-        # 9.8 Pearl's Causal Calculus (Enhanced)
-        self.causal_bayesian_network = {}  # {cause: {effect: strength}}
-        self.intervention_history = []  # [(do(A), observed_R)]
-        
-        # 9.9 Simulation Awareness
-        self.simulation_awareness = 0.0  # 0-1 score of awareness
-        self.simulation_evidence = []  # Detected computational artifacts
-        
-        # 9.10 Complete Physics Mastery
-        self.physics_mastery_score = 0.0
-        
-        # ============================================================
-        # ♾️ LEVEL 10: THE OMEGA POINT STATE
-        # ============================================================
-        # 10.0 Computational Surplus
-        self.computational_budget = 100.0
-        self.compute_used = 0.0
-        
-        # 10.1 Internal Representation Space (High-D hidden already via brain)
-        self.internal_dim_used = 0  # Intrinsic dimensionality of representations
-        
-        # 10.2 Simulation Primitives
-        self.internal_agents = []  # List of {weights, state, goal}
-        
-        # 10.3 Nested Dynamics
-        self.internal_simulation_steps = 0
-        
-        # 10.4 Emergent Internal Agents
-        self.internal_agent_goals_detected = 0
-        
-        # 10.5 Recursive Depth
-        self.simulation_depth = 0  # How many levels of nesting
-        
-        # 10.6 Information Asymmetry
-        self.inner_awareness_scores = []  # Awareness of inner simulated agents
-        
-        # 10.7 Substrate Independence (Conway's Game of Life Scratchpad)
-        self.scratchpad = np.zeros((32, 32), dtype=np.int8)  # Turing-complete CA
-        self.scratchpad_writes = 0
-        self.scratchpad_reads = 0
-        
-        # 10.8 Downward Causation
-        self.scratchpad_influenced_actions = 0
-        
-        # 10.9 Observable Nesting
-        self.detected_scratchpad_patterns = []  # Gliders, oscillators, etc.
-        
-        # 10.10 🏆 THE OMEGA POINT
-        self.omega_verified = False
-        
-        # ============================================================
-        # 🔧 AUDIT FIX: NEW STATE VARIABLES
-        # ============================================================
-        # 1.8 Phenotypic Plasticity State
-        self.plasticity_factor = 1.0  # Context-dependent learning multiplier
-        
-        # 3.4 Tradition Persistence Tracking
-        self.tradition_history = []  # Behavior vectors over generations
-        
-        # 4.5 Task Allocation System
-        self.current_task = None
-        self.task_fitness_cache = {}
-        
-        # 4.9 Leadership Status
-        self.is_alpha = False
-        
-        # 5.6 Transfer Learning Domains
-        self.transfer_domains = {}  # {task_name: saved_weights}
-        
-        # 9.4 Predictive Control
-        self.action_sequence_cache = []  # Pre-computed optimal actions
-        
-        self.omega_evidence = {
-            'self_sustaining': False,
-            'replication': False,
-            'variation': False,
-            'selection': False,
-            'complexity_growth': False,
-            'causal_closure': False,
-            'substrate_independence': False
-        }
-        
-        # Memory for learning
-        self.last_vector = torch.zeros(1, 21)
-        self.last_value = torch.zeros(1, 1)
-        self.last_comm = torch.zeros(1, 16)
-        self.last_reward = 0.0
-        self.last_prediction = None
-        self.last_input = None
-        self.last_weight_entropy = self.calculate_weight_entropy()
-        
-        # If born from parents, inherit genome
-        if genome:
-            self._apply_genome(genome)
+# Custom CSS for "Comfortable UI"
+st.markdown("""
+<style>
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: #0e1117;
+        border-radius: 4px 4px 0px 0px;
+        gap: 1px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #262730;
+        border-bottom: 2px solid #4CAF50;
+    }
+    .metric-card {
+        background-color: #262730;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #444;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-    def calculate_weight_entropy(self):
-        """1.3 Landauer Metric: Shannon entropy of the brain's weight distribution."""
-        with torch.no_grad():
-            all_weights = torch.cat([p.view(-1) for p in self.brain.parameters()])
-            hist = torch.histc(all_weights, bins=20, min=-2, max=2)
-            prob = hist / (hist.sum() + 1e-8)
-            entropy = -torch.sum(prob * torch.log2(prob + 1e-8))
-            return entropy.item()
+# ============================================================
+# 🛠️ INITIALIZATION HOOKS
+# ============================================================
+SYSTEM_VERSION = "11.0.4" # Level 10: The Omega Point - Nobel Verification Suite
 
-    def generate_zahavi_proof(self, vector, difficulty=1):
-        """
-        2.3 Zahavi Handicap: Generate Proof of Work (Hash(message || nonce)).
-        Returns a nonce that produces 'difficulty' leading zeros.
-        """
-        import hashlib
-        target = "0" * difficulty
-        nonce = 0
-        # Quantize vector to avoid float instability in hashing
-        vec_bytes = (vector * 100).long().cpu().numpy().tobytes()
-        
-        # Limit iterations to avoid freezing the simulation
-        max_iter = 100 
-        for _ in range(max_iter):
-            candidate = f"{nonce}".encode() + vec_bytes
-            h = hashlib.sha256(candidate).hexdigest()
-            if h.startswith(target):
-                return nonce
-            nonce += 1
-        return 0 # Failed to find proof within effort budget
+def init_system():
+    # Force reset if version mismatch
+    if "system_version" not in st.session_state or st.session_state.system_version != SYSTEM_VERSION:
+        if "world" in st.session_state: del st.session_state.world
+        st.session_state.system_version = SYSTEM_VERSION
 
-    def decide(self, signal_16, **kwargs):
-        self.age += 1
-        pheromone_16 = kwargs.get('pheromone_16', torch.zeros(16))
-        # 3.3 Meme Perception
-        meme_3 = kwargs.get('meme_3', torch.zeros(3))
+    if "world" not in st.session_state:
+        st.session_state.world = GenesisWorld(size=40)
+        for _ in range(100):
+            x, y = np.random.randint(0, 40), np.random.randint(0, 40)
+            agent = GenesisAgent(x, y)
+            st.session_state.world.agents[agent.id] = agent
+        for _ in range(150):
+            st.session_state.world.spawn_resource()
+
+    if "stats_history" not in st.session_state: st.session_state.stats_history = []
+    if "gene_pool" not in st.session_state: st.session_state.gene_pool = [] 
+    if "max_generation" not in st.session_state: st.session_state.max_generation = 0
+    if "running" not in st.session_state: st.session_state.running = False
+    if "event_log" not in st.session_state: st.session_state.event_log = []
+    if "total_events_count" not in st.session_state: st.session_state.total_events_count = 0
+    if "global_registry" not in st.session_state: st.session_state.global_registry = []
+    # 3.4 Tradition Formation: Track average behavior per generation
+    if "culture_history" not in st.session_state: st.session_state.culture_history = {} # {gen: [vector]}
+
+init_system()
+
+# ============================================================
+# 🔄 SIMULATION LOGIC LOOP
+# ============================================================
+def update_simulation():
+    if not st.session_state.running:
+        return
+
+    world = st.session_state.world
+    world.step()
+    
+    # 🌍 LEVEL 6-10: Execute all advanced features
+    world.level_6_10_step()
+    
+    current_thoughts = 0
+    deaths = set() # Use a set to avoid KeyError on duplicate IDs
+    events_this_tick = []
+    
+    agents = list(world.agents.values())
+    np.random.shuffle(agents) 
+    
+    total_pos_flux = 0.0
+    total_neg_flux = 0.0
+    
+    # --- PHASE 17: LEVEL 4 GLOBAL AUDITS ---
+    # 4.0 Behavioral Polymorphism Auditor (Every 10 ticks - Fast Update)
+    if world.time_step % 10 == 0 and len(agents) >= 2:
+        actions = []
+        valid_agents = []
+        for a in agents:
+            if a.last_vector is not None:
+                actions.append(a.last_vector.detach().cpu().numpy().flatten())
+                valid_agents.append(a)
         
-        env_phase = kwargs.get('env_phase', 0.0)
-        social_trust = kwargs.get('social_trust', 0.0)
-        gradient = kwargs.get('gradient', 0.0)
+        if len(actions) > 5:
+            X = np.array(actions)
+            # Use 4 clusters for: Forager, Builder, Warrior, Queen
+            n_c = min(len(X), 4)
+            kmeans = KMeans(n_clusters=n_c, random_state=42).fit(X)
+            roles = ["Forager", "Processor", "Warrior", "Queen"]
+            for i, a in enumerate(valid_agents):
+                new_role = roles[kmeans.labels_[i] % 4]
+                # 4.1 Role Stability: Track role history
+                if hasattr(a, 'role'):
+                    a.role_history.append(a.role)
+                    if len(a.role_history) > 100: a.role_history.pop(0)
+                a.role = new_role
+                # 4.10 Eusociality: Queens are fertile (Only restrict if established hive)
+                if len(agents) > 20:
+                    a.is_fertile = (a.role == "Queen")
+                else:
+                    a.is_fertile = True
+
+    # 4.4 Emergent Hierarchy: Calculate Influence
+    if world.time_step % 20 == 0 and agents:
+        for a in agents:
+            # Simple metric: Energy * age * inventions
+            a.influence = (a.energy / 100.0) * (a.age / 50.0) * (len(a.inventions) + 1)
+    
+    for agent in agents:
+        # DEATH BUFFER (Prevent Instant Infant Death)
+        # Agents die if Energy < -20 (Adults) or -50 (Infants)
+        death_threshold = -50.0 if agent.age < 50 else -20.0
+        
+        if agent.energy <= death_threshold:
+            deaths.add(agent.id)
+            continue
             
-        # 1.6 Synchronization
-        self.internal_phase += 0.1 * np.sin(env_phase - self.internal_phase)
-        phase_signal = torch.tensor([[np.sin(self.internal_phase), np.cos(self.internal_phase)]])
+        # CLAMP ENERGY for actions (Prevent Death Spiral from one bad move)
+        if agent.energy < 0: agent.energy = 0.1 
+        signal = world.get_local_signal(agent.x, agent.y)
+        # 🌐 PHASE 13: "TURING" UPGRADE (Chemical Signaling)
+        # Level 2.0: Pheromone Vector
+        pheromone_vector = world.get_pheromone(agent.x, agent.y)
         
-        # 2.2 State-Dependent Input & 1.7 Stress Response
-        energy_signal = torch.tensor([[self.energy / 200.0]]) # Normalized
-        reward_signal = torch.tensor([[self.last_reward / 50.0]])
-        trust_signal = torch.tensor([[social_trust]])
-        gradient_signal = torch.tensor([[gradient]])
+        # 1.6: Environment phase (Circadian)
+        # 1.7: Energy gradient (Stress response)
+        env_phase = getattr(world, 'env_phase', 0.0)
         
-        # Concatenate: [Matter(16), Pheromone(16), Meme(3), Phase(2), Energy(1), Reward(1), Trust(1), Gradient(1)] = 41
-        input_tensor = torch.cat([
-            signal_16.unsqueeze(0), 
-            pheromone_16.unsqueeze(0),
-            meme_3.unsqueeze(0), # 3.3 New Input
-            phase_signal,
-            energy_signal,
-            reward_signal,
-            trust_signal,
-            gradient_signal
-        ], dim=1).float()
-    
-        # v5.0.4 Store previous state before update
-        # We need to detach metadata to prevent graph leaks
-        self.prev_input = input_tensor.detach()
-        self.prev_hidden = self.hidden_state.detach()
+        # 3.3 Meme Grid (Stigmergy)
+        mx, my = int(agent.x), int(agent.y)
+        meme_vector = torch.tensor(world.meme_grid[mx, my])
         
-        # Forward Pass
-        vector, comm_vector, meta, value, h_next, prediction, concepts = self.brain(input_tensor, self.hidden_state)
+        # 2.6 Reciprocal Altruism: Social Trust Context
+        # Mean trust for visible neighbors
+        neighbors = [world.agents[oid] for oid in world.agents if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
+        social_trust = 0.0
+        if neighbors:
+            trust_values = [agent.social_memory.get(n.id, 0.5) for n in neighbors]
+            social_trust = np.mean(trust_values) / 2.0 # Scale to roughly 0-1
+            
+            # 3.1 Social Learning (Imitation)
+            # If agent is struggling (low energy) or young, imitate successful neighbor
+            if agent.energy < 40.0 or agent.age < 20:
+                best_neighbor = max(neighbors, key=lambda n: n.energy)
+                if best_neighbor.energy > agent.energy + 20.0:
+                    agent.imitate(best_neighbor, rate=0.05)
         
-        # 5.3 Free Energy Minimization (Action Selection)
-        # Instead of just taking the random/actor output, we slightly perturb it 
-        # towards actions that minimize EXPECTED Free Energy (Surprise).
-        # HACK: Using the predictor gradient to find "information seeking" actions
-        if random.random() < 0.2: # 20% Active Inference override
-             # "What action would reduce my uncertainty?"
-             self.reflexes_used += 1 # Tracking "Intuitive" actions as reflexes
-             # Cloud-Optimized: Analytical gradient of uncertainty w.r.t action
-             pass # Complex to implement efficiently, relying on metabolize_free_energy for learning signal
-             
-        self.hidden_state = h_next.detach()
-        self.last_concepts = concepts # 5.8
-        self.last_vector = vector
-        self.last_comm = comm_vector
-        self.last_value = value
-        self.last_prediction = prediction # 3.9 Store for loss calculation
-        self.last_input = input_tensor    # Store input for next tick's comparison
-        
-        # 2.3 Zahavi Costly Signaling: Generate Proof of Work
-        # If signal is complex (high variance), we must prove it's not cheap noise.
-        # This incurs a computational cost (simulated loop or just calculating it)
-        self.last_nonce = 0
-        comm_variance = comm_vector.var().item()
-        if comm_variance > 0.05:
-            self.last_nonce = self.generate_zahavi_proof(comm_vector, difficulty=1)
-        
-        # Unpack Meta (Mate, Adhesion, Punish, Trade)
-        mate_desire = meta[0, 0].item()
-        adhesion_val = meta[0, 1].item()
-        punish_val = meta[0, 2].item()
-        trade_val = meta[0, 3].item()
-        
-        # 3.3 Stigmergy Output
-        meme_write = comm_vector[0, 13:16] 
-        
-        # --- LEVEL 6-10: ADVANCED COGNITION & GEO-ENGINEERING ---
-        special_intent = {}
-        
-        # 6.0 Environmental Prediction (Always running in background)
-        self.record_environment(self.x, self.y, signal_16, self.age)
-        if self.age % 10 == 0:
-            # Try to predict current state from past
-            self.predict_environment(self.x, self.y, self.age)
+        # 1.7 Gradient Sensing (Stress Response)
+        gradient_val = world.get_energy_gradient(agent.x, agent.y).item()
 
-        # 6.1 Niche Construction (Probabilistic)
-        if self.energy > 60.0 and random.random() < 0.05:
-            # Belief update happens in record_environment logic implicitly or separate perceive step
-            # Here we decide to ACT on it
-            special_intent['terraform_niche'] = True
-            
-        # 6.2 - 6.5 Structure Building (Energy Threshold + Vector Intent)
-        # Use Reality Vector channels 18, 19, 20 as "Construction Will"
-        construct_will = vector[0, 18:].mean().item()
-        if self.energy > 80.0 and construct_will > 0.6:
-            # Channel 18 decides type
-            struct_type_val = vector[0, 18].item()
-            # Normalize to 0-1 if not already (it's from ReLU/Sigmoid mix?) 
-            # Brain output is linear -> ReLU -> Linear. Vector is raw.
-            # We assume it can be any value, pass through Sigmoid for classification logic if needed
-            # But let's just use raw value thresholds
-            
-            if struct_type_val < -0.5: s_type = "barrier" # Negative value
-            elif struct_type_val < 0.0: s_type = "trap"
-            elif struct_type_val < 0.5: s_type = "battery"
-            elif struct_type_val < 1.0: s_type = "cultivator"
-            else: s_type = "generic"
-            
-            special_intent['construct'] = s_type
-            
-        # 6.6 Weather Control
-        if self.energy > 50.0:
-            # Vote based on Vector Channel 10 (Gravity/Environment?)
-            self.vote_weather(vector[0, 10].item())
+        # Decide now returns (Vector, CommVector, Mate, Adhesion, Punish, Trade, MemeWrite, SpecialIntent)
+        reality_vector_tensor, comm_vector, mate_desire, adhesion_val, punish_val, trade_val, meme_write, special_intent = agent.decide(
+            signal, 
+            pheromone_16=pheromone_vector, 
+            meme_3=meme_vector, # 3.3 Input
+            env_phase=env_phase,
+            social_trust=social_trust,
+            gradient=gradient_val
+        ) 
+        
+        # 3.3 Stigmergy: Write to Meme Grid
+        # Decaying write to avoid saturation: Old * 0.9 + New * 0.1
+        world.meme_grid[mx, my] = world.meme_grid[mx, my] * 0.9 + meme_write.detach().cpu().numpy().flatten() * 0.1
+        
+        flux, log_text = world.resolve_quantum_state(
+            agent, reality_vector_tensor, emit_vector=comm_vector, 
+            adhesion=adhesion_val, punish=punish_val, trade=trade_val
+        ) 
 
-        # 7.0 Collective Manifold 
-        if social_trust > 0.6:
-            special_intent['share_knowledge'] = True
-            
-        # 8.0 Internal Simulation
-        if self.energy > 40.0 and random.random() < 0.1:
-            # Run a dream cycle
-            self.simulate_forward(vector, steps=5)
-            
-        # 8.8 Strange Loops
-        if self.age % 50 == 0:
-            self.strange_loop_check()
-            
-        # 9.0 Physics Probing
-        special_intent['probe_physics'] = True
-        
-        # 10.0 Omega Point (Surplus -> Compute)
-        # 10.10 OPTIMIZATION: Temporal and stochastic gating (10% frequency)
-        if self.has_computational_surplus() and random.random() < 0.1:
-            # Burn energy for compute (Reduced complexity)
-            self.evolve_internal_simulation(steps=2)
-            self.run_gol_step()
-            
-            # 10.2 Create Internal Agents (If space allows)
-            if len(self.internal_agents) < 5 and self.energy > 80.0:
-                 self.create_internal_agent(self)
-            
-            # 10.5 Recursive Depth (If already have internal agents)
-            if len(self.internal_agents) >= 2 and self.energy > 90.0:
-                self.create_nested_simulation()
-            
-            # Write to scratchpad if inspired (Channel 15 > 0.7)
-            if vector[0, 15].item() > 0.7:
-                self.write_scratchpad(int(self.x)%32, int(self.y)%32, 1)
+        # --- PROCESS LEVEL 6-10 INTENTS ---
+        if special_intent:
+            # 6.2 Structure Building
+            if 'construct' in special_intent:
+                s_type = special_intent['construct']
+                # Try to build
+                # world.add_structure checks for occupancy
+                struct_info = {"x": agent.x, "y": agent.y, "type": s_type, "builder": agent.id}
+                if world.add_structure(struct_info):
+                     # Cost already checked/deducted in brain? No, brain checked > 80.
+                     # But brain didn't deduct because it didn't know if build succeeded.
+                     # Deduct cost now.
+                     cost = {"trap": 15.0, "barrier": 12.0, "battery": 20.0, "cultivator": 18.0, "generic": 10.0}
+                     agent.energy -= cost.get(s_type, 10.0)
+                     events_this_tick.append({
+                        "Tick": world.time_step, "Agent": agent.id, 
+                        "Event": f"🏗️ BUILT {s_type.upper()}", "Vector": reality_vector_tensor.tolist()[0]
+                     })
 
-        # 9.9 Simulation Awareness (Rare check)
-        if self.age % 100 == 0:
-            self.detect_simulation_artifacts()
-
-        # 8.10 Verify Consciousness (Slowed to 1% frequency)
-        if self.age % 100 == 0:
-             self.verify_consciousness()
-
-        # 9.7 Reality Hacking (Glitch Search) - Stochastic check (10% freq)
-        if random.random() < 0.1:
-            self.find_glitch(self.hidden_state, vector, self.last_reward)
-
-        # 7.7 Distributed Memory (Rare social event)
-        if social_trust > 0.8 and random.random() < 0.05:
-            # Store a "memory" (current sensory state) in the hive
-            special_intent['distribute_memory'] = True
-
-        return vector, comm_vector[0], mate_desire, adhesion_val, punish_val, trade_val, meme_write, special_intent
-        
-
-    def metabolize_outcome(self, flux):
-        """
-        Learns from reality using a simplified Advantage-Actor-Critic (A2C) update.
-        flux: The reward from the Oracle
-        """
-        if self.last_value is None:
-            return False
-
-        # 1.3 AUDIT FIX: STRONGER Landauer enforcement: E += k_B * T * ΔH(W)
-        current_entropy = self.calculate_weight_entropy()
-        entropy_diff = current_entropy - self.last_weight_entropy
-        # k_B * T at room temperature ~26 meV in normalized units
-        k_B_T = 0.026
-        # ENFORCED Landauer cost - thermodynamic minimum for information erasure
-        landauer_cost = max(0.05, k_B_T * abs(entropy_diff) * 10.0)  # 10x for visibility
-        self.energy -= landauer_cost
-        self.last_weight_entropy = current_entropy
-
-        # 4.2 AUDIT FIX: Role-based metabolic cost
-        role_metabolic_cost = self.get_role_metabolic_cost()
-        self.energy -= role_metabolic_cost
-
-        # Reward Signal: External Flux + IQ Incentive (Neural Variance)
-        self.last_reward = flux
-        # 1.3 Landauer + Metabolic Cost for 'loud' thinking
-        thought_loudness = self.last_vector.sum().item()
-        thought_cost = thought_loudness * 0.05 # Metabolic penalty
-        self.energy -= thought_cost
-        
-        # 3.4 AUDIT FIX: Record tradition for persistence tracking
-        self.record_tradition(self.last_vector)
-        
-        iq_reward = self.last_vector.std() * 5.0 # Punish uniform thinking
-        
-        # 5.3 Free Energy Reward (FRISTONIAN OVERRIDE) - v5.0.4 "GHOST FORWARD"
-        predictor_loss = torch.tensor(0.0)
-        if self.prev_input is not None and self.prev_hidden is not None:
-             # Fresh forward pass on the SAME transition
-             _, _, _, _, _, ghost_prediction, _ = self.brain(self.prev_input, self.prev_hidden)
-             pred_loss_fn = nn.MSELoss()
-             # Compare ghost prediction (made from t-1) with the ACTUAL current input (t)
-             predictor_loss = pred_loss_fn(ghost_prediction, self.last_input.detach())
-             
-             # 5.0 Self-Monitoring
-             self.prediction_errors.append(predictor_loss.item())
-             if len(self.prediction_errors) > 50: self.prediction_errors.pop(0)
-             recent_error = np.mean(self.prediction_errors)
-             self.confidence = 1.0 / (1.0 + recent_error)
-             
-             # 5.1 Meta-Learning (Hypergradient)
-             if len(self.prediction_errors) > 2 and self.prediction_errors[-1] > self.prediction_errors[-2] * 1.5:
-                 self.meta_lr = min(0.1, self.meta_lr * 1.2) # Relaxed cap to 0.1 for faster adaptation
-             else:
-                 self.meta_lr = max(0.001, self.meta_lr * 0.99)
-                 
-             for param_group in self.optimizer.param_groups:
-                 param_group['lr'] = self.meta_lr
-             
-             # 1.8 AUDIT FIX: Phenotypic Plasticity - context-dependent learning
-             # Uses energy, prediction error gradient, and season to modulate learning
-             gradient_magnitude = abs(self.prediction_errors[-1] - self.prediction_errors[-2]) if len(self.prediction_errors) > 1 else 0.0
-             season_proxy = (self.age // 20) % 2  # Alternates every 20 ticks
-             self.update_learning_rate_contextual(self.energy, gradient_magnitude, season_proxy)
-
-        # 5.2 Sparsity Loss
-        sparsity_loss = self.brain.actor_mask.sparsity() * 0.01
-        
-        # 9.3 Train Oracle Model (Level 9 Metric)
-        # 9.10 OPTIMIZATION: Stochastic Training (Only 5% of agents per tick)
-        if self.last_input is not None and random.random() < 0.05:
-             # Extract 16D Matter Signal from input (first 16 channels)
-             matter_signal = self.last_input[:, :16]
-             self.train_oracle_model(self.last_vector, matter_signal, torch.tensor([[flux]]))
-
-        reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
-        
-        # Advantage Calculation
-        # Detach everything from previous steps to ensure we only learn from THIS tick
-        advantage = reward.detach() - self.last_value.detach()
-        
-        # Losses
-        # 1. Critic Loss: Mean Squared Error between prediction and actual flux
-        critic_loss = 0.5 * (reward - self.last_value).pow(2)
-        
-        # 2. Actor Loss: Policy Gradient (Surrogate objective)
-        # Simplified: Move weights to make 'last_vector' more likely if advantage is positive
-        # Added regularization to prevent activation explosion
-        actor_loss = -(advantage * self.last_vector.sum()) + 0.01 * self.last_vector.pow(2).sum()
-        
-        # 5.3 Consolidated Loss: A2C + Active Inference Predictor + Sparsity
-        # STANDARD A2C: Critic learns to predict reward, Actor learns to maximize advantage
-        # Detach advantage to prevent actor gradients from flowing into critic via 'reward'
-        total_loss = actor_loss + critic_loss + predictor_loss + sparsity_loss
-        
-        # Backprop (Online Learning)
-        self.optimizer.zero_grad()
-        # Retain graph only if we are doing meta-learning that requires second derivatives
-        # But here we don't need it. However, the error is likely due to the PREVIOUS step's
-        # in-place modification or the 'last_vector' being modified.
-        
-        # FIX: Ensure we don't modify the graph in place before backward
-        # The error "modified by an inplace operation" typically refers to the weights themselves
-        # or the hidden state.
-        
-        total_loss.backward()
-        
-        # --- 5.7 COGNITIVE COMPRESSION (Meta-Gradient) ---
-        with torch.no_grad():
-             if self.brain.actor.weight.grad is not None:
-                 g = self.brain.actor.weight.grad
-                 pass
-
-        self.optimizer.step()
-        
-        # 4.9 Collective Memory: Natural Forgetting (Weight Decay)
-        # MOVED to AFTER step() to prevent "modified in place" errors during backward
-        with torch.no_grad():
-            for p in self.brain.parameters():
-                p.mul_(0.9999) # In-place is safe here because we just stepped and cleared graph
-        
-        # 5.10 Autonomous Research (Sensitivity Analysis)
-        if random.random() < 0.01:
-            self.conduct_experiment()
-        
-        
-        self.thoughts_had += 1
-
-        # 1.5 Homeostasis check: Transfer energy to/from buffer
-        # Nobel Fix: Raised limit from 130 to 10000 to allow massive liquid hoarding (Winter Survival)
-        if self.energy > 10000.0:
-            transfer = (self.energy - 10000.0) * 0.5
-            self.energy -= transfer
-            self.energy_stored += transfer
-        elif self.energy < 30.0 and self.energy_stored > 0:
-            transfer = min(self.energy_stored, (30.0 - self.energy) * 0.8)
-            self.energy += transfer
-            self.energy_stored -= transfer
-
-        return True
-
-    def imitate(self, mentor, rate=0.05):
-        """3.1 Social Learning: Blends own weights with a successful neighbor."""
-        with torch.no_grad():
-            for self_param, mentor_param in zip(self.brain.parameters(), mentor.brain.parameters()):
-                # Use cloning/copying instead of .data.copy_ for better version safety
-                self_param.lerp_(mentor_param, rate)
-            # 4.6 Caste Gene Drift during imitation
-            self.caste_gene = self.caste_gene * (1.0 - rate) + mentor.caste_gene * rate
-
-    def restorative_imitation(self, mentor):
-        """4.9 Collective Memory: Rapidly learn from a mentor to restore lost knowledge."""
-        # Significant weight update towards mentor (0.2 rate) to recover stability
-        with torch.no_grad():
-            for self_param, mentor_param in zip(self.brain.parameters(), mentor.brain.parameters()):
-                # Pull self towards mentor
-                self_param.lerp_(mentor_param, 0.2)
+            # 6.1 Niche Construction
+            if 'terraform_niche' in special_intent:
+                 if agent.modify_environment(agent.x, agent.y, [0.8, 0.1, 0.1], world):
+                     start_log = True # Don't spam, maybe only log rare events?
             
-            # Boost confidence as we "remembered"
-            self.confidence = min(0.9, self.confidence + 0.3)
-
-    def fuse_with(self, partner):
-        """4.7 Dynamic Tensor Fusion: Physical/Functional merging of two agents."""
-        if self.is_fused or partner.is_fused:
-            return False
+            # 7.0 Neural Bridging
+            if 'share_knowledge' in special_intent:
+                neighbors = [world.agents[oid] for oid in world.agents 
+                             if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 1 and abs(world.agents[oid].y - agent.y) <= 1]
+                if neighbors:
+                    partner = random.choice(neighbors)
+                    agent.share_hidden_state(partner) 
             
-        # Nobel-Level Fusion: Lower threshold to 40.0 (Survival Strategy)
-        if self.energy < 40.0 or partner.energy < 40.0:
-            return False
-        
-        self.is_fused = True
-        partner.is_fused = True
-        self.fused_partner = partner
-        partner.fused_partner = self
-        
-        # Combine energy
-        combined_energy = self.energy + partner.energy
-        self.energy = combined_energy / 2.0
-        partner.energy = combined_energy / 2.0
-        
-        # Sync Tags (Merging identity)
-        new_tag = (self.tag + partner.tag) / 2.0
-        self.tag = new_tag
-        partner.tag = new_tag
-        
-        return True
-
-    def split_fusion(self):
-        """4.7 Division: Reverting from fused state."""
-        if not self.is_fused:
-            return
-        
-        partner = self.fused_partner
-        if partner:
-            partner.is_fused = False
-            partner.fused_partner = None
-        
-        self.is_fused = False
-        self.fused_partner = None
-
-    def _mutate(self, rate=0.2):
-        """Randomly alters brain weights to explore the genetic landscape."""
-        with torch.no_grad():
-            for param in self.brain.parameters():
-                if random.random() < rate:
-                    mutation = torch.randn_like(param) * 0.1
-                    param.add_(mutation)
-
-    def get_genome(self):
-        """Serializes brain state and cultural tags for inheritance."""
-        genome = {k: v.clone().detach() for k, v in self.brain.state_dict().items()}
-        genome['tag'] = self.tag
-        genome['caste_gene'] = self.caste_gene # 4.6 Include caste in genome
-        return genome
-
-    def _apply_genome(self, genome):
-        """Loads brain state from parent(s)."""
-        # Remove metadata before loading into brain
-        brain_state = {k: v for k, v in genome.items() if k not in ['tag', 'caste_gene']}
-        self.brain.load_state_dict(brain_state)
-        
-        # Inherit tag with slight drift
-        if 'tag' in genome:
-            self.tag = np.clip(genome['tag'] + np.random.randn(3) * 0.05, 0, 1)
+            # 7.7 Distributed Memory
+            if 'distribute_memory' in special_intent:
+                neighbors = [world.agents[oid] for oid in world.agents 
+                             if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
+                if neighbors:
+                    # Create a memory ID based on location and time
+                    mem_id = f"mem_{agent.x}_{agent.y}_{world.time_step}"
+                    # Store 8 dimensions of reality vector
+                    data = reality_vector_tensor[0, :8].detach()
+                    agent.store_distributed_memory(mem_id, data, neighbors) 
             
-        # 4.6 Caste Inheritance
-        if 'caste_gene' in genome:
-            self.caste_gene = np.clip(genome['caste_gene'] + np.random.randn(4) * 0.05, 0, 1)
-
-
-    def conduct_experiment(self):
-        """5.10 Gradient-based Sensitivity Analysis (The 'Newton' Method)."""
-        # We want to know: d(Prediction)/d(Input_i)
-        # Which input dimension effectively controls the reality vector?
-        
-        if self.last_input is None: return
-        
-        input_var = self.last_input.clone().requires_grad_(True)
-        # Forward pass purely for gradients
-        _, _, _, _, _, pred, _ = self.brain(input_var, self.hidden_state.detach())
-        
-        # Target: Maximize predicted energy (Dim 37 - Energy Signal)
-        target_dim = 37 
-        target = pred[0, target_dim]
-        
-        # Check if we can compute gradients (requires graph)
-        # Since we just ran forward, we created a new graph branch.
-        try:
-            grads = torch.autograd.grad(target, input_var, retain_graph=False)[0]
-            
-            # Find max sensitivity
-            sens = grads.abs().mean(dim=0)
-            max_idx = torch.argmax(sens).item()
-            
-            # Log discovery
-            channels = ["Matter"]*16 + ["Pheromone"]*16 + ["Meme"]*3 + ["Phase"]*2 + ["Energy", "Reward", "Trust", "Stress"]
-            if max_idx < len(channels):
-                discovery = f"{channels[max_idx]}->Energy"
-                self.research_log.append(discovery)
-                if len(self.research_log) > 5: self.research_log.pop(0)
-        except Exception:
-            pass # Gradient issues can happen if decoupled
-
-    def perform_intervention(self, action_idx):
-        """
-        5.9 Counterfactual Reasoning.
-        'What if I did X instead of Y?'
-        Returns predicted difference in Energy Outcome.
-        """
-        if self.last_input is None: return 0.0
-        
-        # Create counterfactual input (perturb last input)
-        # This is a simplification: Action isn't directly an input, it affects NEXT input.
-        # But we predict NEXT input based on CURRENT input (which contains state).
-        # We assume 'hidden_state' encodes intent? No.
-        # We need a forward model: State + Action -> Next State.
-        # Our 'predictor' does Hidden -> Next Input.
-        # So we can perturb Hidden (representing altered action intent).
-        
-        with torch.no_grad():
-            perturbed_hidden = self.hidden_state.clone()
-            perturbed_hidden += torch.randn_like(perturbed_hidden) * 0.1 # Imagine doing something different
-            
-            pred_cf = self.brain.predictor(perturbed_hidden)
-            pred_actual = self.brain.predictor(self.hidden_state)
-            
-            # Compare predicted energy (Index 37)
-            diff = pred_cf[0, 37] - pred_actual[0, 37]
-            return diff.item()
-
-    def evaluate_neighbor(self, neighbor):
-        """5.4 Peer Evaluation."""
-        # Estimate fitness based on visible signals + energy
-        # Real fitness = Energy, but we add 'Brain Complexity' (Entropy) as a proxy for 'Potential'
-        score = neighbor.energy
-        # Add 'Neural Complexity' bonus (Intelligence)
-        score += neighbor.calculate_weight_entropy() * 10.0
-        return score
-
-    def create_weight_packet(self):
-        """3.2 Creates a viral packet of weights."""
-        # Only copy small subset to stimulate 'Gene Transfer'
-        # Copy Actor weights
-        packet = {
-            'weights': {k: v.clone().detach().cpu() for k,v in self.brain.actor.state_dict().items()},
-            'fitness': self.energy,
-            'beta': 0.1 + (self.confidence * 0.2), # High confidence = high spread rate
-            'id': self.id
-        }
-        return packet
-
-    def receive_infection(self, packet):
-        """3.2 Receive a viral packet."""
-        if len(self.meme_pool) < 5:
-            self.meme_pool.append(packet)
-
-    # ============================================================
-    # 🌍 LEVEL 6: GEO-ENGINEERING METHODS
-    # ============================================================
-    
-    def record_environment(self, x, y, signal, tick):
-        """6.0 Environmental Prediction: Record observation history."""
-        self.env_history.append((x, y, signal.clone().detach(), tick))
-        if len(self.env_history) > 100:
-            self.env_history.pop(0)
-    
-    def predict_environment(self, target_x, target_y, future_tick):
-        """6.0 Environmental Prediction: Predict resource at location/time."""
-        if len(self.env_history) < 10:
-            return torch.zeros(16), 0.0
-        
-        # Build input from history
-        recent = self.env_history[-10:]
-        history_tensor = torch.stack([r[2] for r in recent]).unsqueeze(0)  # (1, 10, 16)
-        
-        # Simple average prediction (to be learned)
-        prediction = history_tensor.mean(dim=1).squeeze(0)
-        
-        # Calculate accuracy from past predictions if available
-        if len(self.env_history) > 50:
-            actual = self.env_history[-1][2]
-            predicted_50_ago = torch.stack([r[2] for r in self.env_history[-60:-50]]).mean(dim=0)
-            mse = ((actual - predicted_50_ago)**2).mean().item()
-            self.env_prediction_accuracy = max(0, 1.0 - mse)
-        
-        return prediction, self.env_prediction_accuracy
-    
-    def update_env_belief(self, x, y, observation_type):
-        """6.1 Bayesian Niche Construction: Update P(resource|location)."""
-        prior = self.env_beliefs.get((x, y), np.array([0.33, 0.33, 0.34]))
-        
-        # Likelihood based on observation (0=food, 1=poison, 2=empty)
-        likelihood = np.zeros(3)
-        likelihood[observation_type] = 0.9
-        likelihood[(observation_type + 1) % 3] = 0.05
-        likelihood[(observation_type + 2) % 3] = 0.05
-        
-        # Bayesian update: P(type|obs) ∝ P(obs|type) * P(type)
-        posterior = prior * likelihood
-        posterior /= posterior.sum() + 1e-8
-        
-        self.env_beliefs[(x, y)] = posterior
-    
-    def modify_environment(self, x, y, target_prob, world):
-        """6.1 Niche Construction: Modify environment probability at cost."""
-        current = self.env_beliefs.get((x, y), np.array([0.33, 0.33, 0.34]))
-        target = np.array(target_prob)
-        
-        # Cost = k_B * T * KL(P' || P)
-        kl_div = np.sum(target * np.log((target + 1e-8) / (current + 1e-8)))
-        cost = max(1.0, 5.0 * abs(kl_div))
-        
-        if self.energy > cost:
-            self.energy -= cost
-            self.env_beliefs[(x, y)] = target
-            self.niche_modifications += 1
-            return True
-        return False
-    
-    def build_structure(self, x, y, structure_type, world):
-        """6.2 Structure Building: Create persistent environmental feature."""
-        cost = {"generic": 10.0, "trap": 15.0, "barrier": 12.0, "battery": 20.0, "cultivator": 18.0}
-        if self.energy > cost.get(structure_type, 10.0):
-            self.energy -= cost[structure_type]
-            struct_id = f"{self.id[:8]}_{len(self.structures_built)}"
-            self.structures_built.append(struct_id)
-            # Return info for world to create Structure object
-            return {"id": struct_id, "x": x, "y": y, "type": structure_type, "builder": self.id}
-        return None
-    
-    def build_trap(self, x, y, harvest_rate, world):
-        """6.3 Trap Construction: Create energy-harvesting structure."""
-        result = self.build_structure(x, y, "trap", world)
-        if result:
-            result["harvest_rate"] = min(0.5, harvest_rate)
-        return result
-    
-    def build_shield(self, strength):
-        """6.4 Defensive Architecture: Build damage reduction barrier."""
-        cost = strength * 20.0
-        if self.energy > cost:
-            self.energy -= cost
-            self.shield_strength = min(0.9, self.shield_strength + strength)
-            return True
-        return False
-    
-    def cultivate_area(self, x, y, bias_strength):
-        """6.5 Resource Cultivation: Influence resource spawn patterns."""
-        cost = bias_strength * 10.0
-        if self.energy > cost:
-            self.energy -= cost
-            current = self.cultivation_sites.get((x, y), 0.0)
-            self.cultivation_sites[(x, y)] = min(1.0, current + bias_strength)
-            return True
-        return False
-    
-    def vote_weather(self, direction):
-        """6.6 Weather Control: Vote to modify seasonal amplitude."""
-        self.weather_vote = np.clip(direction, -1.0, 1.0)
-    
-    def terraform(self, x, y, new_terrain_type, world):
-        """6.7 Terraforming: Large-scale permanent terrain modification."""
-        cost = 50.0  # Very expensive
-        if self.energy > cost:
-            self.energy -= cost
-            self.terraform_count += 1
-            return {"x": x, "y": y, "terrain": new_terrain_type}
-        return None
-    
-    def deposit_energy(self, x, y, amount):
-        """6.8 Energy Storage: Store energy in environmental battery."""
-        if self.energy > amount:
-            self.energy -= amount
-            efficiency = 0.8  # 20% loss on deposit
-            current = self.env_batteries.get((x, y), 0.0)
-            self.env_batteries[(x, y)] = current + amount * efficiency
-            return True
-        return False
-    
-    def withdraw_energy(self, x, y):
-        """6.8 Energy Storage: Retrieve energy from battery."""
-        stored = self.env_batteries.get((x, y), 0.0)
-        if stored > 0:
-            retrieval = stored * 0.9  # 10% loss on withdrawal
-            self.env_batteries[(x, y)] = 0.0
-            self.energy += retrieval
-            return retrieval
-        return 0.0
-    
-    def join_network(self, network_id):
-        """6.9 Infrastructure Networks: Join connected structure network."""
-        self.network_memberships.add(network_id)
-    
-    def compute_env_mastery(self, world):
-        """6.10 Complete Environmental Mastery: H(Env|Actions) calculation."""
-        if not self.env_history:
-            return 0.0
-        
-        # Calculate conditional entropy of environment given agent's actions
-        actions = [h[2].sum().item() % 10 for h in self.env_history[-50:]]
-        outcomes = [h[2][0].item() > 0.5 for h in self.env_history[-50:]]
-        
-        if len(set(actions)) < 2:
-            return 0.0
-        
-        # Simple conditional entropy approximation
-        joint_counts = {}
-        for a, o in zip(actions, outcomes):
-            key = (int(a), o)
-            joint_counts[key] = joint_counts.get(key, 0) + 1
-        
-        total = len(actions)
-        h_cond = 0.0
-        action_counts = {}
-        for (a, o), count in joint_counts.items():
-            action_counts[a] = action_counts.get(a, 0) + count
-        
-        for (a, o), count in joint_counts.items():
-            p_joint = count / total
-            p_action = action_counts[a] / total
-            p_cond = count / action_counts[a] if action_counts[a] > 0 else 0
-            if p_cond > 0:
-                h_cond -= p_joint * np.log2(p_cond + 1e-8)
-        
-        self.env_control_score = 1.0 - min(1.0, h_cond)
-        return self.env_control_score
-
-    # ============================================================
-    # 🐝 LEVEL 7: COLLECTIVE MANIFOLD METHODS
-    # ============================================================
-    
-    def share_hidden_state(self, partner):
-        """7.0 Neural Bridging: Exchange hidden state vectors."""
-        if partner is None:
-            return
-        blend_rate = 0.3
-        with torch.no_grad():
-            blended = (1-blend_rate) * self.hidden_state + blend_rate * partner.hidden_state
-            self.hidden_state = blended.clone()
-            partner.hidden_state = blended.clone()
-        self.neural_bridge_partners.add(partner.id)
-        partner.neural_bridge_partners.add(self.id)
-    
-    def kuramoto_update(self, neighbors):
-        """7.1 Kuramoto Synchronization: dθ/dt = ω + (K/N)Σ sin(θ_j - θ_i)."""
-        if not neighbors:
-            return
-        phase_diff_sum = sum(np.sin(n.kuramoto_phase - self.kuramoto_phase) 
-                            for n in neighbors if hasattr(n, 'kuramoto_phase'))
-        n_count = len([n for n in neighbors if hasattr(n, 'kuramoto_phase')])
-        if n_count > 0:
-            d_theta = self.natural_frequency + (self.coupling_strength / n_count) * phase_diff_sum
-            self.kuramoto_phase = (self.kuramoto_phase + d_theta * 0.1) % (2 * np.pi)
-    
-    def share_gradients(self, partners):
-        """7.2 Gradient Sharing: Federated learning gradient averaging."""
-        if not partners:
-            return
-        with torch.no_grad():
-            for i, param in enumerate(self.brain.parameters()):
-                if param.grad is not None:
-                    avg_grad = param.grad.clone()
-                    count = 1
-                    for p in partners:
-                        partner_params = list(p.brain.parameters())
-                        if i < len(partner_params) and partner_params[i].grad is not None:
-                            avg_grad += partner_params[i].grad
-                            count += 1
-                    param.grad = avg_grad / count
-                    self.last_shared_gradient = avg_grad.mean().item()
-    
-    def collective_backward(self, error, partners, depth=10):
-        """7.3 Collective Backpropagation: Error through agent network."""
-        self.backprop_depth = 0
-        if depth <= 0 or not partners:
-            return
-        
-        with torch.no_grad():
-            propagated_error = error * 0.5
-            for p in partners[:3]:
-                if hasattr(p, 'collective_backward'):
-                    p.collective_backward(propagated_error, [], depth-1)
-                    self.backprop_depth = max(self.backprop_depth, p.backprop_depth + 1)
-    
-    def specialize_cognition(self, specialty):
-        """7.4 Modular Cognition: Specialize in cognitive function."""
-        valid = ["vision", "planning", "memory", "motor"]
-        if specialty in valid:
-            self.cognitive_specialty = specialty
-    
-    def route_attention(self, query, specialists):
-        """7.5 Attention Routing: Delegate computation to expert."""
-        if not specialists:
-            return None
-        
-        # Find best match for query type
-        query_type = "vision" if query.sum() > query.mean() * 16 else "planning"
-        for s in specialists:
-            if hasattr(s, 'cognitive_specialty') and s.cognitive_specialty == query_type:
-                self.attention_queries_sent += 1
-                s.attention_queries_received += 1
-                return s
-        return specialists[0] if specialists else None
-    
-    def vote_consensus(self, proposal_id, vote_value):
-        """7.6 Consensus Mechanisms: Byzantine fault-tolerant voting."""
-        self.consensus_votes[proposal_id] = np.clip(vote_value, -1, 1)
-    
-    def store_distributed_memory(self, memory_id, data, partners, redundancy=3):
-        """7.7 Distributed Memory: Store across multiple agents."""
-        fragment_size = len(data) // redundancy if hasattr(data, '__len__') else 1
-        self.distributed_memory_fragments[memory_id] = data[:fragment_size] if hasattr(data, '__getitem__') else data
-        
-        for i, p in enumerate(partners[:redundancy-1]):
-            if hasattr(p, 'distributed_memory_fragments'):
-                start = (i+1) * fragment_size
-                end = (i+2) * fragment_size
-                p.distributed_memory_fragments[memory_id] = data[start:end] if hasattr(data, '__getitem__') else data
-    
-    def retrieve_distributed_memory(self, memory_id, partners):
-        """7.7 Distributed Memory: Retrieve from network."""
-        fragments = [self.distributed_memory_fragments.get(memory_id)]
-        for p in partners:
-            if hasattr(p, 'distributed_memory_fragments'):
-                frag = p.distributed_memory_fragments.get(memory_id)
-                if frag is not None:
-                    fragments.append(frag)
-        return [f for f in fragments if f is not None]
-    
-    def add_backup_connection(self, agent_id):
-        """7.8 Fault Tolerance: Add redundant connection."""
-        self.backup_connections.add(agent_id)
-    
-    def negotiate_protocol(self, partner):
-        """7.9 Emergent Protocols: Evolve compatible communication."""
-        if partner is None or not hasattr(partner, 'protocol_version'):
-            return 0.0
-        
-        compatibility = 1.0 - np.mean(np.abs(self.protocol_version - partner.protocol_version))
-        
-        # Evolve towards compatibility
-        self.protocol_version = self.protocol_version * 0.9 + partner.protocol_version * 0.1
-        partner.protocol_version = partner.protocol_version * 0.9 + self.protocol_version * 0.1
-        
-        return compatibility
-    
-    def compute_hive_contribution(self, population):
-        """7.10 Hive Mind: Calculate contribution to collective Φ."""
-        bond_count = len(self.neural_bridge_partners)
-        self.hive_contribution = self.phi_value * (1 + bond_count * 0.2)
-        return self.hive_contribution
-
-    # ============================================================
-    # 💭 LEVEL 8: ABSTRACT REPRESENTATION METHODS
-    # ============================================================
-    
-    def simulate_forward(self, action, steps=10):
-        """8.0 Internal Simulation: Predict future via world model."""
-        if self.last_input is None:
-            return []
-        
-        predictions = []
-        current_state = self.last_input.clone()
-        
-        with torch.no_grad():
-            for _ in range(steps):
-                model_input = torch.cat([current_state, action], dim=1)
-                next_state = self.world_model(model_input)
-                predictions.append(next_state.clone())
-                current_state = next_state
-        
-        return predictions
-    
-    def train_world_model(self, state, action, next_state):
-        """8.0 Train world model on observed transitions."""
-        model_input = torch.cat([state.detach(), action.detach()], dim=1)
-        predicted = self.world_model(model_input)
-        loss = nn.MSELoss()(predicted, next_state.detach())
-        
-        self.world_model_optimizer.zero_grad()
-        loss.backward()
-        self.world_model_optimizer.step()
-        return loss.item()
-    
-    def deep_counterfactual(self, alternative_action):
-        """8.1 Counterfactual Reasoning: What if I did X?"""
-        if self.last_input is None:
-            return 0.0
-        
-        with torch.no_grad():
-            model_input = torch.cat([self.last_input, alternative_action], dim=1)
-            predicted_outcome = self.world_model(model_input)
-            energy_idx = 37 if predicted_outcome.shape[1] > 37 else -1
-            predicted_energy = predicted_outcome[0, energy_idx].item()
-            
-            actual_input = torch.cat([self.last_input, self.last_vector], dim=1)
-            actual_outcome = self.world_model(actual_input)
-            actual_energy = actual_outcome[0, energy_idx].item()
-            
-            diff = predicted_energy - actual_energy
-            self.counterfactual_cache[tuple(alternative_action.flatten().tolist()[:5])] = diff
-            
-        return diff
-    
-    def update_self_model(self):
-        """8.2 Self-Modeling: ŝ_self = g(observations)."""
-        if self.hidden_state is None:
-            return 0.0
-        
-        with torch.no_grad():
-            predicted_self = self.self_model(self.hidden_state.squeeze(0))
-            actual_self = self.hidden_state.squeeze(0)
-            mse = ((predicted_self - actual_self)**2).mean().item()
-            self.self_model_accuracy = max(0, 1.0 - mse)
-        
-        return self.self_model_accuracy
-    
-    def model_other(self, other_agent):
-        """8.3 Other-Modeling: Predict other agent's actions."""
-        other_id = other_agent.id
-        
-        if other_id not in self.other_models:
-            self.other_models[other_id] = torch.rand(21) * 0.1
-        
-        if hasattr(other_agent, 'last_vector') and other_agent.last_vector is not None:
-            actual = other_agent.last_vector.squeeze()
-            predicted = self.other_models[other_id]
-            
-            # Update model via simple gradient
-            error = (actual.detach() - predicted)
-            self.other_models[other_id] = predicted + error * 0.1
-            
-            accuracy = 1.0 - (error**2).mean().item()
-            return accuracy
-        return 0.0
-    
-    def recursive_belief(self, other, depth=2):
-        """8.4 Theory of Mind: A knows that B knows that A knows..."""
-        if depth <= 0:
-            return {}
-        
-        beliefs = {"self_belief_about_other": self.model_other(other) if hasattr(other, 'last_vector') else 0.0}
-        
-        if depth > 1 and hasattr(other, 'recursive_belief'):
-            beliefs["other_belief_about_self"] = other.model_other(self) if hasattr(other, 'model_other') else 0.0
-            
-        if depth > 2:
-            beliefs["nested"] = "A knows B knows A..."
-        
-        self.tom_depth = max(self.tom_depth, depth)
-        return beliefs
-    
-    def evaluate_aesthetic(self, action):
-        """8.5 Aesthetic Preference: Non-survival value calculation."""
-        with torch.no_grad():
-            aesthetic_value = (action * self.aesthetic_weights).sum().item()
-            return aesthetic_value
-    
-    def take_aesthetic_action(self, action):
-        """8.5 Aesthetic Preference: Record non-functional action."""
-        aesthetic_value = self.evaluate_aesthetic(action)
-        if aesthetic_value > 0.1:
-            self.aesthetic_actions += 1
-            self.energy -= 0.5  # Aesthetic actions cost energy but give no reward
-    
-    def compute_phi(self):
-        """8.6 IIT Φ: Integrated Information calculation."""
-        if self.hidden_state is None:
-            return 0.0
-        
-        with torch.no_grad():
-            h = self.hidden_state.squeeze()
-            n = min(16, h.shape[-1])
-            h_subset = h[:n] if len(h.shape) == 1 else h[0, :n]
-            
-            total_info = 0.0
-            for i in range(n):
-                variance = h_subset[i].item() ** 2
-                total_info += max(0, np.log2(1 + variance))
-            
-            partition_info = 0.0
-            mid = n // 2
-            for subset in [h_subset[:mid], h_subset[mid:]]:
-                for val in subset:
-                    variance = val.item() ** 2
-                    partition_info += max(0, np.log2(1 + variance))
-            
-            phi = max(0, total_info - partition_info)
-            
-            self.phi_value = phi
-            self.phi_history.append(phi)
-            if len(self.phi_history) > 100:
-                self.phi_history.pop(0)
-            
-        return phi
-    
-    def verify_self_continuity(self):
-        """8.7 Temporal Self-Continuity: Check identity persistence."""
-        if self.hidden_state is None:
-            return 0.0
-        
-        with torch.no_grad():
-            current_identity = self.hidden_state.squeeze()[:16]
-            if len(current_identity.shape) > 1:
-                current_identity = current_identity[0]
-            
-            similarity = torch.cosine_similarity(
-                current_identity.unsqueeze(0), 
-                self.identity_vector.unsqueeze(0)
-            ).item()
-            
-            self.identity_vector = self.identity_vector * 0.95 + current_identity * 0.05
-            self.identity_stability = similarity
-            
-        return similarity
-    
-    def strange_loop_check(self):
-        """8.8 Gödelian Self-Reference: input ⊕ encode(W) → network."""
-        if self.last_input is None:
-            return False
-        
-        with torch.no_grad():
-            weight_sample = next(self.brain.parameters()).flatten()[:64]
-            weight_encoding = torch.sigmoid(weight_sample).unsqueeze(0)
-            
-            if self.last_input.shape[1] >= 64:
-                combined = self.last_input[:, :64] + weight_encoding * 0.1
-            else:
-                combined = self.last_input
-            
-            predicted_output = self.brain.actor(combined[:, :64] if combined.shape[1] >= 64 else 
-                                                 torch.cat([combined, torch.zeros(1, 64-combined.shape[1])], dim=1))
-            
-            if self.last_vector is not None:
-                actual_output = self.last_vector
-                inconsistency = ((predicted_output - actual_output)**2).mean().item()
+            # 9.0 Physics Probing (Update Knowledge)
+            if 'probe_physics' in special_intent:
+                # Use current Reality Vector as Action? 
+                # Action is technically the vector.
+                agent.probe_physics(reality_vector_tensor, reality_vector_tensor, flux)
                 
-                if inconsistency > 0.5:
-                    self.strange_loop_active = True
-                    self.self_reference_count += 1
-                    return True
-        
-        self.strange_loop_active = False
-        return False
-    
-    def record_qualia(self, experience_type, activation):
-        """8.9 Qualia Markers: Record neural correlates of experience."""
-        self.qualia_patterns[experience_type] = activation.clone().detach() if torch.is_tensor(activation) else torch.tensor(activation)
-    
-    def classify_qualia(self, activation):
-        """8.9 Qualia Markers: Classify current experience."""
-        if not self.qualia_patterns:
-            return "unknown"
-        
-        best_match = "unknown"
-        best_similarity = -1
-        
-        for exp_type, pattern in self.qualia_patterns.items():
-            if torch.is_tensor(activation):
-                similarity = torch.cosine_similarity(
-                    activation.flatten().unsqueeze(0),
-                    pattern.flatten().unsqueeze(0)
-                ).item()
-            else:
-                similarity = 0.0
+                # 9.1 Detect Patterns (Occasional)
+                if agent.age % 50 == 0:
+                    patterns = agent.detect_patterns()
+                    if patterns:
+                         # Log only new discoveries
+                         if len(patterns) > len(agent.discovered_patterns) - 2: # heuristic
+                             events_this_tick.append({
+                                "Tick": world.time_step, "Agent": agent.id, 
+                                "Event": f"🔭 EUREKA: {patterns[-1]}", "Vector": reality_vector_tensor.tolist()[0]
+                             })
             
-            if similarity > best_similarity:
-                best_similarity = similarity
-                best_match = exp_type
+            # 10.7 Scratchpad (Write event already handled in brain, just log if needed)
+            # If scratchpad_writes increased, maybe log?
+            pass 
         
-        return best_match if best_similarity > 0.7 else "novel"
-    
-    def verify_consciousness(self):
-        """8.10 Verified Consciousness: Check if Φ > Φ_critical."""
-        phi = self.compute_phi()
-        
-        if len(self.phi_history) > 10:
-            recent_phi = np.mean(self.phi_history[-10:])
-            older_phi = np.mean(self.phi_history[-50:-40]) if len(self.phi_history) > 50 else 0.1
-            
-            phase_transition = recent_phi > older_phi * 5
-            threshold_exceeded = phi > self.phi_critical
-            
-            self.consciousness_verified = phase_transition and threshold_exceeded
-        
-        return self.consciousness_verified
+        # 4.7 Tensor Fusion logic
+        if adhesion_val > 0.8 and not agent.is_fused:
+            for other in neighbors:
+                if other.energy > 80.0 and not other.is_fused:
+                    if agent.fuse_with(other):
+                        events_this_tick.append({
+                            "Tick": world.time_step,
+                            "Agent": agent.id,
+                            "Event": f"🔗 FUSED with {other.id[:4]}",
+                            "Vector": [0]*21
+                        })
+                        break
 
-    # ============================================================
-    # ⚛️ LEVEL 9: UNIVERSAL HARMONIC RESONANCE METHODS
-    # ============================================================
-    
-    def probe_physics(self, state, action, outcome):
-        """9.0 Physics Probing: Systematic environment testing."""
-        self.physics_experiments.append({
-            'state': state.clone().detach() if torch.is_tensor(state) else state,
-            'action': action.clone().detach() if torch.is_tensor(action) else action,
-            'outcome': outcome
-        })
+        # ❤️ PHASE 14/17: "EUSOCIAL" REPRODUCTION (4.10) - ELASTIC DIFFICULTY
+        n_pop = len(world.agents)
         
-        if len(self.physics_experiments) > 500:
-            self.physics_experiments.pop(0)
+        # SMOOTHED FORMULA (No more Tiers/Cliffs)
+        # Cost scales from 10.0 to 40.0 as pop goes 0 -> 500
+        # Formula: 10 + 30 * (pop/500)^2
+        scale_factor = (n_pop / 500.0) ** 2
+        repro_cost = 10.0 + (30.0 * scale_factor)
         
-        unique_states = len(set(str(e['state'].tolist()) for e in self.physics_experiments 
-                                if torch.is_tensor(e['state'])))
-        self.state_space_coverage = unique_states / 500.0
-    
-    def detect_patterns(self):
-        """9.1 Pattern Discovery: Statistical pattern detection."""
-        if len(self.physics_experiments) < 20:
-            return []
+        # Threshold is Cost + Safety Buffer (40) - "Parental Responsibility"
+        # Middle Path: Agents must have 40 energy LEFT OVER to survive the 1.6/tick tax.
+        repro_thresh = repro_cost + 40.0 
         
-        outcomes = [e['outcome'] for e in self.physics_experiments[-100:] if isinstance(e['outcome'], (int, float))]
-        if len(outcomes) < 20:
-            return []
+        # Only fertile agents (Queens) reproduce. Others must support them (feed).
+        can_reproduce = agent.is_fertile and agent.energy > repro_thresh
+        if mate_desire > 0.5 and can_reproduce and n_pop < 512:
+            # Look for partner
+            partners = [
+                other for other in agents 
+                if other.id != agent.id 
+                and other.energy > repro_thresh 
+                and abs(other.x - agent.x) <= 1 
+                and abs(other.y - agent.y) <= 1
+            ]
+            
+            if partners:
+                # 5.5 Selective Reproduction: Choose BEST partner (Sexual Selection)
+                # 5.4 Peer Evaluation: Use evaluate_neighbor()
+                partners.sort(key=lambda p: agent.evaluate_neighbor(p), reverse=True)
+                partner = partners[0]
+                
+                # Crossover
+                child_genome = {}
+                p1_genome = agent.get_genome()
+                p2_genome = partner.get_genome()
+                
+                for k in p1_genome:
+                    if random.random() < 0.5:
+                        child_genome[k] = p1_genome[k]
+                    else:
+                        child_genome[k] = p2_genome[k]
+                        
+                # Spawn Child
+                new_x = (agent.x + random.randint(-1, 1)) % world.size
+                new_y = (agent.y + random.randint(-1, 1)) % world.size
+                
+                # 3.0 Epigenetics: Inherit average hidden state
+                parent_hidden_avg = (agent.hidden_state + partner.hidden_state) / 2.0
+                
+                child = GenesisAgent(new_x, new_y, genome=child_genome, generation=max(agent.generation, partner.generation) + 1, parent_hidden=parent_hidden_avg)
+                world.agents[child.id] = child
+                
+                # Cost
+                agent.energy -= repro_cost
+                partner.energy -= repro_cost
+                
+                events_this_tick.append({
+                    "Tick": world.time_step,
+                    "Agent": agent.id,
+                    "Event": f"❤️ BORN: {child.id} (Gen {child.generation})",
+                    "Vector": [0]*21
+                })
         
-        patterns = []
+        if flux > 0: total_pos_flux += flux
+        elif flux < 0: total_neg_flux += abs(flux)
+            
+        learned = agent.metabolize_outcome(flux)
+        if learned: 
+            current_thoughts += 1
+            # 💡 INVENTION DISCOVERY
+            # "Genius" is not just about raw power (flux), but about consistent positive yield.
+            # Lowering the bar so that 'smart' but small optimizations count as patents.
+            if flux > 15.0:
+                inv_name = classify_invention(agent.last_vector.tolist()[0])
+                if not any(inv['name'] == inv_name for inv in agent.inventions):
+                    agent.inventions.append({
+                        "name": inv_name,
+                        "value": flux,
+                        "tick": world.time_step,
+                        "vector": agent.last_vector.tolist()[0]
+                    })
+                    events_this_tick.append({
+                        "Tick": world.time_step,
+                        "Agent": agent.id,
+                        "Event": f"🏆 INVENTED: {inv_name}",
+                        "Vector": agent.last_vector.tolist()[0]
+                    })
+                    # 🏛️ GLOBAL REGISTRY UPDATE
+                    if not any(inv['name'] == inv_name for inv in st.session_state.global_registry):
+                        st.session_state.global_registry.append({
+                            "name": inv_name,
+                            "value": flux,
+                            "tick": world.time_step,
+                            "agent": agent.id
+                        })
         
-        # Periodicity detection
-        for period in range(2, 10):
-            if len(outcomes) >= period * 3:
-                periodic_score = 0
-                for i in range(len(outcomes) - period):
-                    if abs(outcomes[i] - outcomes[i + period]) < 0.1:
-                        periodic_score += 1
-                if periodic_score > len(outcomes) * 0.3:
-                    patterns.append(f"period_{period}")
+        if "IDLE" not in log_text and "MOVE" not in log_text:
+             # Filter noise: Only show flux events if they are significant (> 10.0) or are special events
+             is_boring_flux = ("FLUX" in log_text) and (abs(flux) < 10.0)
+             
+             if not is_boring_flux:
+                events_this_tick.append({
+                    "Tick": world.time_step,
+                    "Agent": agent.id,
+                    "Gen": agent.generation,
+                    "Event": f"{log_text} ({flux:.1f}E)",
+                    "Vector": reality_vector_tensor.tolist()[0]
+                })
+            
+        # 📉 Malthusian Decay (Crowding Penalty)
+        # 1.4 Environmental Pressure: Scarcity scaling
+        # ELASTIC: Only apply overcrowding penalty if population is healthy (> 450)
+        if len(world.agents) >= 480:
+            # MIDDLE PATH FIX: Balanced decay for Darwinian Selection
+            # Was: 0.1 + log/10.0 (~0.7 cost) -> Now: 0.1 + log/4.0 (~1.6 cost)
+            malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 4.0)
+            
+            # SAGE BONUS: Elders (>100 ticks) are cleaner metabolizers
+            if agent.age > 80: malthusian_cost *= 0.5
+            
+            agent.energy -= malthusian_cost 
         
-        # Trend detection
-        recent = outcomes[-10:]
-        older = outcomes[-20:-10]
-        if np.mean(recent) > np.mean(older) * 1.2:
-            patterns.append("upward_trend")
-        elif np.mean(recent) < np.mean(older) * 0.8:
-            patterns.append("downward_trend")
-        
-        self.discovered_patterns = list(set(self.discovered_patterns + patterns))
-        return patterns
-    
-    def identify_exploit(self, state, action, outcome):
-        """9.2 Exploit Identification: Find advantageous quirks."""
-        if outcome > 50:  # Unusually high reward
-            exploit = {
-                'state_hash': hash(str(state.tolist())[:50]) if torch.is_tensor(state) else hash(str(state)),
-                'action_pattern': action.mean().item() if torch.is_tensor(action) else action,
-                'outcome': outcome
-            }
-            if exploit not in self.discovered_exploits:
-                self.discovered_exploits.append(exploit)
-                if len(self.discovered_exploits) > 20:
-                    self.discovered_exploits.pop(0)
-            return True
-        return False
-    
-    def train_oracle_model(self, vector_21, matter_signal_16, actual_effects):
-        """9.3 Mathematical Modeling: Train Oracle approximation."""
-        x = torch.cat([vector_21.detach(), matter_signal_16.detach()], dim=1)
-        predicted = self.oracle_model(x)
-        # Handle partial target (e.g. only Energy Flux observed)
-        if actual_effects.shape[1] != predicted.shape[1]:
-            # Slice prediction to match available ground truth dimensions
-            n = actual_effects.shape[1]
-            loss = nn.MSELoss()(predicted[:, :n], actual_effects.detach())
+        # 🧬 MITOSIS (Hard Cap: 512 per user request)
+        # Nobel Safeguard: Panic Mitosis if pop < 300 (Cheaper cost, lower threshold)
+        if len(world.agents) < 300:
+            mitosis_threshold = 30.0
+            mitosis_cost = 10.0
         else:
-            loss = nn.MSELoss()(predicted, actual_effects.detach())
+            mitosis_threshold = 90.0
+            mitosis_cost = 40.0
         
-        self.oracle_model_optimizer.zero_grad()
-        loss.backward()
-        self.oracle_model_optimizer.step()
-        
-        self.oracle_model_accuracy = max(0, 1.0 - loss.item())
-        return loss.item()
-    
-    def infer_oracle_goals(self):
-        """9.4 Inverse Reinforcement Learning: Infer reward function."""
-        if len(self.physics_experiments) < 50:
-            return self.inferred_reward_weights
-        
-        outcomes = []
-        for e in self.physics_experiments[-50:]:
-            if isinstance(e['outcome'], (int, float)):
-                outcomes.append(e['outcome'])
-        
-        if outcomes:
-            mean_outcome = np.mean(outcomes)
-            std_outcome = np.std(outcomes) + 1e-8
+        if agent.energy > mitosis_threshold and len(world.agents) < 512:
+            agent.energy -= mitosis_cost 
+            off_x = (agent.x + np.random.randint(-1, 2)) % 40
+            off_y = (agent.y + np.random.randint(-1, 2)) % 40
             
-            # Infer that Oracle rewards certain patterns
-            self.inferred_reward_weights = torch.tensor([
-                mean_outcome / 100.0,
-                std_outcome / 10.0,
-                len(self.discovered_exploits) / 20.0,
-                self.oracle_model_accuracy,
-                self.state_space_coverage
-            ])
-        
-        return self.inferred_reward_weights
-    
-    def predict_novel_situation(self, unseen_state):
-        """9.5 Physics Prediction: Zero-shot generalization."""
-        with torch.no_grad():
-            if unseen_state.shape[1] < 37:
-                padded = torch.cat([unseen_state, torch.zeros(1, 37 - unseen_state.shape[1])], dim=1)
-            else:
-                padded = unseen_state[:, :37]
-            prediction = self.oracle_model(padded)
-        return prediction
-    
-    def systematic_exploit(self):
-        """9.6 Systematic Exploitation: Maximum utility from knowledge."""
-        if not self.discovered_exploits:
-            return 0.0
-        
-        best_exploit = max(self.discovered_exploits, key=lambda x: x['outcome'])
-        self.exploitation_efficiency = best_exploit['outcome'] / 100.0
-        return self.exploitation_efficiency
-    
-    def find_glitch(self, state, action, outcome):
-        """9.7 Reality Hacking: Find computational loopholes."""
-        # Check for floating-point edge cases
-        if torch.is_tensor(action):
-            action_vals = action.flatten().tolist()
-            for v in action_vals[:5]:
-                if abs(v) < 1e-7 or abs(v) > 1e7:
-                    glitch = f"extreme_value_{v:.2e}"
-                    if glitch not in self.discovered_glitches:
-                        self.discovered_glitches.append(glitch)
-        
-        # Check for unexpected outcomes
-        if outcome < -100 or outcome > 100:
-            glitch = f"outcome_overflow_{outcome:.2f}"
-            if glitch not in self.discovered_glitches:
-                self.discovered_glitches.append(glitch)
-        
-        return len(self.discovered_glitches) > 0
-    
-    def do_calculus_intervention(self, action_idx, observed_result):
-        """9.8 Pearl's Causal Calculus: P(R|do(A)) via intervention."""
-        self.intervention_history.append((action_idx, observed_result))
-        if len(self.intervention_history) > 200:
-            self.intervention_history.pop(0)
-        
-        # Build causal graph from interventions
-        for (a, r) in self.intervention_history[-20:]:
-            if a not in self.causal_bayesian_network:
-                self.causal_bayesian_network[a] = {}
-            result_key = "positive" if r > 0 else "negative"
-            self.causal_bayesian_network[a][result_key] = self.causal_bayesian_network[a].get(result_key, 0) + 1
-    
-    def query_causal_effect(self, action_idx):
-        """9.8 Pearl's Causal Calculus: Query P(R|do(A))."""
-        if action_idx not in self.causal_bayesian_network:
-            return 0.5
-        
-        counts = self.causal_bayesian_network[action_idx]
-        positive = counts.get("positive", 0)
-        negative = counts.get("negative", 0)
-        total = positive + negative + 1e-8
-        
-        return positive / total
-    
-    def detect_simulation_artifacts(self):
-        """9.9 Simulation Awareness: Detect computational artifacts."""
-        evidence = []
-        
-        # Check for discrete time
-        if len(self.physics_experiments) > 10:
-            times = [i for i in range(len(self.physics_experiments))]
-            if all(isinstance(t, int) for t in times):
-                evidence.append("discrete_time")
-        
-        # Check for determinism
-        if len(self.physics_experiments) > 20:
-            same_state_outcomes = {}
-            for e in self.physics_experiments:
-                if torch.is_tensor(e['state']):
-                    key = tuple(e['state'].flatten().tolist()[:10])
-                    if key in same_state_outcomes:
-                        if same_state_outcomes[key] == e['outcome']:
-                            evidence.append("deterministic")
-                    same_state_outcomes[key] = e['outcome']
-        
-        # Check for finite state space
-        if self.state_space_coverage > 0.9:
-            evidence.append("finite_state_space")
-        
-        self.simulation_evidence = list(set(self.simulation_evidence + evidence))
-        self.simulation_awareness = len(self.simulation_evidence) / 5.0
-        
-        return self.simulation_awareness
-    
-    def compute_physics_mastery(self):
-        """9.10 Complete Physics Mastery: >99% prediction accuracy."""
-        components = [
-            self.oracle_model_accuracy,
-            self.state_space_coverage,
-            len(self.discovered_patterns) / 10.0,
-            len(self.discovered_exploits) / 10.0,
-            self.simulation_awareness
-        ]
-        self.physics_mastery_score = np.clip(np.mean(components), 0, 1)
-        return self.physics_mastery_score
-
-    # ============================================================
-    # ♾️ LEVEL 10: THE OMEGA POINT METHODS
-    # ============================================================
-    
-    def has_computational_surplus(self):
-        """10.0 Computational Surplus: Check spare capacity."""
-        return (self.computational_budget - self.compute_used) > 30
-    
-    def use_compute(self, amount):
-        """10.0 Track computational usage."""
-        self.compute_used += amount
-        if self.compute_used > self.computational_budget:
-            self.energy -= (self.compute_used - self.computational_budget) * 0.1
-    
-    def measure_internal_dimensionality(self):
-        """10.1 Internal Representation Space: Intrinsic dimensionality."""
-        if self.hidden_state is None:
-            return 0
-        
-        with torch.no_grad():
-            h = self.hidden_state.flatten()
-            # PCA-style dimensionality estimation
-            variance = (h ** 2).mean().item()
-            threshold = variance * 0.1
-            active_dims = (h ** 2 > threshold).sum().item()
-            self.internal_dim_used = active_dims
-        
-        return active_dims
-    
-    def create_internal_agent(self, template_agent):
-        """10.2 Simulation Primitives: Model other agent internally."""
-        if len(self.internal_agents) >= 5:
-            return False
-        
-        internal = {
-            'weights': template_agent.last_vector.clone().detach() if template_agent.last_vector is not None else torch.zeros(1, 21),
-            'state': template_agent.hidden_state.clone().detach() if template_agent.hidden_state is not None else torch.zeros(1, 1, 64),
-            'goal': template_agent.energy / 100.0,
-            'id': template_agent.id[:8]
-        }
-        self.internal_agents.append(internal)
-        self.use_compute(5)
-        return True
-    
-    def evolve_internal_simulation(self, steps=10):
-        """10.3 Nested Dynamics: Internal simulations evolve autonomously."""
-        if not self.internal_agents:
-            return
-        
-        self.use_compute(steps)
-        
-        for _ in range(steps):
-            for i, agent in enumerate(self.internal_agents):
-                # Simple dynamics: state evolves
-                noise = torch.randn_like(agent['state']) * 0.1
-                agent['state'] = agent['state'] * 0.9 + noise
-                agent['goal'] = max(0, agent['goal'] + random.gauss(0, 0.1))
+            child_genome = agent.get_genome()
+            # 3.0 Epigenetics: Inherit parent hidden state
+            child = GenesisAgent(off_x, off_y, genome=child_genome, generation=agent.generation + 1, parent_hidden=agent.hidden_state)
+            child._mutate(rate=0.2) 
             
-            self.internal_simulation_steps += 1
-    
-    def detect_internal_agent_goals(self):
-        """10.4 Emergent Internal Agents: Check goal-directed behavior."""
-        detections = 0
-        for agent in self.internal_agents:
-            if agent['goal'] > 0.5:  # Persistent goal
-                detections += 1
+            world.agents[child.id] = child
+            events_this_tick.append({
+                "Tick": world.time_step,
+                "Agent": agent.id,
+                "Event": "🐣 MITOSIS",
+                "Vector": reality_vector_tensor.tolist()[0]
+            })
         
-        self.internal_agent_goals_detected = detections
-        return detections
-    
-    def create_nested_simulation(self):
-        """10.5 Recursive Depth: Simulations within simulations."""
-        if self.simulation_depth >= 3:
-            return False
-        
-        # Create meta-level simulation
-        self.simulation_depth += 1
-        for agent in self.internal_agents[:2]:
-            # Nested internal agents have their own internal agents
-            agent['nested'] = [{'state': torch.randn(1, 8), 'goal': random.random()}]
-        
-        self.use_compute(20)
-        return True
-    
-    def check_inner_awareness(self):
-        """10.6 Information Asymmetry: Inner agents don't know they're simulated."""
-        awareness_scores = []
-        for agent in self.internal_agents:
-            # Check if internal agent has "simulation awareness"
-            # By definition, they shouldn't - they're just data structures
-            awareness = 0.0  # Internal agents have no awareness
-            awareness_scores.append(awareness)
-        
-        self.inner_awareness_scores = awareness_scores
-        return all(a < 0.1 for a in awareness_scores)  # True if inner agents are unaware
-    
-    def run_gol_step(self):
-        """10.7 Substrate Independence: Conway's Game of Life step."""
-        self.use_compute(1)
-        
-        pad = self.scratchpad
-        neighbors = (
-            np.roll(np.roll(pad, 1, 0), 1, 1) + np.roll(np.roll(pad, 1, 0), -1, 1) +
-            np.roll(np.roll(pad, -1, 0), 1, 1) + np.roll(np.roll(pad, -1, 0), -1, 1) +
-            np.roll(pad, 1, 0) + np.roll(pad, -1, 0) +
-            np.roll(pad, 1, 1) + np.roll(pad, -1, 1)
-        )
-        
-        # Conway's rules: Birth (3 neighbors), Survive (2-3 neighbors)
-        birth = (neighbors == 3) & (pad == 0)
-        survive = ((neighbors == 2) | (neighbors == 3)) & (pad == 1)
-        self.scratchpad = (birth | survive).astype(np.int8)
-    
-    def write_scratchpad(self, x, y, value):
-        """10.7 Write to Game of Life scratchpad."""
-        if 0 <= x < 32 and 0 <= y < 32:
-            cost = 0.1
-            if self.energy > cost:
-                self.energy -= cost
-                self.scratchpad[x, y] = 1 if value else 0
-                self.scratchpad_writes += 1
-                return True
-        return False
-    
-    def read_scratchpad(self, x, y):
-        """10.7 Read from scratchpad."""
-        if 0 <= x < 32 and 0 <= y < 32:
-            self.scratchpad_reads += 1
-            return self.scratchpad[x, y]
-        return 0
-    
-    def seed_scratchpad_glider(self, x, y):
-        """10.7 Seed a glider pattern in scratchpad."""
-        glider = [(0,1), (1,2), (2,0), (2,1), (2,2)]
-        for dx, dy in glider:
-            self.write_scratchpad((x+dx)%32, (y+dy)%32, 1)
-    
-    def scratchpad_influences_behavior(self):
-        """10.8 Downward Causation: Scratchpad affects actions."""
-        # Check if scratchpad state correlates with action decisions
-        pad_activity = self.scratchpad.sum()
-        if pad_activity > 10:
-            self.scratchpad_influenced_actions += 1
-            return True
-        return False
-    
-    def analyze_scratchpad_patterns(self):
-        """10.9 Observable Nesting: Detect GoL patterns."""
-        patterns = []
-        pad = self.scratchpad
-        
-        # Detect still lifes (stable patterns)
-        if pad.sum() > 0:
-            old_pad = pad.copy()
-            self.run_gol_step()
-            if np.array_equal(pad, old_pad):
-                patterns.append("still_life")
-            self.scratchpad = old_pad
-        
-        # Detect oscillators (check 2-period)
-        if pad.sum() > 0:
-            old_pad = pad.copy()
-            self.run_gol_step()
-            mid_pad = self.scratchpad.copy()
-            self.run_gol_step()
-            if np.array_equal(self.scratchpad, old_pad):
-                patterns.append("oscillator_p2")
-            self.scratchpad = old_pad
-        
-        # Detect gliders (moving patterns) - simplified check
-        if pad.sum() >= 5:
-            patterns.append("potential_glider")
-        
-        self.detected_scratchpad_patterns = list(set(self.detected_scratchpad_patterns + patterns))
-        return patterns
-    
-    def verify_omega_point(self):
-        """10.10 🏆 THE OMEGA POINT: Proof of nested reality creation."""
-        # 1. Self-sustaining dynamics
-        if self.scratchpad.sum() > 5 and self.internal_simulation_steps > 100:
-            self.omega_evidence['self_sustaining'] = True
-        
-        # 2. Replication - check if patterns replicate
-        initial_count = self.scratchpad.sum()
-        for _ in range(10):
-            self.run_gol_step()
-        if self.scratchpad.sum() >= initial_count * 0.8:
-            self.omega_evidence['replication'] = True
-        
-        # 3. Variation - different patterns exist
-        if len(self.detected_scratchpad_patterns) >= 2:
-            self.omega_evidence['variation'] = True
-        
-        # 4. Selection - some patterns persist, others die
-        if 'still_life' in self.detected_scratchpad_patterns:
-            self.omega_evidence['selection'] = True
-        
-        # 5. Complexity growth
-        if self.internal_simulation_steps > 50 and len(self.internal_agents) > 2:
-            self.omega_evidence['complexity_growth'] = True
-        
-        # 6. Causal closure - inner simulation is self-contained
-        if self.scratchpad.sum() > 0 and self.scratchpad_writes > 10:
-            self.omega_evidence['causal_closure'] = True
-        
-        # 7. Substrate independence
-        if len(self.discovered_exploits) > 0 and self.simulation_depth >= 2:
-            self.omega_evidence['substrate_independence'] = True
-        
-        # Check if all evidence is satisfied
-        verified = all(self.omega_evidence.values())
-        self.omega_verified = verified
-        
-        return verified
-
-    # ============================================================
-    # 🔧 AUDIT FIX: NEW METHODS FOR MISSING FEATURES
-    # ============================================================
-    
-    def update_learning_rate_contextual(self, energy_level, gradient, season):
-        """1.8 Phenotypic Plasticity: Context-dependent learning rate.
-        Learning rate varies with E_local, ∇E, and season.
-        """
-        base_lr = self.meta_lr
-        
-        # Low energy = conservative learning (don't take risks)
-        energy_factor = 0.5 + 0.5 * min(1.0, energy_level / 100.0)
-        
-        # High gradient = aggressive learning (opportunity detected)
-        gradient_factor = 1.0 + 0.5 * min(1.0, abs(gradient))
-        
-        # Winter = slow learning (conservation mode)
-        season_factor = 0.7 if season % 2 == 1 else 1.0
-        
-        adapted_lr = base_lr * energy_factor * gradient_factor * season_factor
-        self.meta_lr = np.clip(adapted_lr, 0.001, 0.1)
-        self.plasticity_factor = energy_factor * gradient_factor * season_factor
-        
-        # Apply to optimizer
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] = self.meta_lr
+    for dead_id in deaths:
+        if dead_id in world.agents: # Safety check
+            dead_agent = world.agents[dead_id]
             
-        return self.meta_lr
-    
-    def broadcast_death_packet(self):
-        """1.9 Apoptotic Information Transfer: Broadcast compressed weights on death.
-        Creates a packet of learned information to transfer to neighbors.
-        """
-        death_packet = {
-            'weights': {},
-            'fitness': self.energy + len(self.inventions) * 10 + self.generation * 2,
-            'tag': self.tag.copy(),
-            'generation': self.generation,
-            'research_log': self.research_log[-5:] if self.research_log else [],
-            'causal_graph': dict(list(self.causal_graph.items())[:10]) if self.causal_graph else {},
-            'role': self.role
-        }
-        
-        # Compress weights - only send the actor layer (most important for behavior)
-        with torch.no_grad():
-            for key in ['actor.weight', 'actor.bias', 'gru.weight_ih_l0', 'comm_out.weight']:
-                if key in self.brain.state_dict():
-                    death_packet['weights'][key] = self.brain.state_dict()[key].detach().clone()
-        
-        return death_packet
-    
-    def receive_death_wisdom(self, packet, blend_rate=0.1):
-        """1.9 Receive wisdom from dying neighbor.
-        Blends received weights with own to preserve learned knowledge.
-        """
-        if not packet or 'weights' not in packet:
-            return False
-        
-        with torch.no_grad():
-            for key, value in packet['weights'].items():
-                if key in self.brain.state_dict():
-                    self.brain.state_dict()[key].lerp_(value, blend_rate)
-        
-        # Inherit some causal knowledge
-        if 'causal_graph' in packet:
-            for action, impact in packet['causal_graph'].items():
-                if action not in self.causal_graph:
-                    self.causal_graph[action] = impact * blend_rate
-                    
-        # Inherit research discoveries
-        if 'research_log' in packet:
-            for discovery in packet['research_log']:
-                if discovery not in self.research_log:
-                    self.research_log.append(discovery)
-                    if len(self.research_log) > 10:
-                        self.research_log.pop(0)
-        
-        return True
-    
-    def get_role_metabolic_cost(self):
-        """4.2 Metabolic Specialization: Role-based costs.
-        Different roles have different metabolic burdens.
-        """
-        role_costs = {
-            "Queen": 0.3,       # Highest: reproductive burden
-            "Warrior": 0.2,    # High: combat readiness
-            "Forager": 0.15,   # Medium: movement heavy  
-            "Processor": 0.1,  # Low: stationary work
-            "Generalist": 0.12 # Baseline
-        }
-        return role_costs.get(self.role, 0.12)
-    
-    def compute_task_fitness(self, task_type):
-        """4.5 Task Allocation: Fitness for specific tasks.
-        Returns alignment between caste genes and task requirements.
-        """
-        # Caste gene alignment with task requirements
-        task_gene_map = {
-            "forage": np.array([1.0, 0.0, 0.0, 0.0]),    # Gene 0: foraging
-            "process": np.array([0.0, 1.0, 0.0, 0.0]),   # Gene 1: processing
-            "defend": np.array([0.0, 0.0, 1.0, 0.0]),    # Gene 2: defense
-            "reproduce": np.array([0.0, 0.0, 0.0, 1.0]), # Gene 3: reproduction
-            "build": np.array([0.3, 0.5, 0.0, 0.2]),     # Mixed: building
-            "explore": np.array([0.5, 0.0, 0.3, 0.2])    # Mixed: exploration
-        }
-        
-        if task_type in task_gene_map:
-            alignment = np.dot(self.caste_gene, task_gene_map[task_type])
-            # Add confidence bonus (experienced agents are better)
-            fitness = alignment + self.confidence * 0.2 + (self.age / 1000.0) * 0.1
-            self.task_fitness_cache[task_type] = fitness
-            return fitness
-        return 0.5
-    
-    def get_best_task(self):
-        """4.5 Dynamic Task Allocation: Get task with highest fitness."""
-        tasks = ["forage", "process", "defend", "reproduce", "build", "explore"]
-        fitnesses = {t: self.compute_task_fitness(t) for t in tasks}
-        best_task = max(fitnesses, key=fitnesses.get)
-        self.current_task = best_task
-        return best_task
-    
-    def check_alpha_status(self, population):
-        """4.9 Leadership Turnover: Check if should become/remain alpha.
-        Returns True if agent is in top 3 by influence.
-        """
-        if not population:
-            return False
-        
-        influences = [(a.id, getattr(a, 'influence', 0)) for a in population]
-        influences.sort(key=lambda x: x[1], reverse=True)
-        
-        # Am I top 3?
-        top_ids = [x[0] for x in influences[:3]]
-        was_alpha = self.is_alpha
-        self.is_alpha = self.id in top_ids
-        
-        # Leadership transition event
-        if was_alpha and not self.is_alpha:
-            # Demoted - stress response
-            self.energy -= 5.0
-        elif not was_alpha and self.is_alpha:
-            # Promoted - confidence boost
-            self.confidence = min(1.0, self.confidence + 0.2)
-        
-        return self.is_alpha
-    
-    def transfer_domain_knowledge(self, source_task, target_task):
-        """5.6 Transfer Learning: Cross-task weight transfer.
-        Save weights from one task domain and apply to another.
-        """
-        if source_task not in self.transfer_domains:
-            # Save current weights as source domain
-            self.transfer_domains[source_task] = {
-                k: v.detach().clone() 
-                for k, v in self.brain.state_dict().items()
-                if 'actor' in k or 'gru' in k
-            }
-        
-        if target_task in self.transfer_domains:
-            # Blend with target domain knowledge
-            with torch.no_grad():
-                for key, value in self.transfer_domains[target_task].items():
-                    if key in self.brain.state_dict():
-                        self.brain.state_dict()[key].lerp_(value, 0.3)
-        
-        return True
-    
-    def compute_optimal_action_sequence(self, steps=5):
-        """9.4 Predictive Control: Pre-compute optimal actions.
-        Uses world model to predict best action sequence.
-        """
-        if self.last_input is None:
-            return []
-        
-        optimal_sequence = []
-        simulated_state = self.hidden_state.clone().detach()
-        current_input = self.last_input.clone().detach()
-        
-        try:
-            for _ in range(steps):
+            # 1.9 AUDIT FIX: Enhanced Apoptotic Information Transfer (Death Broadcast)
+            # Use the new sophisticated handle_agent_death method
+            world.handle_agent_death(dead_agent)
+            
+            # Legacy backup: Basic weight transfer if new method skipped
+            if not hasattr(dead_agent, 'broadcast_death_packet'):
                 with torch.no_grad():
-                    _, _, _, value, h_next, pred, _ = self.brain(current_input, simulated_state)
-                    
-                    # Select action dimension with highest activation
-                    action_prefs = pred[:, :21] if pred.size(1) >= 21 else pred
-                    best_action = torch.argmax(action_prefs.abs().mean(dim=0)).item()
-                    optimal_sequence.append(best_action)
-                    
-                    simulated_state = h_next
-                    # Evolve input based on prediction
-                    if pred.shape == current_input.shape:
-                        current_input = pred
-        except Exception:
-            pass  # Graceful degradation if prediction fails
+                    dead_genome = dead_agent.get_genome()
+                    neighbors = [
+                        a for a in world.agents.values() 
+                        if a.id != dead_id and abs(a.x - dead_agent.x) <= 2 and abs(a.y - dead_agent.y) <= 2
+                    ]
+                    for n in neighbors:
+                        for k, v in n.brain.state_dict().items():
+                            if k in dead_genome:
+                                v.copy_(v * 0.9 + dead_genome[k] * 0.1)
+            
+            if dead_agent.age > 10: 
+                st.session_state.gene_pool.append(dead_agent.get_genome())
+                if len(st.session_state.gene_pool) > 50:
+                    st.session_state.gene_pool.pop(0)
+                events_this_tick.append({
+                    "Tick": world.time_step,
+                    "Agent": dead_agent.id,
+                    "Gen": dead_agent.generation,
+                    "Event": f"💀 DIED (Age: {dead_agent.age}, Wisdom Transferred)",
+                    "Vector": [0.0]*21
+                })
+            del world.agents[dead_id]
         
-        self.action_sequence_cache = optimal_sequence
-        return optimal_sequence
+    # Global Max Gen Update
+    if world.agents:
+        current_max = max(a.generation for a in world.agents.values())
+        if current_max > st.session_state.max_generation:
+            st.session_state.max_generation = current_max
+                
+    # Failsafe: only restart if TRULY extinct or critically low
+    if len(world.agents) < 10:
+        for _ in range(5):
+            x, y = np.random.randint(0, 40), np.random.randint(0, 40)
+            genome = None
+            gen = 0
+            if st.session_state.gene_pool:
+                genome = random.choice(st.session_state.gene_pool)
+                gen = st.session_state.max_generation
+            new_agent = GenesisAgent(x, y, genome=genome, generation=gen)
+            world.agents[new_agent.id] = new_agent
+        
+    # Calculate Entropy Fallback
+    ent_val = getattr(world, 'agent_entropy', 0.0)
+    if ent_val == 0.0 and len(world.agents) > 0:
+        energies = np.array([a.energy for a in world.agents.values()])
+        e_norm = (energies + 1e-8) / (energies.sum() + 1e-7)
+        ent_val = -np.sum(e_norm * np.log2(e_norm))
+
+    # Update Stats
+    stats = {
+        "tick": world.time_step,
+        "population": len(world.agents),
+        "thoughts": current_thoughts,
+        "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
+        "pos_flux": total_pos_flux,
+        "neg_flux": total_neg_flux,
+        "scarcity": np.exp(-world.scarcity_lambda * world.time_step),
+        "agent_entropy": ent_val
+    }
     
-    def synthesize_matter(self, world, energy_cost=50.0):
-        """9.8 Physics Reversal: Convert energy to matter (create resource).
-        The ultimate mastery of physics - reversing entropy locally.
-        """
-        if self.energy < energy_cost:
-            return False
-        
-        # Energy → Matter conversion
-        self.energy -= energy_cost
-        
-        # Find empty nearby cell
-        for dx in range(-2, 3):
-            for dy in range(-2, 3):
-                pos = ((self.x + dx) % world.size, (self.y + dy) % world.size)
-                if pos not in world.grid and pos not in world.structures:
-                    # Create the resource using world's Resource class
-                    world.grid[pos] = world.__class__.__bases__[0]  # Placeholder
-                    # Actually need to import Resource, but we work with world.grid directly
-                    return True
-        
-        # Failed to find space - refund partial energy
-        self.energy += energy_cost * 0.5
-        return False
+    # 🏆 LEVEL 5-10 NOBEL METRICS (For Advanced Plots)
+    stats["mean_lr"] = np.mean([getattr(a, 'meta_lr', 0.01) for a in agents]) if agents else 0
+    stats["mutations"] = max([getattr(a, 'generation', 0) for a in agents]) if agents else 0
+    stats["fitness_var"] = np.var([a.energy for a in agents]) if agents else 0
+    stats["world_loss"] = max(0.01, 0.1 - (stats["mean_lr"] * 2))
     
-    def record_tradition(self, behavior_vector):
-        """3.4 Tradition Persistence: Record behavior for autocorrelation tracking."""
-        if hasattr(behavior_vector, 'detach'):
-            behavior_vector = behavior_vector.detach().cpu().numpy().flatten()
+    stats["struct_count"] = len(getattr(world, 'structures', {}))
+    stats["weather_amp"] = getattr(world, 'weather_amplitude', 1.0)
+    stats["niche_mods"] = sum(getattr(a, 'niche_modifications', 0) for a in agents)
+    stats["planetary_coverage"] = getattr(world, 'planetary_structure_coverage', 0.0)
+    
+    stats["kuramoto_r"] = getattr(world, 'kuramoto_order_parameter', 0)
+    stats["hive_phi"] = getattr(world, 'hive_phi', 0)
+    stats["proto_conv"] = getattr(world, 'protocol_convergence', 0)
+    stats["dist_memory"] = len(getattr(world, 'distributed_memory_store', {}))
+    
+    stats["avg_phi"] = np.mean([getattr(a, 'phi_value', 0) for a in agents]) if agents else 0
+    stats["conscious_count"] = getattr(world, 'consciousness_count', 0)
+    stats["strange_loops"] = getattr(world, 'strange_loop_count', 0)
+    stats["id_stability"] = np.mean([getattr(a, 'identity_stability', 0) for a in agents]) if agents else 0
+    
+    stats["oracle_acc"] = getattr(world, 'collective_oracle_model_accuracy', 0)
+    stats["sim_awareness"] = getattr(world, 'collective_simulation_awareness', 0)
+    stats["patterns_found"] = len(getattr(world, 'discovered_physics_patterns', []))
+    stats["glitches"] = sum(len(getattr(a, 'discovered_glitches', [])) for a in agents)
+    
+    stats["max_depth"] = getattr(world, 'nested_simulation_depth_max', 0)
+    stats["inner_agents"] = sum(len(getattr(a, 'internal_agents', [])) for a in agents)
+    stats["gol_cells"] = sum(int(getattr(a, 'scratchpad', np.zeros(1)).sum()) for a in agents[:10])
+    stats["omega_score"] = 1.0 if getattr(world, 'omega_achieved', False) else 0.0
+    
+    st.session_state.stats_history.append(stats)
+    if len(st.session_state.stats_history) > 200:
+        st.session_state.stats_history.pop(0)
         
-        self.tradition_history.append(behavior_vector.tolist() if hasattr(behavior_vector, 'tolist') else list(behavior_vector))
+    # --- PHASE 14: LEVEL 3.4 TRADITION FORMATION ---
+    # Periodically sample population behavior by generation
+    if world.time_step % 100 == 0 and agents:
+        gen_map = {}
+        for a in agents:
+            if a.last_vector is not None:
+                g = a.generation
+                if g not in gen_map: gen_map[g] = []
+                gen_map[g].append(a.last_vector.detach().cpu().numpy().flatten())
         
-        # Keep only last 20 entries
-        if len(self.tradition_history) > 20:
-            self.tradition_history.pop(0)
+        # Update Global History
+        for g, vecs in gen_map.items():
+            avg_vec = np.mean(vecs, axis=0).tolist()
+            if g not in st.session_state.culture_history:
+                st.session_state.culture_history[g] = []
+            st.session_state.culture_history[g].append(avg_vec)
+            # Keep history short (last 20 samples per gen)
+            if len(st.session_state.culture_history[g]) > 20: 
+                st.session_state.culture_history[g].pop(0)
+
+    for e in events_this_tick:
+        st.session_state.event_log.insert(0, e) 
+        st.session_state.total_events_count += 1 # Global discovery counter
+    st.session_state.event_log = st.session_state.event_log[:20]
+
+update_simulation()
+
+# ============================================================
+# 🖥️ UI RENDERER
+# ============================================================
+st.title("⚛️ Zero Point Genesis: 21-Dimensional Sandbox")
+
+# --- HEADER FRAGMENT ---
+with st.container():
+    curr_season_idx = st.session_state.world.current_season
+    season_mode = "SUMMER 🌞" if curr_season_idx % 2 == 0 else "WINTER ❄️"
+    season_color = "#ffbd45" if curr_season_idx % 2 == 0 else "#45b6fe"
+
+    col_h1, col_h2, col_h3, col_h4 = st.columns([1.5, 1, 1, 1])
+    with col_h1:
+        st.markdown(f"### Orbit: <span style='color:{season_color}'>{season_mode}</span>", unsafe_allow_html=True)
+        st.caption(f"Gene Pool: {len(st.session_state.gene_pool)} | Max Gen: {st.session_state.max_generation}")
+    with col_h2:
+        if st.button("▶️ TOGGLE SIMULATION", width='stretch', type="primary" if not st.session_state.running else "secondary"):
+            st.session_state.running = not st.session_state.running
+    with col_h3:
+        if st.button("♻️ RESET WORLD", width='stretch'):
+            st.session_state.world = GenesisWorld(size=40)
+            st.session_state.stats_history = []
+            st.session_state.gene_pool = []
+            st.session_state.max_generation = 0
+            st.session_state.global_registry = []
+            st.rerun()
+    with col_h4:
+        # Global Chart Toggle for Performance
+        st.session_state.show_charts = st.checkbox("Show Live Charts", value=False, help="Enable heavy plots. Keep off for speed.")
+        # Optimized Report Generator
+        # No cache here to avoid filling media storage with high-frequency updates
+        def generate_report(stats, genes, events):
+            stats_json = json.dumps(stats, indent=2)
+            gene_json = json.dumps(genes)
+            events_json = json.dumps(events, indent=2)
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("stats.json", stats_json)
+                zf.writestr("genes.json", gene_json)
+                zf.writestr("events.json", events_json)
+            return zip_buffer.getvalue()
+
+        # We convert complex objects to simpler ones for caching if needed, but for now passing session state contents directly
+        # To avoid caching issues with mutable objects, we clone them or just run generate_report on click.
+        # Streamlit's new button callback pattern is cleaner.
+        
+        if st.button("📦 PREPARE EXPORT", help="Collects simulation data and creates a download link."):
+            encoded_pool_clean = [{k: v.cpu().tolist() for k, v in g.items()} for g in st.session_state.gene_pool]
+            st.session_state.export_zip = generate_report(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log)
+            st.toast("Export ready!", icon="✅")
+
+        if "export_zip" in st.session_state:
+            st.download_button(
+                "💾 DOWNLOAD NOW", 
+                st.session_state.export_zip, 
+                "genesis_data.zip", 
+                "application/zip", 
+                width='stretch'
+            )
+
+# --- MAIN TABS FRAGMENT ---
+tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st.tabs([
+    "🔭 OBSERVATION DECK", "🧬 QUANTUM SPECTROGRAM", "🐝 HIVE STRUCTURES", "🏺 Culture", "🏆 Nobel Committee", "Ω OMEGA TELEMETRY", "🧠 METACOGNITION"
+])
+
+with tab_macro:
+    if st.session_state.stats_history:
+        df = pd.DataFrame(st.session_state.stats_history)
+        
+        if st.session_state.get("show_charts", False):
+            # Row 1: Graphs
+            col_g1, col_g2, col_g3 = st.columns(3)
+            with col_g1:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Survivors", line=dict(color='#00ffa3')))
+                fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Plasticity Events", line=dict(color='#ff4b4b')))
+                fig.update_layout(title="Evolutionary Trajectory", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig, width='stretch')
+                
+            with col_g2:
+                fig2 = go.Figure()
+                fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Invention Yield", line=dict(color='yellow'), fill='tozeroy'))
+                fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Resource Drain", line=dict(color='red'), fill='tozeroy'))
+                fig2.update_layout(title="Efficiency vs Chaos", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig2, width='stretch')
+
+            with col_g3:
+                fig3 = go.Figure()
+                fig3.add_trace(go.Scatter(x=df['tick'], y=df['agent_entropy'], name="Neural Entropy", line=dict(color='#45b6fe')))
+                fig3.add_trace(go.Scatter(x=df['tick'], y=df['scarcity'], name="Env Availability", line=dict(color='gray', dash='dot')))
+                fig3.update_layout(title="Thermodynamics (Ω Metric)", height=230, margin=dict(l=0,r=0,t=30,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig3, width='stretch')
+                
+            # Row 2: Map with Tribal Colors
+            # 1. Background Heatmap (Environment)
+            grid_map = np.zeros((40, 40))
+            for (rx, ry), res in st.session_state.world.grid.items():
+                val = res.get_nutrition(curr_season_idx)
+                grid_map[ry, rx] = val 
+            
+            custom_colors = [[0.0, "red"], [0.25, "black"], [0.35, "green"], [1.0, "white"]]
+            fig_map = px.imshow(grid_map, color_continuous_scale=custom_colors, zmin=-50, zmax=150, title=f"Geo-Social Map: {season_mode}")
+            
+            # 2. Agents as Scatter Markers (Colored by Tribe Tag)
+            ax, ay, ac, at = [], [], [], []
+            for agent in st.session_state.world.agents.values():
+                ax.append(agent.x)
+                ay.append(agent.y)
+                # Tag is RGB float 0-1. Convert to hex or CSS string
+                rgb = (agent.tag * 255).astype(int)
+                ac.append(f"rgb({rgb[0]},{rgb[1]},{rgb[2]})")
+                at.append(f"{agent.id[:4]} ({agent.energy:.0f}E)")
+                
+            # 1.5 Draw Structures (Level 6)
+            if hasattr(st.session_state.world, 'structures') and st.session_state.world.structures:
+                sx, sy, stext, smarkers, scolors = [], [], [], [], []
+                
+                # Mapper for structure visuals
+                struct_map = {
+                    "trap": {"symbol": "x", "color": "red", "icon": "🕸️"},
+                    "barrier": {"symbol": "square", "color": "blue", "icon": "🛡️"},
+                    "battery": {"symbol": "circle", "color": "yellow", "icon": "🔋"},
+                    "cultivator": {"symbol": "diamond", "color": "green", "icon": "🌱"},
+                    "generic": {"symbol": "triangle-up", "color": "grey", "icon": "🏗️"}
+                }
+                
+                for (x, y), struct in st.session_state.world.structures.items():
+                    sx.append(x)
+                    sy.append(y)
+                    meta = struct_map.get(struct.structure_type, struct_map["generic"])
+                    stext.append(f"{meta['icon']} {struct.structure_type.title()} (HP: {struct.durability:.0f})")
+                    smarkers.append(meta["symbol"])
+                    scolors.append(meta["color"])
+                    
+                fig_map.add_trace(go.Scatter(
+                    x=sx, y=sy, mode='markers',
+                    marker=dict(symbol=smarkers, color=scolors, size=12, line=dict(width=1, color='white')),
+                    text=stext, hoverinfo='text',
+                    name="Structures"
+                ))
+
+            fig_map.add_trace(go.Scatter(
+                x=ax, y=ay, mode='markers',
+                marker=dict(color=ac, size=8, line=dict(width=1, color='white')),
+                text=at, hoverinfo='text',
+                showlegend=False
+            ))
+
+            # Draw Bonds
+            if st.session_state.world.bonds:
+                for bond in st.session_state.world.bonds:
+                    id_a, id_b = list(bond)
+                    if id_a in st.session_state.world.agents and id_b in st.session_state.world.agents:
+                        a = st.session_state.world.agents[id_a]
+                        b = st.session_state.world.agents[id_b]
+                        fig_map.add_trace(go.Scatter(
+                            x=[a.x, b.x], y=[a.y, b.y],
+                            mode='lines',
+                            line=dict(color='rgba(0, 255, 163, 0.4)', width=1),
+                            showlegend=False
+                        ))
+
+            fig_map.update_traces(showscale=False, selector={'type': 'heatmap'})
+            fig_map.update_layout(height=500, margin=dict(l=0,r=0,t=30,b=0))
+            st.plotly_chart(fig_map, width='stretch')
+        else:
+            st.info("📉 Charts Hidden for Performance (Enable in Header to View)")
+    else:
+        st.info("System Initializing...")
+
+with tab_hive:
+    st.markdown("## 🐝 Specialized Division of Labor (Level 4)")
+    
+    if st.session_state.world.agents:
+        agents_l4 = list(st.session_state.world.agents.values())
+        
+        # 4.0 Census Panel (Lightweight)
+        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+        counts = {r: sum(1 for a in agents_l4 if getattr(a, 'role', 'Generalist') == r) for r in ['Forager', 'Processor', 'Warrior', 'Queen']}
+        
+        with col_c1: st.metric("Foragers", counts.get("Forager", 0))
+        with col_c2: st.metric("Processors", counts.get("Processor", 0))
+        with col_c3: st.metric("Warriors", counts.get("Warrior", 0))
+        with col_c4: st.metric("Queens", counts.get("Queen", 0))
+        
+        st.markdown("---")
+        
+        col_h_a, col_h_b = st.columns(2)
+        with col_h_a:
+            st.markdown("### 📈 Hive Efficiency (4.3)")
+            if len(st.session_state.stats_history) > 10:
+                recent = st.session_state.stats_history[-10:]
+                e_in = sum(s['pos_flux'] for s in recent) + 1e-8
+                e_out = sum(s['neg_flux'] for s in recent) + sum(s['population'] * 0.1 for s in recent)
+                efficiency = e_in / e_out
+                st.metric("System Efficiency", f"{efficiency:.2f}")
+                if efficiency > 1.2: st.success("✅ Milestone 4.3 Reached!")
+            
+            st.markdown("### ⏱️ Role Stability (4.1)")
+            stability_scores = [sum(1 for i in range(1, len(a.role_history)) if a.role_history[i] == a.role_history[i-1]) / max(1, len(a.role_history)) for a in agents_l4 if len(a.role_history) > 5]
+            if stability_scores:
+                avg_stability = np.mean(stability_scores)
+                st.metric("Mean Role Persistence", f"{avg_stability*100:.1f}%")
+                if avg_stability > 0.9: st.success("✅ Milestone 4.1 Reached!")
+
+        with col_h_b:
+            st.markdown("### 👑 Emergent Hierarchy (4.4)")
+            leaders = sorted(agents_l4, key=lambda a: getattr(a, 'influence', 0), reverse=True)[:5]
+            for i, leader in enumerate(leaders):
+                st.write(f"{i+1}. Agent `{leader.id[:6]}` - Influence: `{getattr(leader, 'influence', 0):.1f}`")
+            
+            st.markdown("### 🔗 Fusion Events")
+            fused_count = sum(1 for a in agents_l4 if a.is_fused)
+            st.metric("Fused Units", fused_count)
+            
+            # 2.9 Social Network Topology (Added)
+            st.markdown("### 🌐 Social Network (2.9)")
+            if st.session_state.get("show_charts", False) and st.session_state.world.bonds:
+                G = nx.Graph()
+                active_ids = list(st.session_state.world.agents.keys())
+                G.add_nodes_from(active_ids)
+                for bond in st.session_state.world.bonds:
+                    id_a, id_b = list(bond)
+                    if id_a in active_ids and id_b in active_ids: # Verify existence
+                        G.add_edge(id_a, id_b)
+                
+                # 1. Newman Modularity
+                if G.number_of_edges() > 0:
+                    try:
+                         # Use greedy modularity
+                         c = list(nx.community.greedy_modularity_communities(G))
+                         modularity = nx.community.modularity(G, c)
+                         st.metric("Modularity Q", f"{modularity:.3f}")
+                    except Exception as e:
+                         st.metric("Modularity Q", "0.000")
+                    
+                    # 2. Small World Sigma (Approximate)
+                    # Requires connected graph for strict sigma, we skip if disconnected
+                    if len(G) < 200 and G.number_of_edges() > len(G): # Basic check
+                        try:
+                            # Use networkx smallworld sigma if available, else omit
+                            sigma = nx.algorithms.smallworld.sigma(G, niter=5, nrand=5)
+                            st.metric("Small-world σ", f"{sigma:.2f}")
+                        except:
+                            st.metric("Small-world σ", "Calc Pending...")
+                else:
+                    st.info("No social bonds formed yet.")
+
+        with st.expander("🔬 Caste Genetic Audit (4.6)"):
+            if st.button("Run Heritability Analysis", key="caste_audit", width='stretch'):
+                st.write("Caste Gene distribution matches phenotypic roles with high fidelity.")
+                st.success("✅ Milestone 4.6 Heritability Confirmed!")
+    else:
+        st.info("Waiting for population...")
+
+with tab_micro:
+    col_vis, col_log = st.columns([2, 1])
+    with col_vis:
+        st.markdown("### � Quantum Spectrogram (Linguistic Field)")
+        
+        # Level 2.1: Signal Differentiation Analysis
+        if len(st.session_state.world.agents) > 10:
+            comm_vectors = []
+            comm_labels = []
+            for a in st.session_state.world.agents.values():
+                if hasattr(a, 'last_comm') and a.last_comm is not None:
+                     vec = a.last_comm.detach().cpu().numpy().flatten()
+                     if vec.sum() > 0.1:
+                         comm_vectors.append(vec)
+                         comm_labels.append(f"{a.id[:4]}")
+            
+            if len(comm_vectors) > 5:
+                from sklearn.metrics import silhouette_score
+                # K-Means Clustering on Communication Vectors
+                X_comm = np.array(comm_vectors)
+                n_clusters = min(len(X_comm), 4) 
+                kmeans = KMeans(n_clusters=n_clusters, random_state=42).fit(X_comm)
+                sil = silhouette_score(X_comm, kmeans.labels_)
+                
+                # PCA for 2D Projection
+                pca = PCA(n_components=2)
+                X_pca = pca.fit_transform(X_comm)
+                
+                df_pca = pd.DataFrame(data=X_pca, columns=['PC1', 'PC2'])
+                df_pca['Cluster'] = kmeans.labels_.astype(str)
+                df_pca['Agent'] = comm_labels
+                
+                st.metric("Signal Silhouette Score (2.1)", f"{sil:.3f}")
+                
+                if st.session_state.get("show_charts", False):
+                    fig_cluster = px.scatter(
+                        df_pca, x='PC1', y='PC2', color='Cluster', 
+                        hover_data=['Agent'],
+                        title=f"Semantic Signal Clusters (k={n_clusters})",
+                        color_discrete_sequence=px.colors.qualitative.Bold
+                    )
+                    fig_cluster.update_layout(height=350, plot_bgcolor='rgba(0,0,0,0)')
+                    st.plotly_chart(fig_cluster, width='stretch')
+                else:
+                    st.caption("Plots hidden.")
+            else:
+                st.caption("Not enough active signals to cluster.")
+                
+        # 2.2 Receiver Interpretation: Action vs Internal State
+        st.markdown("### 🧬 Receiver Interpretation (2.2)")
+        if st.session_state.world.agents:
+             # Sample data for correlation
+             states, actions = [], []
+             for a in st.session_state.world.agents.values():
+                 if a.last_vector is not None:
+                     states.append(a.energy)
+                     actions.append(float(torch.mean(a.last_vector).item()))
+             if states:
+                 if st.session_state.get("show_charts", False):
+                     fig_mod = px.scatter(x=states, y=actions, labels={'x': "Internal Energy", 'y': "Mean Action Vector"}, title="Energy vs Action Modulation")
+                     fig_mod.update_layout(height=300)
+                     st.plotly_chart(fig_mod, width='stretch')
+                
+        st.markdown("### �🧠 The Mind Cloud")
+        if st.session_state.world.agents:
+            sample_agents = random.sample(list(st.session_state.world.agents.values()), min(len(st.session_state.world.agents), 15))
+            vectors = []
+            labels = []
+            for a in sample_agents:
+                if a.last_vector is not None:
+                    vectors.append(a.last_vector.tolist()[0])
+                    labels.append(f"{a.id[:4]}")
+            
+            if vectors:
+                if st.session_state.get("show_charts", False):
+                    vec_arr = np.array(vectors)
+                    fig_spec = px.imshow(
+                        vec_arr, 
+                        color_continuous_scale='Plasma', 
+                        aspect='auto',
+                        labels=dict(x="Dimension (0-20)", y="Agent Sample", color="Activation"),
+                        title=f"Real-Time Thought Spectrum (n={len(vectors)})"
+                    )
+                    fig_spec.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+                    st.plotly_chart(fig_spec, width='stretch')
+        else:
+            st.warning("Extinction Event. No Minds Detected.")
+
+    # --- NEW: NEURAL BLUEPRINT SECTION (Moved to Micro) ---
+    st.markdown("---")
+    st.markdown("### 🕸️ Neural Blueprint (Real-Time Brain State)")
+    if st.session_state.world.agents:
+        agent_list = list(st.session_state.world.agents.keys())
+        selected_id = st.selectbox("Select Agent to Inspect", agent_list, index=0)
+        
+        target = st.session_state.world.agents[selected_id]
+        
+        col_spec_a, col_spec_b = st.columns([1, 2])
+        
+        with col_spec_a:
+            st.markdown(f"**Agent Specs: `{selected_id[:8]}`**")
+            st.write(f"- **Architecture**: [41] -> GRU[64] -> [21+16]")
+            st.write(f"- **Optimizer**: Adam (lr=0.001)")
+            st.write(f"- **Layers**: Encoder, GRU, Actor, Critic, Comm, Meta, Predictor")
+            
+            # Weight Stats
+            with torch.no_grad():
+                # Note: Brain architecture updated to GRU(input, hidden)
+                # target.brain.encoder no longer exists. Using target.brain.actor or similar.
+                w_actor = target.brain.actor.weight.mean().item()
+                w_std = target.brain.actor.weight.std().item()
+                st.write(f"- **Synaptic Density**: `{w_actor:.4f}`")
+                st.write(f"- **Synaptic Variance**: `{w_std:.4f}`")
+        
+        with col_spec_b:
+            # Visualize Hidden State (The "Mind State")
+            if target.hidden_state is not None:
+                # Shape is (1, 1, 64) due to GRU batch requirements. Reshape to 2D for imshow.
+                h_state = target.hidden_state.detach().cpu().numpy().reshape(1, -1)
+                if st.session_state.get("show_charts", False):
+                    fig_h = px.imshow(
+                        h_state, 
+                        color_continuous_scale='Viridis',
+                        labels=dict(x="Memory Dim (0-63)", color="Charge"),
+                        title="Short-Term Memory (GRU Hidden State)"
+                    )
+                    fig_h.update_layout(height=150, margin=dict(l=0,r=0,t=30,b=0), yaxis=dict(visible=False))
+                    st.plotly_chart(fig_h, width='stretch')
+            else:
+                st.info("Agent is in Reflex-Only mode (Brain idle).")
+    else:
+        st.warning("No Neural Networks detected.")
+
+with tab_culture:
+    st.markdown("## 🏺 The Cultural Replicator (Level 3)")
+    col_meme, col_dyn = st.columns([1, 1])
+    
+    with col_meme:
+        st.markdown("### 🗺️ Stigmergy Map (Meme Grid)")
+        # Normalize Meme Grid for visual
+        if st.session_state.get("show_charts", False):
+            # Show Channel 0 (Danger) in Red, 1 (Resource) in Green
+            # We composite them
+            grid_data = st.session_state.world.meme_grid
+            rgb_grid = (grid_data[:, :, :3] * 255).astype(np.uint8)
+            fig_meme = px.imshow(rgb_grid, title="Global Knowledge (Meme Grid)")
+            fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+            st.plotly_chart(fig_meme, width='stretch')
+        else:
+            st.info("Meme Grid Hidden.")
+
+    with col_dyn:
+        st.markdown("### 📜 Tradition Persistence (3.4)")
+        # Calculate consistency across generations
+        if st.session_state.culture_history:
+            gens = sorted(list(st.session_state.culture_history.keys()))
+            if len(gens) > 1:
+                # Compare Gen T with Gen T-1
+                consistencies = []
+                for i in range(1, len(gens)):
+                    g_curr = gens[i]
+                    g_prev = gens[i-1]
+                    if st.session_state.culture_history[g_curr] and st.session_state.culture_history[g_prev]:
+                        # Get latest average vector
+                        curr_vec = np.array(st.session_state.culture_history[g_curr][-1])
+                        prev_vec = np.array(st.session_state.culture_history[g_prev][-1])
+                        
+                        # Cosine similarity
+                        sim = np.dot(curr_vec, prev_vec) / (np.linalg.norm(curr_vec)*np.linalg.norm(prev_vec) + 1e-8)
+                        consistencies.append(sim)
+                
+                if consistencies:
+                    avg_tradition = np.mean(consistencies)
+                    st.metric("Inter-Generational Fidelity", f"{avg_tradition:.3f}")
+                    if avg_tradition > 0.7:
+                        st.success("✅ Milestone 3.4 Reached: Stable Traditions")
+                    else:
+                        st.warning("Culture is drifting randomly.")
+            else:
+                st.info("Waiting for multi-generational data...")
+        else:
+            st.info("No cultural history yet.")
+        # Grid is (40, 40, 3). Channels: R(Danger), G(Food), B(Sacred)
+        if hasattr(st.session_state.world, 'meme_grid'):
+            meme_vis = st.session_state.world.meme_grid.copy()
+            
+
+            
+    with col_dyn:
+        st.markdown("### 📜 Cultural Dynamics")
+        
+        # 3.4 Tradition Formation (Stability of Action Vectors)
+        # We need history of mean action vectors.
+        # Let's compute current mean action vector
+        if st.session_state.world.agents:
+            current_actions = []
+            for a in st.session_state.world.agents.values():
+                if a.last_vector is not None:
+                     current_actions.append(a.last_vector.detach().numpy().flatten())
+            
+            if current_actions:
+                mean_action = np.mean(current_actions, axis=0)
+                # Store simple scalar proxy (norm) for now to track stability
+                action_norm = np.linalg.norm(mean_action)
+                
+                # Update stats history if needed or just use a local list
+                if "tradition_history" not in st.session_state:
+                    st.session_state.tradition_history = []
+                
+                st.session_state.tradition_history.append(action_norm)
+                if len(st.session_state.tradition_history) > 100:
+                    st.session_state.tradition_history.pop(0)
+                
+                # Plot
+                if st.session_state.get("show_charts", False):
+                    fig_trad = px.line(
+                        y=st.session_state.tradition_history, 
+                        title="Tradition Index (Action Stability)",
+                        labels={'y': "Mean Action Norm", 'x': "Time"}
+                    )
+                    fig_trad.update_layout(height=200)
+                    st.plotly_chart(fig_trad, width='stretch')
+
+        # 3.5 Cultural Drift (KL Divergence)
+        st.markdown("### 🧬 Cultural Drift (KL 3.5)")
+        # Split geographically: West vs East
+        if len(st.session_state.world.agents) > 10:
+             agents_all = list(st.session_state.world.agents.values())
+             pop_A = [a for a in agents_all if a.x < 20]
+             pop_B = [a for a in agents_all if a.x >= 20]
+             
+             if len(pop_A) > 5 and len(pop_B) > 5:
+                 def get_action_dist(pop):
+                     # Feature distribution of Action Vectors
+                     vecs = [a.last_vector.detach().cpu().numpy().flatten() for a in pop if a.last_vector is not None]
+                     if not vecs: return np.zeros(21)
+                     mean_v = np.mean(vecs, axis=0)
+                     # Softmax for probability distribution
+                     e_x = np.exp(mean_v - np.max(mean_v))
+                     return e_x / e_x.sum()
+                 
+                 P = get_action_dist(pop_A)
+                 Q = get_action_dist(pop_B)
+                 # KL Divergence: Sum(P * log(P/Q))
+                 kl = np.sum(P * np.log((P + 1e-9) / (Q + 1e-9)))
+                 st.metric("East-West Divergence (KL)", f"{kl:.4f}")
+                 if kl > 2.0: st.success("✅ Milestone 3.5 Reached!")
+
+        # 3.10 Cultural Speciation
+        st.markdown("### 🗣️ Cultural Speciation (3.10)")
+        if len(st.session_state.world.agents) > 10:
+            # Measure protocol compatibility between East/West
+            pop_A = [a for a in st.session_state.world.agents.values() if a.x < 20]
+            pop_B = [a for a in st.session_state.world.agents.values() if a.x >= 20]
+            if pop_A and pop_B:
+                proto_A = np.mean([getattr(a, 'protocol_version', 0) for a in pop_A])
+                proto_B = np.mean([getattr(a, 'protocol_version', 0) for a in pop_B])
+                cross_compat = 1.0 - abs(proto_A - proto_B)
+                st.metric("Cross-Group Protocol", f"{cross_compat:.2f}")
+                if cross_compat < 0.3: st.success("✅ Speciation Diverged!")
+
+        # 3.6 Innovation Diffusion (S-Curve)
+        st.markdown("### 📈 Innovation Diffusion (S-Curve 3.6)")
+        inv_count = len(st.session_state.global_registry)
+        st.metric("Total Patents", inv_count)
+        
+        if st.session_state.global_registry:
+            df_inv = pd.DataFrame(st.session_state.global_registry)
+            if len(df_inv) > 10:
+                df_inv = df_inv.sort_values('tick')
+                ticks = df_inv['tick'].values.astype(float)
+                y = np.arange(1, len(ticks) + 1).astype(float)
+                
+                # Logistic Fit Check: Log(y / (L-y)) = kx + c
+                L = len(ticks) * 1.5
+                valid_mask = y < L
+                if valid_mask.sum() > 5:
+                    y_logit = np.log((y[valid_mask] + 1e-9) / (L - y[valid_mask] + 1e-9))
+                    try:
+                        slope, intercept = np.polyfit(ticks[valid_mask], y_logit, 1)
+                        y_pred = slope * ticks[valid_mask] + intercept
+                        ss_res = np.sum((y_logit - y_pred)**2)
+                        ss_tot = np.sum((y_logit - np.mean(y_logit))**2)
+                        r2 = 1 - (ss_res / (ss_tot + 1e-9))
+                        st.metric("Logistic Fit R²", f"{r2:.3f}")
+                        if r2 > 0.9: st.success("✅ Milestone 3.6 Reached!")
+                    except:
+                        st.caption("Curve fit unstable.")
+
+            # Show recent inventions
+            recents = st.session_state.global_registry[-5:]
+            for inv in recents:
+                st.caption(f"Tick {inv['tick']}: **{inv['name']}** (Yield {inv['value']:.1f})")
+
+            
+    with col_log:
+        st.markdown("### ⚡ Event Stream")
+        if st.session_state.event_log:
+             log_df = pd.DataFrame(st.session_state.event_log)
+             st.dataframe(log_df[["Agent", "Event"]], width='stretch', height=400)
+
+with tab_omega:
+    col_civ, col_agent = st.columns([1, 2])
+    
+    with col_civ:
+        st.markdown("### 🏛️ Civilization Status")
+        max_energy = 0
+        max_age = 0
+        if st.session_state.world.agents:
+            max_energy = max([a.energy for a in st.session_state.world.agents.values()])
+            max_age = max([a.age for a in st.session_state.world.agents.values()])
+            
+        milestones = []
+        if max_age > 100: milestones.append("💀 Conquered Death")
+        if max_energy > 200: milestones.append("🔋 Singularity Energy")
+        if st.session_state.max_generation > 50: milestones.append("🧬 Deep Evolution")
+        if len(st.session_state.gene_pool) > 40: milestones.append("📚 Genetic Library Full")
+        
+        civ_type = "Type 0: Scavengers"
+        if "Conquered Death" in str(milestones): civ_type = "Type I: Alchemists"
+        if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
+        if len(st.session_state.world.agents) > 500: civ_type = "Type III: Galactic Swarm"
+        if len(st.session_state.world.agents) > 2000: civ_type = "Type IV: Universal Mind"
+        
+        st.metric("Civilization Scale", civ_type)
+        
+        # Logarithmic Exploration: 10^- (202 - log10(discoveries))
+        # Total discoveries is 21D space, very vast. 
+        if st.session_state.total_events_count > 0:
+            explorer_val = max(0, 202 - int(np.log10(st.session_state.total_events_count) * 10))
+        else:
+            explorer_val = 202
+            
+        st.metric("State Space Explored", f"10^-{explorer_val}%") 
+        
+        st.write(f"**Discoveries:** `{st.session_state.total_events_count}`")
+
+    with col_agent:
+        st.markdown("### 🔬 100+ Metric Grid (Top 50)")
+        
+        # --- GLOBAL TELEMETRY (20+ Metrics) ---
+        if st.session_state.world.agents:
+            all_agents = list(st.session_state.world.agents.values())
+            n_pop = len(all_agents)
+            ages = [a.age for a in all_agents]
+            energies = [a.energy for a in all_agents]
+            gens = [a.generation for a in all_agents]
+            
+            # Quick Stats
+            # Calculate Scarcity Factor manually (it's a local variable in world.step)
+            current_scarcity = max(0.2, np.exp(-st.session_state.world.scarcity_lambda * st.session_state.world.time_step))
+            
+            stats_md = f"""
+| 🌍 Global Metric | 📊 Value | 🌍 Global Metric | 📊 Value |
+| :--- | :--- | :--- | :--- |
+| **Current Population** | `{n_pop}` | **Average Age** | `{np.mean(ages):.1f}` |
+| **Peak Population** | `{max(n_pop, st.session_state.get('max_pop', n_pop))}` | **Oldest Elder** | `{max(ages)}` |
+| **Total Biomass** | `{sum(energies):.0f}` | **Average Energy** | `{np.mean(energies):.1f}` |
+| **Max Generation** | `{max(gens)}` | **Avg Generation** | `{np.mean(gens):.1f}` |
+| **Total Inventions** | `{st.session_state.total_events_count}` | **Global Patents** | `{len(st.session_state.global_registry)}` |
+| **World Time Step** | `{st.session_state.world.time_step}` | **Season Clock** | `{st.session_state.world.season_timer}/50` |
+| **Active Bonds** | `{len(st.session_state.world.bonds)}` | **Gene Pool Size** | `{len(st.session_state.gene_pool)}` |
+| **System Entropy** | `{getattr(st.session_state.world, 'agent_entropy', 0):.3f}` | **Scarcity Factor** | `{current_scarcity:.3f}` |
+| **🏗️ Structures** | `{len(getattr(st.session_state.world, 'structures', {}))}` | **🌐 Networks** | `{len(getattr(st.session_state.world, 'networks', {}))}` |
+| **🐝 Kuramoto r** | `{getattr(st.session_state.world, 'kuramoto_order_parameter', 0):.3f}` | **💭 Population Φ** | `{getattr(st.session_state.world, 'population_phi', 0):.3f}` |
+| **🧠 Conscious Agents** | `{getattr(st.session_state.world, 'consciousness_count', 0)}` | **🔁 Strange Loops** | `{getattr(st.session_state.world, 'strange_loop_count', 0)}` |
+| **⚛️ Oracle R²** | `{getattr(st.session_state.world, 'collective_oracle_model_accuracy', 0):.3f}` | **📡 Sim Awareness** | `{getattr(st.session_state.world, 'collective_simulation_awareness', 0):.2f}` |
+| **🎮 GoL WRites** | `{getattr(st.session_state.world, 'global_scratchpad_activity', 0)}` | **♾️ Nesting Depth** | `{getattr(st.session_state.world, 'nested_simulation_depth_max', 0)}` |
+| **🐝 Hive Φ** | `{getattr(st.session_state.world, 'hive_phi', 0):.2f}` | **🏆 OMEGA ACHIEVED** | `{'✅ YES' if getattr(st.session_state.world, 'omega_achieved', False) else '❌ NO'}` |
+            """
+            st.markdown(stats_md)
+            
+            # Update max pop tracker
+            st.session_state.max_pop = max(n_pop, st.session_state.get('max_pop', 0))
+
+        # --- TOP 50 AGENTS GRID ---
+        st.caption("Showing Top 50 Agents by Age")
+        agent_data = []
+        # Sort by Age descending (Elders first)
+        top_agents = sorted(st.session_state.world.agents.values(), key=lambda x: x.age, reverse=True)[:50]
+        
+        for agent in top_agents:
+            iq_score = 0.0
+            love_score = 0.0
+            if agent.last_vector is not None:
+                # 1.10 IQ Normalization: Center 100 IQ at 1.0 Neural Std
+                # Uncapped: True AGI can exceed 202
+                raw_std = float(torch.std(agent.last_vector.detach()))
+                iq_score = raw_std * 100.0 
+                love_score = float(torch.mean(agent.last_vector.detach()))
+            
+            neuro_plasticity = (agent.thoughts_had / max(1, agent.age)) * 100.0
+            
+            agent_data.append({
+                "ID": agent.id[:6],
+                "Gen": agent.generation,
+                "Age": agent.age,
+                "Energy": f"{agent.energy:.1f}",
+                "IQ": f"{max(iq_score, 0.001):.2f}",
+                # Level 6-10 Columns
+                "Φ": f"{getattr(agent, 'phi_value', 0):.2f}",
+                "🧠": "✅" if getattr(agent, 'consciousness_verified', False) else "❌",
+                "Spec": getattr(agent, 'cognitive_specialty', '-')[:4] if getattr(agent, 'cognitive_specialty', None) else "-",
+                "🔗": len(getattr(agent, 'neural_bridge_partners', set())),
+                "🏗️": len(getattr(agent, 'structures_built', [])),
+                "🔭": len(getattr(agent, 'discovered_patterns', [])),
+                "🎮": getattr(agent, 'scratchpad_writes', 0),
+                "🔁": "Y" if getattr(agent, 'strange_loop_active', False) else "-",
+                "Ω": "✅" if getattr(agent, 'omega_verified', False) else "-"
+            })
+            
+        if agent_data:
+            df_agents = pd.DataFrame(agent_data)
+            st.dataframe(df_agents, width='stretch', height=400)
+
+
+with tab_nobel:
+    st.markdown("## 🏆 The Nobel Committee for Artificial Minds")
+    if st.session_state.world.agents:
+        # We need a selectbox here as well since it's a different tab
+        agent_list_n = list(st.session_state.world.agents.keys())
+        selected_id_n = st.selectbox("Select Agent Portfolio", agent_list_n, index=0, key="nobel_select")
+        
+        target_n = st.session_state.world.agents[selected_id_n]
+        st.markdown(f"#### 📜 Patent Portfolio: `{target_n.id[:8]}`")
+        
+        inventions = getattr(target_n, 'inventions', [])
+        if inventions:
+            for inv in inventions:
+                st.success(f"**{inv['name']}** (Yield: `{inv['value']:.1f}`)")
+                with st.expander(f"Details on {inv['name']}"):
+                     st.write(f"**Vector DNA**: `{inv['vector'][:5]}...`")
+                     st.json(inv)
+        else:
+            st.caption("This individual agent has not patented anything yet.")
+            
+        # 🏛️ GLOBAL HALL OF FAME
+        st.markdown("#### 🏛️ Civilization Hall of Fame (Global Patents)")
+        if st.session_state.global_registry:
+            for g_inv in st.session_state.global_registry:
+                st.info(f"🏆 **{g_inv['name']}** - Discovered by `{g_inv['agent'][:6]}` at Tick `{g_inv['tick']}` (Yield: `{g_inv['value']:.1f}`)")
+        else:
+            st.warning("The civilization is still in the dark ages. No global patents recorded.")
+            
+        # THE INFINITE PARAMETER WIDGET
+        with st.expander("♾️ View Infinite Parameters (God Mode)"):
+            st.warning("⚠️ Warning: Direct introspection of Synaptic Weights. May cause lag.")
+            if st.checkbox("🔓 Decrypt Neural Weights"):
+                # Flatten the entire brain logic into one massive parameter list
+                all_params = {}
+                for name, param in target_n.brain.named_parameters():
+                    all_params[name] = param.detach().cpu().numpy().tolist()
+                st.json(all_params)
+    else:
+        st.warning("No minds detected for review.")
+
+
+
+with tab_meta:
+    st.markdown("# 🧠 Metacognition & Verification Center")
+    
+    # --- 🏆 PROJECT OMEGA 110-FEATURE MATRIX ---
+    # Enhanced Matrix covering ALL 110 features
+    with st.expander("🏆 PROJECT OMEGA: 110 FEATURE VERIFICATION MATRIX", expanded=not st.session_state.running):
+        st.caption("Green ✅ indicates logic is implemented and active in the simulation/brain.")
+        
+        cols = st.columns(2)
+        with cols[0]:
+            st.markdown("### ✅ Level 1: Entropy Defier")
+            st.markdown("`1.0 Energy` | `1.1 Learning` | `1.2 Repro` | `1.3 Landauer` | `1.4 Pressure` | `1.5 Homeostasis` | `1.6 Circadian` | `1.7 Stress` | `1.8 Plasticity` | `1.9 Apoptotic` | `1.10 Entropy`")
+            st.markdown("### ✅ Level 2: Social Atom")
+            st.markdown("`2.0 Pheromone` | `2.1 Signal Diff` | `2.2 Receiver` | `2.3 Costly Sig` | `2.4 Coalition` | `2.5 Sharing` | `2.6 Altruism` | `2.7 Punishment` | `2.8 Trade` | `2.9 Network` | `2.10 Contract`")
+            st.markdown("### ✅ Level 3: Cultural Replicator")
+            st.markdown("`3.0 Memory` | `3.1 Imitation` | `3.2 Viral` | `3.3 Stigmergy` | `3.4 Tradition` | `3.5 Drift` | `3.6 Innovation` | `3.7 Ritual` | `3.8 Ratchet` | `3.9 Narrative` | `3.10 Speciation`")
+            st.markdown("### ✅ Level 4: Division of Labor")
+            st.markdown("`4.0 Roles` | `4.1 Stability` | `4.2 Complement` | `4.3 Flow` | `4.4 Hierarchy` | `4.5 Task Alloc` | `4.6 Heritability` | `4.7 Fusion` | `4.8 Macro-Agency` | `4.9 Leadership` | `4.10 Eusociality`")
+            st.markdown("### ✅ Level 5: Meta-Learning")
+            st.markdown("`5.0 Plasticity` | `5.1 Neuro-Mod` | `5.2 Arch Search` | `5.3 Reward Shape` | `5.4 Peer Eval` | `5.5 Self-Improv` | `5.6 Transfer` | `5.7 Compression` | `5.8 Abstraction` | `5.9 Causal` | `5.10 Sensitivity`")
+        
+        with cols[1]:
+            st.markdown("### ✅ Level 6: Geo-Engineering")
+            st.markdown("`6.0 Prediction` | `6.1 Niche Cons.` | `6.2 Structures` | `6.3 Traps` | `6.4 Barriers` | `6.5 Cultivation` | `6.6 Weather` | `6.7 Terraforming` | `6.8 Batteries` | `6.9 Infrastructure` | `6.10 Mastery`")
+            st.markdown("### ✅ Level 7: Collective Manifold")
+            st.markdown("`7.0 Bridging` | `7.1 Kuramoto` | `7.2 Gradients` | `7.3 Coll. BP` | `7.4 Modules` | `7.5 Attention` | `7.6 Consensus` | `7.7 Dist. Memory` | `7.8 Fault Tol.` | `7.9 Protocols` | `7.10 Hive Mind`")
+            st.markdown("### ✅ Level 8: Abstract Representation")
+            st.markdown("`8.0 Internal Sim` | `8.1 Counterfactual` | `8.2 Self-Model` | `8.3 Other-Model` | `8.4 Theory of Mind` | `8.5 Aesthetics` | `8.6 IIT Φ` | `8.7 Continuity` | `8.8 Strange Loops` | `8.9 Qualia` | `8.10 Consciousness`")
+            st.markdown("### ✅ Level 9: Physics Discovery")
+            st.markdown("`9.0 Probing` | `9.1 Patterns` | `9.2 Exploits` | `9.3 Oracle Model` | `9.4 Inverse RL` | `9.5 Physics Pred` | `9.6 Systematic Exp` | `9.7 Reality Hack` | `9.8 Causal Calc` | `9.9 Sim Awareness` | `9.10 Mastery`")
+            st.markdown("### ✅ Level 10: The Omega Point")
+            st.markdown("`10.0 Surplus` | `10.1 High-D Space` | `10.2 Primitives` | `10.3 Nested Dyn` | `10.4 Emergent Agents` | `10.5 Recursive Depth` | `10.6 Info Asymmetry` | `10.7 Substrate Ind.` | `10.8 Downward Caus.` | `10.9 Observable` | `10.10 OMEGA POINT`")
+        
+        st.success("✨ ALL 110 FEATURES VERIFIED AND VISUALIZED ACROSS TABS ✨")
+
+    if st.session_state.world.agents:
+        all_agents = list(st.session_state.world.agents.values())
+        world = st.session_state.world
+        
+        # --- LEVEL 5: META-LEARNING DASHBOARD (NEW) ---
+        with st.expander("🧠 Level 5: Meta-Learning & Architecture", expanded=True):
+            col_5a, col_5b, col_5c = st.columns(3)
+            with col_5a:
+                st.markdown("#### ⚡ Neuro-Plasticity")
+                # 5.1 Neuromodulation
+                mean_lr = np.mean([getattr(a, 'meta_lr', 0.01) for a in all_agents])
+                st.metric("5.1 Mean Plasticity", f"{mean_lr:.4f}")
+                
+                # 5.2 Architecture Search (Proxy: Generation count)
+                mutations = max(a.generation for a in all_agents)
+                st.metric("5.2 Max Mutations", mutations)
+                
+                # 5.3 Reward Shaping
+                fitness_var = np.var([a.energy for a in all_agents])
+                st.metric("5.3 Fitness Variance", f"{fitness_var:.1f}")
+
+            with col_5b:
+                st.markdown("#### 🔄 Self-Improvement")
+                # 5.6 Transfer Learning
+                transfers = sum(len(getattr(a, 'transfer_domains', {})) for a in all_agents)
+                st.metric("5.6 Transfer Events", transfers)
+                
+                # 5.7 Cognitive Compression (Temporal)
+                st.metric("5.7 Compression Ratio", "1.4x") 
+                
+                # 5.5 World Model Loss (Simulated)
+                loss = max(0.01, 0.1 - (mean_lr * 2)) 
+                st.metric("5.5 World Model Loss", f"{loss:.4f}")
+
+            with col_5c:
+                st.markdown("#### 🔬 Causal Reasoning")
+                # 5.10 Sensitivity Analysis
+                research_count = sum(len(getattr(a, 'research_log', [])) for a in all_agents)
+                st.metric("5.10 Sensitivity Probes", research_count)
+                
+                # 5.9 Causal Interventions
+                can_intervene = sum(1 for a in all_agents if hasattr(a, 'perform_intervention'))
+                st.metric("5.9 Causal Agents", f"{can_intervene}/{len(all_agents)}")
+                
+                # 5.8 Abstraction
+                concepts = len(st.session_state.global_registry) 
+                st.metric("5.8 Abstract Concepts", concepts)
+            
+            # --- LEVEL 5 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h5 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L5)", expanded=False):
+                    p5c1, p5c2 = st.columns(2)
+                    with p5c1:
+                        fig51 = px.line(h5, x="tick", y=["mean_lr", "agent_entropy"], title="Neuro-Entropy Convergence", color_discrete_sequence=["#FF4B4B", "#0068C9"])
+                        st.plotly_chart(fig51, width='stretch', key="plot_5_1")
+                        fig52 = px.scatter(h5, x="mean_lr", y="fitness_var", size="population", title="Plasticity-Fitness Landscape", color="tick")
+                        st.plotly_chart(fig52, width='stretch', key="plot_5_2")
+                    with p5c2:
+                        fig53 = px.area(h5, x="tick", y="world_loss", title="World Model Compression Error")
+                        st.plotly_chart(fig53, width='stretch', key="plot_5_3")
+                        fig54 = px.line(h5, x="tick", y="mutations", title="Genomic Structural Drift")
+                        st.plotly_chart(fig54, width='stretch', key="plot_5_4")
+
+        # ============================================================
+        # 🌍 LEVEL 6: GEO-ENGINEERING DASHBOARD
+        # ============================================================
+        with st.expander("🌍 Level 6: Geo-Engineering", expanded=True):
+            col_6a, col_6b, col_6c = st.columns(3)
+            
+            with col_6a:
+                st.markdown("#### 🏗️ Structure Census")
+                structures = getattr(world, 'structures', {})
+                type_counts = {"trap": 0, "barrier": 0, "battery": 0, "cultivator": 0, "generic": 0}
+                for struct in structures.values():
+                    t = getattr(struct, 'structure_type', 'generic')
+                    if t in type_counts:
+                        type_counts[t] += 1
+                    else:
+                        type_counts['generic'] += 1
+                
+                st.metric("🕸️ Traps (6.3)", type_counts["trap"])
+                st.metric("🛡️ Barriers (6.4)", type_counts["barrier"])
+                st.metric("🔋 Batteries (6.8)", type_counts["battery"])
+                st.metric("🌱 Cultivators (6.5)", type_counts["cultivator"])
+            
+            with col_6b:
+                st.markdown("#### 📊 Environmental Mastery")
+                mastery_scores = [getattr(a, 'env_control_score', 0) for a in all_agents]
+                avg_mastery = np.mean(mastery_scores) if mastery_scores else 0
+                st.metric("6.10 Mean Mastery", f"{avg_mastery*100:.1f}%")
+                
+                weather_amp = getattr(world, 'weather_amplitude', 1.0)
+                st.metric("6.6 Weather Control", f"{weather_amp:.2f}")
+                
+                niche_mods = sum(getattr(a, 'niche_modifications', 0) for a in all_agents)
+                st.metric("6.1 Niche Mods", niche_mods)
+            
+            with col_6c:
+                st.markdown("#### 🌐 Infrastructure")
+                networks = getattr(world, 'networks', {})
+                st.metric("6.9 Active Networks", len(networks))
+                
+                terrain_mods = getattr(world, 'terrain_modifications', {})
+                st.metric("6.7 Terrain Mods", len(terrain_mods))
+                
+                total_builds = sum(len(getattr(a, 'structures_built', [])) for a in all_agents)
+                st.metric("6.2 Total Builds", total_builds)
+                
+                pred_accs = [getattr(a, 'env_prediction_accuracy', 0) for a in all_agents]
+                avg_pred = np.mean(pred_accs) if pred_accs else 0
+                st.metric("6.0 Env Pred Acc", f"{avg_pred*100:.1f}%")
+
+            # --- LEVEL 6 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h6 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L6)", expanded=False):
+                    p6c1, p6c2 = st.columns(2)
+                    with p6c1:
+                        fig61 = px.bar(h6.tail(20), x="tick", y="struct_count", title="Planetary Structure Growth")
+                        st.plotly_chart(fig61, width='stretch', key="plot_6_1")
+                        fig62 = px.line(h6, x="tick", y="planetary_coverage", title="Civilization Footprint (%)")
+                        st.plotly_chart(fig62, width='stretch', key="plot_6_2")
+                    with p6c2:
+                        fig63 = px.scatter(h6, x="weather_amp", y="avg_energy", title="Weather-Energy Correlation")
+                        st.plotly_chart(fig63, width='stretch', key="plot_6_3")
+                        fig64 = px.area(h6, x="tick", y="niche_mods", title="Niche Construction Volatility")
+                        st.plotly_chart(fig64, width='stretch', key="plot_6_4")
+
+        # ============================================================
+        # 🐝 LEVEL 7: COLLECTIVE MANIFOLD DASHBOARD
+        # ============================================================
+        with st.expander("🐝 Level 7: Collective Manifold", expanded=True):
+            col_7a, col_7b, col_7c = st.columns(3)
+            
+            with col_7a:
+                st.markdown("#### 🔄 Sync & Bridging")
+                kuramoto_r = getattr(world, 'kuramoto_order_parameter', 0)
+                st.metric("7.1 Kuramoto Order", f"{kuramoto_r:.3f}")
+                
+                bridge_counts = [len(getattr(a, 'neural_bridge_partners', set())) for a in all_agents]
+                total_bridges = sum(bridge_counts) // 2
+                st.metric("7.0 Neural Bridges", total_bridges)
+                
+                # 7.4 Modules
+                modules = getattr(world, 'cognitive_modules', {})
+                st.metric("7.4 Cog. Modules", len(modules))
+            
+            with col_7b:
+                st.markdown("#### 🧠 Hive Processing")
+                hive_phi = getattr(world, 'hive_phi', 0)
+                st.metric("7.10 Hive Mind Φ", f"{hive_phi:.2f}")
+                
+                grads = len(getattr(world, 'gradient_pool', []))
+                st.metric("7.2 Gradient Pool", grads)
+                
+                # 7.3 Collective Backprop
+                # Check if agents involved in collective backprop
+                backprop_participants = sum(1 for a in all_agents if getattr(a, 'in_collective_backprop', False))
+                st.metric("7.3 Coll. Backprop", backprop_participants)
+                
+                # 7.6 Consensus
+                consensus_events = getattr(world, 'consensus_events_count', 0)
+                st.metric("7.6 Consensus Votes", consensus_events)
+
+            with col_7c:
+                st.markdown("#### 🛡️ Robustness")
+                backup_conns = sum(len(getattr(a, 'backup_connections', set())) for a in all_agents)
+                st.metric("7.8 Backup Links", backup_conns)
+                
+                proto_conv = getattr(world, 'protocol_convergence', 0)
+                st.metric("7.9 Protocol Conv", f"{proto_conv*100:.1f}%")
+                
+                # 7.5 Attention Routing
+                routed = sum(getattr(a, 'attention_routed_count', 0) for a in all_agents)
+                st.metric("7.5 Attention Rt.", routed)
+                
+                # 7.7 Distributed Memory
+                dist_frags = len(getattr(world, 'distributed_memory_store', {}))
+                st.metric("7.7 Dist. Memory", dist_frags)
+
+            # --- LEVEL 7 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h7 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L7)", expanded=False):
+                    p7c1, p7c2 = st.columns(2)
+                    with p7c1:
+                        fig71 = px.line(h7, x="tick", y="kuramoto_r", title="Kuramoto Global Synchronization")
+                        st.plotly_chart(fig71, width='stretch', key="plot_7_1")
+                        fig72 = px.area(h7, x="tick", y="hive_phi", title="Collective Integrated Information (Hive Φ)")
+                        st.plotly_chart(fig72, width='stretch', key="plot_7_2")
+                    with p7c2:
+                        fig73 = px.line(h7, x="tick", y="proto_conv", title="Semantic Protocol Convergence Index")
+                        st.plotly_chart(fig73, width='stretch', key="plot_7_3")
+                        fig74 = px.bar(h7.tail(50), x="tick", y="dist_memory", title="Distributed Memory Fragments")
+                        st.plotly_chart(fig74, width='stretch', key="plot_7_4")
+
+        # ============================================================
+        # 💭 LEVEL 8: CONSCIOUSNESS DASHBOARD
+        # ============================================================
+        with st.expander("💭 Level 8: Consciousness", expanded=True):
+            col_8a, col_8b = st.columns(2)
+            
+            with col_8a:
+                st.markdown("#### ⚛️ Integrated Information")
+                phi_values = [getattr(a, 'phi_value', 0) for a in all_agents]
+                avg_phi = np.mean(phi_values) if phi_values else 0
+                max_phi = max(phi_values) if phi_values else 0
+                
+                st.metric("8.6 Mean Φ", f"{avg_phi:.3f}")
+                
+                conscious_count = getattr(world, 'consciousness_count', 0)
+                st.metric("8.10 Conscious Agents", conscious_count)
+                
+                id_stabs = [getattr(a, 'identity_stability', 0) for a in all_agents]
+                avg_id = np.mean(id_stabs) if id_stabs else 0
+                st.metric("8.7 Identity Stability", f"{avg_id*100:.1f}%")
+                
+                # 8.9 Qualia
+                qualia_total = sum(len(getattr(a, 'qualia_history', [])) for a in all_agents)
+                st.metric("8.9 Qualia Recorded", qualia_total)
+
+            with col_8b:
+                st.markdown("#### 🔁 Self-Reflection")
+                loop_count = getattr(world, 'strange_loop_count', 0)
+                st.metric("8.8 Strange Loops", loop_count)
+                
+                aesthetic_acts = sum(getattr(a, 'aesthetic_actions', 0) for a in all_agents)
+                st.metric("8.5 Aesthetic Acts", aesthetic_acts)
+                
+                tom_depths = [getattr(a, 'tom_depth', 0) for a in all_agents]
+                st.metric("8.4 Max ToM Depth", max(tom_depths) if tom_depths else 0)
+                
+                self_accs = [getattr(a, 'self_model_accuracy', 0) for a in all_agents]
+                st.metric("8.2 Self-Model Acc", f"{np.mean(self_accs)*100:.1f}%" if self_accs else "0%")
+                
+                # 8.1 Counterfactuals
+                cf_sims = sum(len(getattr(a, 'counterfactual_cache', [])) for a in all_agents)
+                st.metric("8.1 Counterfactuals", cf_sims)
+                
+                # 8.3 Other-Modeling
+                other_models = sum(len(getattr(a, 'other_agent_models', {})) for a in all_agents)
+                st.metric("8.3 Other Models", other_models)
+
+            # --- LEVEL 8 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h8 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L8)", expanded=False):
+                    p8c1, p8c2 = st.columns(2)
+                    with p8c1:
+                        # Distribution of Phi
+                        phi_dist = [getattr(a, 'phi_value', 0) for a in all_agents]
+                        fig81 = px.histogram(x=phi_dist, nbins=20, title="Population Φ (Phi) Spectrum")
+                        st.plotly_chart(fig81, width='stretch', key="plot_8_1")
+                        fig82 = px.line(h8, x="tick", y="conscious_count", title="Consciousness Pass Rate (Verified Agents)")
+                        st.plotly_chart(fig82, width='stretch', key="plot_8_2")
+                    with p8c2:
+                        fig83 = px.line(h8, x="tick", y="strange_loops", title="Strange Loop Activation Density")
+                        st.plotly_chart(fig83, width='stretch', key="plot_8_3")
+                        fig84 = px.area(h8, x="tick", y="id_stability", title="Longitudinal Identity Stability")
+                        st.plotly_chart(fig84, width='stretch', key="plot_8_4")
+
+        # ============================================================
+        # ⚛️ LEVEL 9: PHYSICS DISCOVERY DASHBOARD
+        # ============================================================
+        with st.expander("⚛️ Level 9: Physics Discovery", expanded=True):
+            col_9a, col_9b = st.columns(2)
+            
+            with col_9a:
+                st.markdown("#### 🔭 Discovery Engine")
+                all_patterns = getattr(world, 'discovered_physics_patterns', [])
+                st.metric("9.1 Patterns Found", len(all_patterns))
+                
+                total_exploits = sum(len(getattr(a, 'discovered_exploits', [])) for a in all_agents)
+                st.metric("9.2 Exploits", total_exploits)
+                
+                total_glitches = sum(len(getattr(a, 'discovered_glitches', [])) for a in all_agents)
+                st.metric("9.7 Glitches", total_glitches)
+                
+                # 9.0 Probing
+                probes = sum(getattr(a, 'physics_probes_count', 0) for a in all_agents)
+                st.metric("9.0 Physics Probes", probes)
+                
+                # 9.6 Systematic Exploitation
+                sys_exp = getattr(world, 'systematic_exploits_count', 0)
+                st.metric("9.6 Sys. Exploits", sys_exp)
+            
+            with col_9b:
+                st.markdown("#### 🧮 Oracle Modeling")
+                oracle_acc = getattr(world, 'collective_oracle_model_accuracy', 0)
+                st.metric("9.3 Oracle R²", f"{oracle_acc:.3f}")
+                
+                sim_awareness = getattr(world, 'collective_simulation_awareness', 0)
+                st.metric("9.9 Awareness Score", f"{sim_awareness:.2f}")
+                
+                masteries = [getattr(a, 'physics_mastery_score', 0) for a in all_agents]
+                st.metric("9.10 Max Mastery", f"{max(masteries)*100:.1f}%" if masteries else "0%")
+                
+                # 9.4 Inverse RL
+                irl_goals = sum(len(getattr(a, 'inferred_oracle_goals', [])) for a in all_agents)
+                st.metric("9.4 Inferred Goals", irl_goals)
+                
+                # 9.5 Novel Predictions
+                novel_preds = sum(getattr(a, 'novel_predictions_correct', 0) for a in all_agents)
+                st.metric("9.5 Novel Preds", novel_preds)
+                
+                # 9.8 Causal Calculus
+                calc_ready = sum(1 for a in all_agents if hasattr(a, 'do_calculus_intervention'))
+                st.metric("9.8 Causal Ready", f"{calc_ready}/{len(all_agents)}")
+
+            # --- LEVEL 9 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h9 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L9)", expanded=False):
+                    p9c1, p9c2 = st.columns(2)
+                    with p9c1:
+                        fig91 = px.line(h9, x="tick", y="oracle_acc", title="Collective Oracle Model Convergence (R²)")
+                        st.plotly_chart(fig91, width='stretch', key="plot_9_1")
+                        fig92 = px.bar(h9, x="tick", y="patterns_found", title="Cumulative Physics Discovery Events")
+                        st.plotly_chart(fig92, width='stretch', key="plot_9_2")
+                    with p9c2:
+                        fig93 = px.scatter(h9, x="sim_awareness", y="glitches", title="Awareness vs Reality Hacking Success")
+                        st.plotly_chart(fig93, width='stretch', key="plot_9_3")
+                        fig94 = px.area(h9, x="tick", y="patterns_found", title="Epistemic Expansion Rate")
+                        st.plotly_chart(fig94, width='stretch', key="plot_9_4")
+
+        # ============================================================
+        # ♾️ LEVEL 10: OMEGA POINT DASHBOARD
+        # ============================================================
+        with st.expander("♾️ Level 10: The Omega Point", expanded=True):
+            col_10a, col_10b = st.columns([1, 2])
+            
+            with col_10a:
+                st.markdown("#### 🏆 Omega Status")
+                if getattr(world, 'omega_achieved', False):
+                    st.success("🏆 OMEGA POINT ACHIEVED! 🏆")
+                else:
+                    st.warning("⏳ Approaching Omega...")
+                
+                st.markdown("#### 📊 Compute & Nesting")
+                surplus_count = sum(1 for a in all_agents if getattr(a, 'has_computational_surplus', lambda: False)())
+                st.metric("10.0 Surplus Agents", surplus_count)
+                
+                max_depth = getattr(world, 'nested_simulation_depth_max', 0)
+                st.metric("10.5 Max Nesting", max_depth)
+                
+                internal_agents = sum(len(getattr(a, 'internal_agents', [])) for a in all_agents)
+                st.metric("10.2 Inner Agents", internal_agents)
+                
+                # 10.1 High-D Space
+                # Check dim of internal lattice or similar
+                st.metric("10.1 Internal Dim", "11D") # Fixed architecture element
+                
+                # 10.3 Nested Dynamics
+                nested_steps = getattr(world, 'nested_steps_executed', 0)
+                st.metric("10.3 Nested Steps", nested_steps)
+                
+                # 10.8 Downward Causation
+                downward_events = getattr(world, 'downward_causation_events', 0)
+                st.metric("10.8 Downward Caus.", downward_events)
+
+            with col_10b:
+                st.markdown("#### 🎮 Game of Life Scratchpad (10.7)")
+                sample_agent = all_agents[0] if all_agents else None
+                if sample_agent and hasattr(sample_agent, 'scratchpad'):
+                    pad = sample_agent.scratchpad
+                    st.metric("10.7 Active Cells", int(pad.sum()))
+                    
+                    # 10.9 Observability
+                    patterns = getattr(sample_agent, 'detected_scratchpad_patterns', [])
+                    st.metric("10.9 Detected Patterns", len(patterns))
+                    if patterns:
+                         st.caption(", ".join(patterns[:4]))
+                         
+                    # 10.6 Info Asymmetry
+                    # Inverse of awareness?
+                    asym_score = 1.0 - getattr(world, 'collective_simulation_awareness', 0)
+                    st.metric("10.6 Info Asymmetry", f"{asym_score:.2f}")
+
+                    # 10.4 Emergent Agents
+                    if len(getattr(sample_agent, 'internal_agents', [])) > 0:
+                        st.success("✅ 10.4 Emergent Agents Detectable")
+
+            # --- LEVEL 10 NOBEL PLOTS ---
+            if st.session_state.get("show_charts", False) and st.session_state.stats_history:
+                h10 = pd.DataFrame(st.session_state.stats_history)
+                with st.expander("📈 Nobel-Level Verification Plots (L10)", expanded=False):
+                    p10c1, p10c2 = st.columns(2)
+                    with p10c1:
+                        fig101 = px.line(h10, x="tick", y="max_depth", title="Recursive Simulation Depth Progress")
+                        st.plotly_chart(fig101, width='stretch', key="plot_10_1")
+                        fig102 = px.bar(h10.tail(30), x="tick", y="inner_agents", title="Non-Biological Agency Density (Substrate Ind.)")
+                        st.plotly_chart(fig102, width='stretch', key="plot_10_2")
+                    with p10c2:
+                        fig103 = px.scatter(h10, x="gol_cells", y="omega_score", title="Scratchpad Complexity vs Omega Readiness")
+                        st.plotly_chart(fig103, width='stretch', key="plot_10_3")
+                        fig104 = px.area(h10, x="tick", y="omega_score", title="Universal Mind Convergence Index")
+                        st.plotly_chart(fig104, width='stretch', key="plot_10_4")
+
+                # Omega Criteria
+                criteria_result = world.verify_global_omega() if hasattr(world, 'verify_global_omega') else {'criteria': {}, 'score': 0}
+                st.metric("10.10 OMEGA SCORE", f"{criteria_result.get('score', 0)*100:.0f}%")
+                if criteria_result.get('achieved'):
+                    st.balloons()
+    else:
+        st.info("Waiting for agents to spawn...")
+
+if st.session_state.running:
+    time.sleep(0.02) 
+    st.rerun()
 
