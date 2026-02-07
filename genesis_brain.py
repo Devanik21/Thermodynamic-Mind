@@ -1575,7 +1575,13 @@ class GenesisAgent:
         """9.3 Mathematical Modeling: Train Oracle approximation."""
         x = torch.cat([vector_21.detach(), matter_signal_16.detach()], dim=1)
         predicted = self.oracle_model(x)
-        loss = nn.MSELoss()(predicted, actual_effects.detach())
+        # Handle partial target (e.g. only Energy Flux observed)
+        if actual_effects.shape[1] != predicted.shape[1]:
+            # Slice prediction to match available ground truth dimensions
+            n = actual_effects.shape[1]
+            loss = nn.MSELoss()(predicted[:, :n], actual_effects.detach())
+        else:
+            loss = nn.MSELoss()(predicted, actual_effects.detach())
         
         self.oracle_model_optimizer.zero_grad()
         loss.backward()
