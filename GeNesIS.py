@@ -1158,8 +1158,8 @@ with tab_culture:
                 # Apply the projection
                 transformed = np.dot(grid_data[:, :, :3], matrix.T)
                 
-                # Apply a slight contrast boost to match the original 'pixel' pop
-                transformed = np.clip(transformed * 1.1, 0, 1)
+                # Apply a slight contrast boost to match the original 'pixel' pop (Increased by ~10%)
+                transformed = np.clip(transformed * 1.2, 0, 1)
                 
                 # Final RGB conversion
                 rgb = (transformed * 255).astype(np.uint8)
@@ -1167,13 +1167,13 @@ with tab_culture:
 
             with sg_c1:
                 rgb_v1 = generate_procedural_map(garden_freq, 101)
-                fig_sg1 = px.imshow(rgb_v1, title=f"📊 Spectral Perspective Alpha ({garden_freq})", template='plotly_dark')
+                fig_sg1 = px.imshow(rgb_v1, title=f"🌈 Spectral Resonance Alpha ({garden_freq})", template='plotly_dark')
                 fig_sg1.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg1, width='stretch', key=f"fig_sg1_{garden_freq}")
                 
             with sg_c2:
                 rgb_v2 = generate_procedural_map(garden_freq, 202)
-                fig_sg2 = px.imshow(rgb_v2, title=f"📊 Spectral Perspective Beta ({garden_freq+1})", template='plotly_dark')
+                fig_sg2 = px.imshow(rgb_v2, title=f"🌈 Spectral Resonance Beta ({garden_freq+1})", template='plotly_dark')
                 fig_sg2.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg2, width='stretch', key=f"fig_sg2_{garden_freq}")
                 
@@ -1182,13 +1182,13 @@ with tab_culture:
             
             with sg_c3:
                 rgb_v3 = generate_procedural_map(garden_freq, 303)
-                fig_sg3 = px.imshow(rgb_v3, title=f"📊 Spectral Perspective Gamma ({garden_freq+2})", template='plotly_dark')
+                fig_sg3 = px.imshow(rgb_v3, title=f"🌈 Spectral Resonance Gamma ({garden_freq+2})", template='plotly_dark')
                 fig_sg3.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg3, width='stretch', key=f"fig_sg3_{garden_freq}")
                 
             with sg_c4:
                 rgb_v4 = generate_procedural_map(garden_freq, 404)
-                fig_sg4 = px.imshow(rgb_v4, title=f"📊 Spectral Perspective Delta ({garden_freq+3})", template='plotly_dark')
+                fig_sg4 = px.imshow(rgb_v4, title=f"🌈 Spectral Resonance Delta ({garden_freq+3})", template='plotly_dark')
                 fig_sg4.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg4, width='stretch', key=f"fig_sg4_{garden_freq}")
     else:
