@@ -1730,7 +1730,7 @@ with tab_meta:
                     x=gx, y=gy,
                     title="9.3 Reality Hacking Glitch Map",
                     template='plotly_dark',
-                    colorscale='Hot'
+                    color_continuous_scale='Hot'
                 )
                 fig_9_3.update_traces(contours_coloring="fill", contours_showlabels = True)
                 fig_9_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
