@@ -624,9 +624,36 @@ class GenesisAgent:
             # Burn energy for compute
             self.evolve_internal_simulation(steps=5)
             self.run_gol_step()
+            
+            # 10.2 Create Internal Agents (If space allows)
+            if len(self.internal_agents) < 5 and self.energy > 80.0:
+                 self.create_internal_agent(self)
+            
+            # 10.5 Recursive Depth (If already have internal agents)
+            if len(self.internal_agents) >= 2 and self.energy > 90.0:
+                self.create_nested_simulation()
+            
             # Write to scratchpad if inspired (Channel 15 > 0.7)
             if vector[0, 15].item() > 0.7:
                 self.write_scratchpad(int(self.x)%32, int(self.y)%32, 1)
+
+        # 9.9 Simulation Awareness (Rare check)
+        if self.age % 50 == 0:
+            self.detect_simulation_artifacts()
+
+        # 8.10 Verify Consciousness (Every tick to ensure metric updates)
+        # Calculates Phi and checks threshold
+        if self.age % 10 == 0:
+             self.verify_consciousness()
+
+        # 9.7 Reality Hacking (Glitch Search)
+        # Check for floating point anomalies in own action
+        self.find_glitch(self.last_hidden, vector, self.last_reward)
+
+        # 7.7 Distributed Memory (Rare social event)
+        if social_trust > 0.8 and random.random() < 0.05:
+            # Store a "memory" (current sensory state) in the hive
+            special_intent['distribute_memory'] = True
 
         return vector, comm_vector[0], mate_desire, adhesion_val, punish_val, trade_val, meme_write, special_intent
         
@@ -698,6 +725,14 @@ class GenesisAgent:
         # 5.2 Sparsity Loss
         sparsity_loss = self.brain.actor_mask.sparsity() * 0.01
         
+        # 9.3 Train Oracle Model (Level 9 Metric)
+        # Inputs: 21D Action Vector + 16D Matter Signal -> Predicted Flux
+        # We need the local signal that was used for the action (self.last_input)
+        if self.last_input is not None:
+             # Extract 16D Matter Signal from input (first 16 channels)
+             matter_signal = self.last_input[:, :16]
+             self.train_oracle_model(self.last_vector, matter_signal, torch.tensor([[flux]]))
+
         reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
         # Advantage Calculation
