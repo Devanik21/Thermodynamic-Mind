@@ -740,6 +740,17 @@ tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st
 with tab_macro:
     if st.session_state.stats_history:
         df = pd.DataFrame(st.session_state.stats_history)
+        # --- SUMMARY METRICS (Always Visible) ---
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        latest = df.iloc[-1]
+        prev = df.iloc[-2] if len(df) > 1 else latest
+        
+        with col_m1: st.metric("Survivors", f"{latest['population']:.0f}", f"{latest['population'] - prev['population']:.0f}")
+        with col_m2: st.metric("Avg Energy", f"{latest['avg_energy']:.1f}", f"{latest['avg_energy'] - prev['avg_energy']:.1f}")
+        with col_m3: st.metric("Entropy (S)", f"{latest['agent_entropy']:.3f}", f"{latest['agent_entropy'] - prev['agent_entropy']:.3f}")
+        with col_m4: st.metric("Net Flux", f"{latest['pos_flux'] - latest['neg_flux']:.1f}")
+        
+        st.markdown("---")
         
         if st.session_state.get("show_charts", False):
             # Row 1: Graphs
