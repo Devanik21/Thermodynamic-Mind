@@ -1359,7 +1359,8 @@ with tab_meta:
                     sample_agent = all_agents[0]
                     # Accessing actor weights safely
                     if hasattr(sample_agent.brain, 'actor'):
-                        weights = sample_agent.brain.actor.weight.detach().cpu().numpy()
+                        w_raw = sample_agent.brain.actor.weight
+                        weights = w_raw.detach().cpu().numpy() if torch.is_tensor(w_raw) else w_raw
                         # Normalize for heatmap
                         fig_5_2 = px.imshow(
                             weights[:20, :], # Show subset
@@ -1605,7 +1606,8 @@ with tab_meta:
                 concepts_list = []
                 for a in all_agents:
                     if hasattr(a, 'last_concepts'):
-                         concepts_list.append(a.last_concepts.detach().cpu().numpy().flatten())
+                         val = a.last_concepts
+                         concepts_list.append((val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten())
                 
                 if concepts_list:
                     c_arr = np.array(concepts_list)
@@ -1803,7 +1805,8 @@ with tab_meta:
                 # Fig 10.3: Scratchpad Activity Matrix (Binary Heatmap)
                 # Agent 0 scratchpad
                 if all_agents and hasattr(all_agents[0], 'scratchpad'):
-                    scratch = all_agents[0].scratchpad.detach().cpu().numpy()
+                    sp_raw = all_agents[0].scratchpad
+                    scratch = sp_raw.detach().cpu().numpy() if torch.is_tensor(sp_raw) else sp_raw
                     fig_10_3 = px.imshow(
                         scratch,
                         title="10.3 Active Scratchpad State",
