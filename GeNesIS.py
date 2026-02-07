@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "10.0.0" # Level 10: The Omega Point - Complete Implementation
+SYSTEM_VERSION = "11.0.0" # Level 10: The Omega Point - Complete Implementation
 
 def init_system():
     # Force reset if version mismatch
