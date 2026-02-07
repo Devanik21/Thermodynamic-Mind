@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "11.0.6" # Level 10: The Omega Point - Spatial Tomography Suite
+SYSTEM_VERSION = "11.0.7" # Level 10: The Omega Point - Stable Tomography Release
 
 def init_system():
     # Force reset if version mismatch
@@ -1708,8 +1708,12 @@ with tab_meta:
                         st.plotly_chart(fig81, width='stretch', key="map_8_1")
                         
                         # 8.2 Strange Loops (Recurrence Plot - Simulated)
-                        # We use the Phi Field auto-correlation or similar visual
-                        fig82 = px.imshow(np.corrcoef(spatial["phi_field"]), color_continuous_scale='Balance', title="Strange Loop Recurrence Topology")
+                        # Added epsilon to avoid NaN division warnings if Phi field is constant
+                        phi_std = np.std(spatial["phi_field"])
+                        if phi_std > 1e-6:
+                            fig82 = px.imshow(np.corrcoef(spatial["phi_field"]), color_continuous_scale='Balance', title="Strange Loop Recurrence Topology")
+                        else:
+                            fig82 = px.imshow(spatial["phi_field"], color_continuous_scale='Greys', title="Strange Loop (Insufficient Variance)")
                         st.plotly_chart(fig82, width='stretch', key="map_8_2")
                         
                     with p8c2:
