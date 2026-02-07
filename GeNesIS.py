@@ -526,8 +526,14 @@ def update_simulation():
         "pos_flux": total_pos_flux,
         "neg_flux": total_neg_flux,
         "scarcity": np.exp(-world.scarcity_lambda * world.time_step),
-        "agent_entropy": ent_val
-    }
+        "agent_entropy": ent_val,
+        # Level 5 Metrics for Plots
+        "mean_meta_lr": np.mean([getattr(a, 'meta_lr', 0.01) for a in world.agents.values()]) if world.agents else 0.01,
+        "mean_weight_entropy": np.mean([
+            -torch.sum(torch.softmax(a.brain.actor.weight.detach().flatten(), dim=0) * 
+             torch.log2(torch.softmax(a.brain.actor.weight.detach().flatten(), dim=0) + 1e-9)).item()
+            for a in random.sample(list(world.agents.values()), min(5, len(world.agents)))
+        ]) if world.agents else 0.0
     
     st.session_state.stats_history.append(stats)
     if len(st.session_state.stats_history) > 200:
@@ -628,6 +634,10 @@ tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st
 with tab_macro:
     if st.session_state.stats_history:
         df = pd.DataFrame(st.session_state.stats_history)
+        # Migrations for new columns
+        for col in ["mean_weight_entropy", "mean_meta_lr"]:
+            if col not in df.columns:
+                df[col] = 0.0
         
         if st.session_state.get("show_charts", False):
             # Row 1: Graphs
@@ -1620,6 +1630,10 @@ with tab_meta:
         # ============================================================
         if st.session_state.stats_history:
             df_history = pd.DataFrame(st.session_state.stats_history)
+            # Migrations for new columns to prevent crash on reload
+            for col in ["mean_weight_entropy", "mean_meta_lr"]:
+                if col not in df_history.columns:
+                    df_history[col] = 0.0
             
             # --- LEVEL 5 PLOTS ---
             with st.expander("📈 Level 5: Advanced Metacognition Plots", expanded=False):
