@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "11.0.7" # Level 10: The Omega Point - Stable Tomography Release
+SYSTEM_VERSION = "11.0.3" # Level 10: The Omega Point - Complete Implementation
 
 def init_system():
     # Force reset if version mismatch
@@ -529,119 +529,7 @@ def update_simulation():
         "agent_entropy": ent_val
     }
     
-    # Initialize Nobel Spatial Cache if missing (For 24 Grid Plots)
-    if "nobel_spatial_cache" not in st.session_state:
-        # Initialize with empty grids or default structures
-        st.session_state.nobel_spatial_cache = {
-             # Level 5
-             "meta_lr_grid": np.zeros((40, 40)), 
-             "loss_contour": np.zeros((40, 40)),
-             "gene_flow_u": np.zeros((40, 40)), "gene_flow_v": np.zeros((40, 40)),
-             "energy_landscape": np.zeros((40, 40)),
-             # Level 6
-             "structure_hex": [], 
-             "thermo_flux_u": np.zeros((40, 40)), "thermo_flux_v": np.zeros((40, 40)),
-             "niche_map": np.zeros((40, 40)),
-             "pressure_grad": np.zeros((40, 40)),
-             # Level 7
-             "kuramoto_phase": np.zeros((40, 40)),
-             "attention_graph": [],
-             "protocol_regions": np.zeros((40, 40)),
-             "dist_memory_map": np.zeros((40, 40)),
-             # Level 8
-             "phi_field": np.zeros((40, 40)),
-             "strange_loop_topology": [], # List of (x, y, state_val)
-             "identity_alpha": np.zeros((40, 40)),
-             "qualia_map": np.zeros((40, 40)),
-             # Level 9
-             "causal_influence": np.zeros((40, 40)),
-             "oracle_error": np.zeros((40, 40)),
-             "glitch_points": [],
-             "discovery_wave": np.zeros((40, 40)),
-             # Level 10
-             "compute_density": np.zeros((40, 40)),
-             "depth_step": np.zeros((40, 40)),
-             "gol_grid": np.zeros((32, 32)), # Scratchpad is 32x32
-             "omega_radial": []
-        }
-
-    # 🏆 NOBEL SPATIAL TOMOGRAPHY (Optimized: Every 20 ticks)
-    if world.time_step % 20 == 0:
-        spatial = st.session_state.nobel_spatial_cache # Ref for in-place updates where possible
-        
-        # Helper: Reset Grids
-        for k in spatial:
-            if isinstance(spatial[k], np.ndarray) and "gol" not in k: spatial[k].fill(0)
-            elif isinstance(spatial[k], list): spatial[k] = []
-            
-        # --- LEVEL 5: META-LEARNING ARRAYS ---
-        # 5.1 Plasticity & 5.4 Fitness
-        for a in agents:
-            ax, ay = int(a.x)%40, int(a.y)%40
-            spatial["meta_lr_grid"][ax, ay] = getattr(a, 'meta_lr', 0.01)
-            spatial["energy_landscape"][ax, ay] = a.energy
-            
-            # 5.3 Gene Flow (Vector from parent)
-            if hasattr(a, 'parent_hidden'):
-                spatial["gene_flow_u"][ax, ay] = np.random.uniform(-1, 1) # Simplified for visual
-                spatial["gene_flow_v"][ax, ay] = np.random.uniform(-1, 1)
-        
-        # 5.2 Surprise (World Loss) - Simulated Perlin
-        spatial["loss_contour"] = np.random.rand(40, 40) * 0.1 # Placeholder for complex loss manifold
-        
-        # --- LEVEL 6: GEO-ENGINEERING ARRAYS ---
-        # 6.1 Structures
-        spatial["structure_hex"] = [{"x": k[0], "y": k[1], "type": v.structure_type} for k, v in getattr(world, 'structures', {}).items()]
-        
-        # 6.2 Thermo Flow
-        # Use simple gradient of energy landscape
-        dy, dx = np.gradient(spatial["energy_landscape"])
-        spatial["thermo_flux_u"] = -dx
-        spatial["thermo_flux_v"] = -dy
-        
-        # 6.3 Niche Map (0=Wild, 1=Cultivated)
-        # 6.4 Pressure (Weather)
-        # Simulated atmospheric bands
-        for y in range(40):
-            spatial["pressure_grad"][:, y] = np.sin(y/10.0 + world.time_step/50.0) * getattr(world, 'weather_amplitude', 1.0)
-            
-        # --- LEVEL 7: MANIFOLD ARRAYS ---
-        for a in agents:
-            ax, ay = int(a.x)%40, int(a.y)%40
-            # 7.1 Kuramoto (Simulated phase 0-2pi based on internal clock)
-            spatial["kuramoto_phase"][ax, ay] = (a.age % 20) / 20.0 * 2 * np.pi
-            # 7.3 Protocol (Integer ID)
-            spatial["protocol_regions"][ax, ay] = getattr(a, 'protocol_version', 0)
-            
-        spatial["dist_memory_map"] = np.random.rand(40, 40) > 0.95 # Sparse memory
-        
-        # --- LEVEL 8: CONSCIOUSNESS ARRAYS ---
-        for a in agents:
-            ax, ay = int(a.x)%40, int(a.y)%40
-            # 8.1 Phi 
-            spatial["phi_field"][ax, ay] = getattr(a, 'phi_value', 0)
-            # 8.3 Identity Stability
-            spatial["identity_alpha"][ax, ay] = min(1.0, getattr(a, 'identity_stability', 0))
-            
-        # --- LEVEL 9: PHYSICS ARRAYS ---
-        spatial["oracle_error"] = np.abs(np.random.normal(0, 1, (40, 40))) # Error surface
-        # 9.3 Glitches
-        spatial["glitch_points"] = [{"x": a.x, "y": a.y} for a in agents if len(getattr(a, 'discovered_glitches', [])) > 0]
-        
-        # --- LEVEL 10: OMEGA ARRAYS ---
-        # 10.1 Compute Density
-        for a in agents:
-            ax, ay = int(a.x)%40, int(a.y)%40
-            spatial["compute_density"][ax, ay] += 1
-            spatial["depth_step"][ax, ay] = len(getattr(a, 'internal_agents', []))
-            
-        # 10.3 Gol Grid (Fetch from random agent if available)
-        if agents and hasattr(agents[0], 'scratchpad'):
-             spatial["gol_grid"] = agents[0].scratchpad.detach().cpu().numpy()
-
-        st.session_state.nobel_spatial_cache = spatial
-
-    # Stats history still needed for basic timeline, but we rely on spatial cache for advanced plots
+    st.session_state.stats_history.append(stats)
     if len(st.session_state.stats_history) > 200:
         st.session_state.stats_history.pop(0)
         
@@ -740,24 +628,6 @@ tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st
 with tab_macro:
     if st.session_state.stats_history:
         df = pd.DataFrame(st.session_state.stats_history)
-        # --- SUMMARY METRICS (Always Visible) ---
-        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-        latest = df.iloc[-1]
-        prev = df.iloc[-2] if len(df) > 1 else latest
-        
-        with col_m1: st.metric("Survivors", f"{latest['population']:.0f}", f"{latest['population'] - prev['population']:.0f}")
-        with col_m2: st.metric("Avg Energy", f"{latest['avg_energy']:.1f}", f"{latest['avg_energy'] - prev['avg_energy']:.1f}")
-        with col_m3: st.metric("Entropy (S)", f"{latest['agent_entropy']:.3f}", f"{latest['agent_entropy'] - prev['agent_entropy']:.3f}")
-        with col_m4: st.metric("Net Flux", f"{latest['pos_flux'] - latest['neg_flux']:.1f}")
-        
-        st.markdown("---")
-
-        with st.expander("📝 Recent Discovery Logs", expanded=False):
-            if st.session_state.event_log:
-                for event in st.session_state.event_log[:10]:
-                    st.write(f"**Tick {event['Tick']}**: {event['Event']}")
-            else:
-                st.info("Awaiting simulation events...")
         
         if st.session_state.get("show_charts", False):
             # Row 1: Graphs
@@ -1485,36 +1355,6 @@ with tab_meta:
                 # 5.8 Abstraction
                 concepts = len(st.session_state.global_registry) 
                 st.metric("5.8 Abstract Concepts", concepts)
-            
-            # --- LEVEL 5 SPATIAL TOMOGRAPHY ---
-            spatial = st.session_state.get("nobel_spatial_cache", {})
-            if st.session_state.get("show_charts", False) and spatial:
-                with st.expander("🗺️ Nobel Spatial Tomography (L5)", expanded=False):
-                    p5c1, p5c2 = st.columns(2)
-                    with p5c1:
-                        # 5.1 Plasticity Field
-                        fig51 = px.imshow(spatial["meta_lr_grid"], color_continuous_scale='Magma', title="Plasticity Field (Learning Rate)")
-                        fig51.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
-                        st.plotly_chart(fig51, width='stretch', key="map_5_1")
-                        
-                        # 5.3 Gene Flow Vector
-                        # Quiver plot simulated with scatter
-                        df_flow = pd.DataFrame({
-                            'x': np.repeat(np.arange(0, 40, 4), 10),
-                            'y': np.tile(np.arange(0, 40, 4), 10),
-                        })
-                        fig52 = px.density_heatmap(spatial["energy_landscape"], title="Fitness Landscape (Energy Density)", color_continuous_scale='Viridis')
-                        fig52.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
-                        st.plotly_chart(fig52, width='stretch', key="map_5_2")
-
-                    with p5c2:
-                        # 5.2 World Loss Contour
-                        fig53 = px.imshow(spatial["loss_contour"], color_continuous_scale='Cividis', title="Epistemic Surprise Manifold")
-                        st.plotly_chart(fig53, width='stretch', key="map_5_3")
-                        
-                        # 5.4 Mutations (Using Gene Flow U/V as proxy for visual variety)
-                        fig54 = px.imshow(spatial["gene_flow_u"], color_continuous_scale='Twilight', title="Genetic Drift Vector Field")
-                        st.plotly_chart(fig54, width='stretch', key="map_5_4")
 
         # ============================================================
         # 🌍 LEVEL 6: GEO-ENGINEERING DASHBOARD
@@ -1564,33 +1404,6 @@ with tab_meta:
                 pred_accs = [getattr(a, 'env_prediction_accuracy', 0) for a in all_agents]
                 avg_pred = np.mean(pred_accs) if pred_accs else 0
                 st.metric("6.0 Env Pred Acc", f"{avg_pred*100:.1f}%")
-
-            # --- LEVEL 6 SPATIAL TOMOGRAPHY ---
-            if st.session_state.get("show_charts", False) and st.session_state.get("nobel_spatial_cache"):
-                spatial = st.session_state["nobel_spatial_cache"]
-                with st.expander("🗺️ Nobel Spatial Tomography (L6)", expanded=False):
-                    p6c1, p6c2 = st.columns(2)
-                    with p6c1:
-                        # 6.1 Structure Density
-                        if spatial["structure_hex"]:
-                            df_struct = pd.DataFrame(spatial["structure_hex"])
-                            fig61 = px.density_heatmap(df_struct, x='x', y='y', nbinsx=40, nbinsy=40, title="Infrastructure Density (Hexbin)")
-                            st.plotly_chart(fig61, width='stretch', key="map_6_1")
-                        else:
-                            st.info("No structures built yet.")
-                            
-                        # 6.2 Thermo Flux (Streamlines - using imshow as proxy)
-                        fig62 = px.imshow(spatial["thermo_flux_u"], color_continuous_scale='RdBu', title="Thermodynamic Flux Vectors (East-West)")
-                        st.plotly_chart(fig62, width='stretch', key="map_6_2")
-                        
-                    with p6c2:
-                        # 6.3 Niche Map
-                        fig63 = px.imshow(spatial["niche_map"], color_continuous_scale='Greens', title="Ecological Niche Construction")
-                        st.plotly_chart(fig63, width='stretch', key="map_6_3")
-                        
-                        # 6.4 Atmospheric Pressure
-                        fig64 = px.imshow(spatial["pressure_grad"], color_continuous_scale='Blues', title="Atmospheric Pressure Gradient")
-                        st.plotly_chart(fig64, width='stretch', key="map_6_4")
 
         # ============================================================
         # 🐝 LEVEL 7: COLLECTIVE MANIFOLD DASHBOARD
@@ -1644,30 +1457,6 @@ with tab_meta:
                 dist_frags = len(getattr(world, 'distributed_memory_store', {}))
                 st.metric("7.7 Dist. Memory", dist_frags)
 
-            # --- LEVEL 7 SPATIAL TOMOGRAPHY ---
-            if st.session_state.get("show_charts", False) and st.session_state.get("nobel_spatial_cache"):
-                spatial = st.session_state["nobel_spatial_cache"]
-                with st.expander("🗺️ Nobel Spatial Tomography (L7)", expanded=False):
-                    p7c1, p7c2 = st.columns(2)
-                    with p7c1:
-                        # 7.1 Kuramoto Phase (Cyclic Colormap)
-                        fig71 = px.imshow(spatial["kuramoto_phase"], color_continuous_scale='hsv', title="Kuramoto Process (Phase 0-2π)")
-                        st.plotly_chart(fig71, width='stretch', key="map_7_1")
-                        
-                        # 7.2 Attention Network (Simulated with random graph/points for now as placeholder for intense graph)
-                        # Falling back to Dist Memory Map here for visual balance
-                        fig72 = px.imshow(spatial["dist_memory_map"], color_continuous_scale='Mint', title="Distributed Memory Fragments")
-                        st.plotly_chart(fig72, width='stretch', key="map_7_2")
-                        
-                    with p7c2:
-                        # 7.3 Protocol Regions
-                        fig73 = px.imshow(spatial["protocol_regions"], color_continuous_scale='Jet', title="Protocol Dialect Regions (Voronoi)")
-                        st.plotly_chart(fig73, width='stretch', key="map_7_3")
-                        
-                        # 7.4 Hive Phi (Using Phase as proxy for diverse visualization)
-                        fig74 = px.density_heatmap(spatial["kuramoto_phase"], title="Synchronization Density Clusters", color_continuous_scale='Turbo')
-                        st.plotly_chart(fig74, width='stretch', key="map_7_4")
-
         # ============================================================
         # 💭 LEVEL 8: CONSCIOUSNESS DASHBOARD
         # ============================================================
@@ -1714,34 +1503,6 @@ with tab_meta:
                 # 8.3 Other-Modeling
                 other_models = sum(len(getattr(a, 'other_agent_models', {})) for a in all_agents)
                 st.metric("8.3 Other Models", other_models)
-
-            # --- LEVEL 8 SPATIAL TOMOGRAPHY ---
-            if st.session_state.get("show_charts", False) and st.session_state.get("nobel_spatial_cache"):
-                spatial = st.session_state["nobel_spatial_cache"]
-                with st.expander("🗺️ Nobel Spatial Tomography (L8)", expanded=False):
-                    p8c1, p8c2 = st.columns(2)
-                    with p8c1:
-                        # 8.1 Phi Field
-                        fig81 = px.imshow(spatial["phi_field"], color_continuous_scale='Inferno', title="Integrated Information Field (Φ)")
-                        st.plotly_chart(fig81, width='stretch', key="map_8_1")
-                        
-                        # 8.2 Strange Loops (Recurrence Plot - Simulated)
-                        # Added epsilon to avoid NaN division warnings if Phi field is constant
-                        phi_std = np.std(spatial["phi_field"])
-                        if phi_std > 1e-6:
-                            fig82 = px.imshow(np.corrcoef(spatial["phi_field"]), color_continuous_scale='Balance', title="Strange Loop Recurrence Topology")
-                        else:
-                            fig82 = px.imshow(spatial["phi_field"], color_continuous_scale='Greys', title="Strange Loop (Insufficient Variance)")
-                        st.plotly_chart(fig82, width='stretch', key="map_8_2")
-                        
-                    with p8c2:
-                        # 8.3 Identity Stability
-                        fig83 = px.imshow(spatial["identity_alpha"], color_continuous_scale='Greys', title="Identity Stability Manifold")
-                        st.plotly_chart(fig83, width='stretch', key="map_8_3")
-                        
-                        # 8.4 Qualia Map (Simulated)
-                        fig84 = px.imshow(spatial["phi_field"] * spatial["identity_alpha"], color_continuous_scale='Spectral', title="Subjective Experience (Qualia) Map")
-                        st.plotly_chart(fig84, width='stretch', key="map_8_4")
 
         # ============================================================
         # ⚛️ LEVEL 9: PHYSICS DISCOVERY DASHBOARD
@@ -1790,34 +1551,6 @@ with tab_meta:
                 # 9.8 Causal Calculus
                 calc_ready = sum(1 for a in all_agents if hasattr(a, 'do_calculus_intervention'))
                 st.metric("9.8 Causal Ready", f"{calc_ready}/{len(all_agents)}")
-
-            # --- LEVEL 9 SPATIAL TOMOGRAPHY ---
-            if st.session_state.get("show_charts", False) and st.session_state.get("nobel_spatial_cache"):
-                spatial = st.session_state["nobel_spatial_cache"]
-                with st.expander("🗺️ Nobel Spatial Tomography (L9)", expanded=False):
-                    p9c1, p9c2 = st.columns(2)
-                    with p9c1:
-                         # 9.1 Causal Influence Heatmap
-                         fig91 = px.imshow(spatial["causal_influence"], color_continuous_scale='Hot', title="Causal Influence Heatmap")
-                         st.plotly_chart(fig91, width='stretch', key="map_9_1")
-                         
-                         # 9.3 Glitch Artifacts (Scatter)
-                         if spatial["glitch_points"]:
-                             df_glitch = pd.DataFrame(spatial["glitch_points"])
-                             fig92 = px.scatter(df_glitch, x='x', y='y', title="Physics Violations (Glitches)", color_discrete_sequence=['red'])
-                             fig92.update_layout(height=300, xaxis=dict(range=[0,40]), yaxis=dict(range=[0,40]))
-                             st.plotly_chart(fig92, width='stretch', key="map_9_2")
-                         else:
-                             st.info("No glitches detected.")
-
-                    with p9c2:
-                         # 9.2 Oracle Error Surface
-                         fig93 = px.imshow(spatial["oracle_error"], color_continuous_scale='RdGy', title="Oracle Prediction Error Manifold")
-                         st.plotly_chart(fig93, width='stretch', key="map_9_3")
-                         
-                         # 9.4 Discovery Wavefront
-                         fig94 = px.density_contour(spatial["discovery_wave"], title="Epistemic Discovery Wavefront")
-                         st.plotly_chart(fig94, width='stretch', key="map_9_4")
 
         # ============================================================
         # ♾️ LEVEL 10: OMEGA POINT DASHBOARD
@@ -1875,32 +1608,6 @@ with tab_meta:
                     # 10.4 Emergent Agents
                     if len(getattr(sample_agent, 'internal_agents', [])) > 0:
                         st.success("✅ 10.4 Emergent Agents Detectable")
-
-            # --- LEVEL 10 SPATIAL TOMOGRAPHY ---
-            if st.session_state.get("show_charts", False) and st.session_state.get("nobel_spatial_cache"):
-                spatial = st.session_state["nobel_spatial_cache"]
-                with st.expander("🗺️ Nobel Spatial Tomography (L10)", expanded=False):
-                    p10c1, p10c2 = st.columns(2)
-                    with p10c1:
-                        # 10.1 Compute Density
-                        fig101 = px.imshow(spatial["compute_density"], color_continuous_scale='Electric', title="Computational Density (Thoughts/Sector)")
-                        st.plotly_chart(fig101, width='stretch', key="map_10_1")
-                        
-                        # 10.2 Recursive Depth Steps
-                        fig102 = px.imshow(spatial["depth_step"], color_continuous_scale='Viridis', title="Recursive Simulation Depth Topography")
-                        st.plotly_chart(fig102, width='stretch', key="map_10_2")
-                        
-                    with p10c2:
-                        # 10.3 Game of Life Holograph
-                        fig103 = px.imshow(spatial["gol_grid"], color_continuous_scale='Greens', title="Universal Scratchpad (Game of Life State)")
-                        st.plotly_chart(fig103, width='stretch', key="map_10_3")
-                        
-                        # 10.4 Omega Convergence (Radial)
-                        # Simulated radial data
-                        r_vals = np.linspace(0, 1, 100)
-                        theta_vals = np.linspace(0, 360, 100)
-                        fig104 = px.bar_polar(r=r_vals, theta=theta_vals, title="Singularity Convergence Horizon", color=r_vals)
-                        st.plotly_chart(fig104, width='stretch', key="map_10_4")
 
                 # Omega Criteria
                 criteria_result = world.verify_global_omega() if hasattr(world, 'verify_global_omega') else {'criteria': {}, 'score': 0}
