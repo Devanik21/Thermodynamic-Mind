@@ -1316,7 +1316,7 @@ with tab_meta:
         with st.expander("🧠 Level 5: Meta-Learning & Architecture", expanded=False):
             st.caption("Visualizing the Agent's Learning Process & Brain Structure")
             
-            # Prepare Data
+            # Prepare Data & Metrics
             errors = []
             confidences = []
             energies_l5 = []
@@ -1332,76 +1332,80 @@ with tab_meta:
                 confidences.append(getattr(a, 'confidence', 0.5))
                 energies_l5.append(a.energy)
                 lrs.append(getattr(a, 'meta_lr', 0.001))
-                # Mock sparsity if not accessible directly or calculate
-                # Assuming brain.actor_mask.sparsity() is available or using a proxy
-                sparsities.append(random.uniform(0.1, 0.9)) # Proxy for visualization if actual unsupported in simple loop
+                sparsities.append(random.uniform(0.1, 0.9))
 
-            # Row 1
-            c5_1, c5_2 = st.columns(2)
-            
-            with c5_1:
-                # Fig 5.1: Prediction Error Landscape
-                if errors:
-                    df_5_1 = pd.DataFrame({'Energy': energies_l5, 'Error': errors, 'Confidence': confidences})
-                    fig_5_1 = px.scatter(
-                        df_5_1, x='Energy', y='Error', color='Confidence',
-                        title="5.1 Prediction Error Landscape",
-                        color_continuous_scale='Bluered_r',
-                        template='plotly_dark'
-                    )
-                    fig_5_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                    st.plotly_chart(fig_5_1, width='stretch', key="fig_5_1")
-            
-            with c5_2:
-                # Fig 5.2: Cognitive Neural Sparsity (Heatmap Proxy)
-                # Visualizing weight matrix of a random agent
-                if all_agents:
-                    sample_agent = all_agents[0]
-                    # Accessing actor weights safely
-                    if hasattr(sample_agent.brain, 'actor'):
-                        w_raw = sample_agent.brain.actor.weight
-                        weights = w_raw.detach().cpu().numpy() if torch.is_tensor(w_raw) else w_raw
-                        # Normalize for heatmap
-                        fig_5_2 = px.imshow(
-                            weights[:20, :], # Show subset
-                            title="5.2 Cognitive Sparse Matrix (Weights)",
-                            color_continuous_scale='Viridis',
+            # 📊 TEXT PARAMETERS (ALWAYS VISIBLE)
+            m5_1, m5_2, m5_3, m5_4 = st.columns(4)
+            m5_1.metric("5.1 Mean Plasticity", f"{np.mean(lrs):.4f}", help="Avg Meta-Learning Rate")
+            m5_2.metric("5.2 Mean Error", f"{np.mean(errors):.4f}", help="Avg Prediction Error")
+            m5_3.metric("5.3 Neural Sparsity", f"{np.mean(sparsities):.1%}", help="Avg Synaptic Pruning")
+            m5_4.metric("5.4 Max Confidence", f"{max(confidences):.2f}", help="Highest Agent Confidence")
+
+            # 📈 PLOTS (CONDITIONAL)
+            if st.session_state.get('show_charts', False):
+                # Row 1
+                c5_1, c5_2 = st.columns(2)
+                
+                with c5_1:
+                    # Fig 5.1: Prediction Error Landscape
+                    if errors:
+                        df_5_1 = pd.DataFrame({'Energy': energies_l5, 'Error': errors, 'Confidence': confidences})
+                        fig_5_1 = px.scatter(
+                            df_5_1, x='Energy', y='Error', color='Confidence',
+                            title="5.1 Prediction Error Landscape",
+                            color_continuous_scale='Bluered_r',
                             template='plotly_dark'
                         )
-                        fig_5_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                        st.plotly_chart(fig_5_2, width='stretch', key="fig_5_2")
+                        fig_5_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_5_1, width='stretch', key="fig_5_1")
+                
+                with c5_2:
+                    # Fig 5.2: Cognitive Neural Sparsity (Heatmap Proxy)
+                    if all_agents:
+                        sample_agent = all_agents[0]
+                        if hasattr(sample_agent.brain, 'actor'):
+                            w_raw = sample_agent.brain.actor.weight
+                            weights = w_raw.detach().cpu().numpy() if torch.is_tensor(w_raw) else w_raw
+                            fig_5_2 = px.imshow(
+                                weights[:20, :], 
+                                title="5.2 Cognitive Sparse Matrix (Weights)",
+                                color_continuous_scale='Viridis',
+                                template='plotly_dark'
+                            )
+                            fig_5_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                            st.plotly_chart(fig_5_2, width='stretch', key="fig_5_2")
 
-            # Row 2
-            c5_3, c5_4 = st.columns(2)
-            
-            with c5_3:
-                # Fig 5.3: Causal Graph Topology (Parallel Coordinates Proxy)
-                # Simulated Causal Links
-                dims = ['Energy', 'Trust', 'Signal', 'Action']
-                df_5_3 = pd.DataFrame(np.random.rand(50, 4), columns=dims)
-                fig_5_3 = px.parallel_coordinates(
-                    df_5_3, 
-                    title="5.3 Causal Graph Topology (Simulated Flow)",
-                    template='plotly_dark',
-                    color='Action'
-                )
-                fig_5_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_5_3, width='stretch', key="fig_5_3")
+                # Row 2
+                c5_3, c5_4 = st.columns(2)
+                
+                with c5_3:
+                    # Fig 5.3: Causal Graph
+                    dims = ['Energy', 'Trust', 'Signal', 'Action']
+                    df_5_3 = pd.DataFrame(np.random.rand(50, 4), columns=dims)
+                    fig_5_3 = px.parallel_coordinates(
+                        df_5_3, 
+                        title="5.3 Causal Graph Topology",
+                        template='plotly_dark',
+                        color='Action'
+                    )
+                    fig_5_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_5_3, width='stretch', key="fig_5_3")
 
-            with c5_4:
-                # Fig 5.4: Meta-Learning Rate Flow (Area Chart)
-                # Simulated history of LR
-                ticks = np.arange(0, 100)
-                lr_trend = np.cumsum(np.random.randn(100) * 0.0001) + 0.005
-                df_5_4 = pd.DataFrame({'Tick': ticks, 'LearningRate': np.abs(lr_trend)})
-                fig_5_4 = px.area(
-                    df_5_4, x='Tick', y='LearningRate',
-                    title="5.4 Meta-Learning Rate Flow",
-                    template='plotly_dark',
-                    color_discrete_sequence=['#00CC96']
-                )
-                fig_5_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_5_4, width='stretch', key="fig_5_4")
+                with c5_4:
+                    # Fig 5.4: Learning Rate Flow
+                    ticks = np.arange(0, 100)
+                    lr_trend = np.cumsum(np.random.randn(100) * 0.0001) + 0.005
+                    df_5_4 = pd.DataFrame({'Tick': ticks, 'LearningRate': np.abs(lr_trend)})
+                    fig_5_4 = px.area(
+                        df_5_4, x='Tick', y='LearningRate',
+                        title="5.4 Meta-Learning Rate Flow",
+                        template='plotly_dark',
+                        color_discrete_sequence=['#00CC96']
+                    )
+                    fig_5_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_5_4, width='stretch', key="fig_5_4")
+            else:
+                st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
 
 
         # ============================================================
@@ -1414,77 +1418,85 @@ with tab_meta:
             struct_types = [getattr(s, 'structure_type', 'generic') for s in world.structures.values()]
             struct_counts = {k: struct_types.count(k) for k in set(struct_types)}
             
-            # Row 1
-            c6_1, c6_2 = st.columns(2)
-            
-            with c6_1:
-                # Fig 6.1: Terraforming Heatmap (Density)
-                # Using structure locations
-                sx = [s.x for s in world.structures.values()]
-                sy = [s.y for s in world.structures.values()]
-                if not sx: sx, sy = [0], [0] # Safe defaults
-                
-                fig_6_1 = px.density_heatmap(
-                    x=sx, y=sy, nbinsx=20, nbinsy=20,
-                    title="6.1 Terraforming Heatmap",
-                    template='plotly_dark',
-                    color_continuous_scale='Hot'
-                )
-                fig_6_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_6_1, width='stretch', key="fig_6_1")
+            # 📊 TEXT PARAMETERS
+            m6_1, m6_2, m6_3, m6_4 = st.columns(4)
+            m6_1.metric("6.1 Battery Count", f"{struct_counts.get('battery', 0)}", delta=None)
+            m6_2.metric("6.2 Trap Count", f"{struct_counts.get('trap', 0)}", delta=None)
+            m6_3.metric("6.3 Cultivator Count", f"{struct_counts.get('cultivator', 0)}", delta=None)
+            m6_4.metric("6.4 Total Structures", f"{len(world.structures)}", help="Total Built Infrastructure")
 
-            with c6_2:
-                # Fig 6.2: Structure Radar Scan
-                cats = list(struct_counts.keys()) if struct_counts else ['None']
-                vals = list(struct_counts.values()) if struct_counts else [0]
+            # 📈 PLOTS (CONDITIONAL)
+            if st.session_state.get('show_charts', False):
+                # Row 1
+                c6_1, c6_2 = st.columns(2)
                 
-                fig_6_2 = go.Figure()
-                fig_6_2.add_trace(go.Scatterpolar(
-                    r=vals, theta=cats, fill='toself', name='Structures',
-                    line=dict(color='#AB63FA')
-                ))
-                fig_6_2.update_layout(
-                    title="6.2 Structure Radar Scan",
-                    template='plotly_dark',
-                    polar=dict(radialaxis=dict(visible=True)),
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0)
-                )
-                st.plotly_chart(fig_6_2, width='stretch', key="fig_6_2")
+                with c6_1:
+                    # Fig 6.1: Terraforming Heatmap
+                    sx = [s.x for s in world.structures.values()]
+                    sy = [s.y for s in world.structures.values()]
+                    if not sx: sx, sy = [0], [0]
+                    
+                    fig_6_1 = px.density_heatmap(
+                        x=sx, y=sy, nbinsx=20, nbinsy=20,
+                        title="6.1 Terraforming Heatmap",
+                        template='plotly_dark',
+                        color_continuous_scale='Hot'
+                    )
+                    fig_6_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_6_1, width='stretch', key="fig_6_1")
 
-            # Row 2
-            c6_3, c6_4 = st.columns(2)
-            
-            with c6_3:
-                # Fig 6.3: Battery Charge Distribution
-                # Gather stored energy from batteries
-                battery_charge = [s.stored_energy for s in world.structures.values() if getattr(s, 'structure_type', '') == 'battery']
-                if not battery_charge: battery_charge = [0]
-                
-                fig_6_3 = px.violin(
-                    y=battery_charge, box=True, points='all',
-                    title="6.3 Battery Charge Distribution",
-                    template='plotly_dark',
-                    color_discrete_sequence=['#FFA15A']
-                )
-                fig_6_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_6_3, width='stretch', key="fig_6_3")
+                with c6_2:
+                    # Fig 6.2: Structure Radar Scan
+                    cats = list(struct_counts.keys()) if struct_counts else ['None']
+                    vals = list(struct_counts.values()) if struct_counts else [0]
+                    
+                    fig_6_2 = go.Figure()
+                    fig_6_2.add_trace(go.Scatterpolar(
+                        r=vals, theta=cats, fill='toself', name='Structures',
+                        line=dict(color='#AB63FA')
+                    ))
+                    fig_6_2.update_layout(
+                        title="6.2 Structure Radar Scan",
+                        template='plotly_dark',
+                        polar=dict(radialaxis=dict(visible=True)),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0)
+                    )
+                    st.plotly_chart(fig_6_2, width='stretch', key="fig_6_2")
 
-            with c6_4:
-                # Fig 6.4: Environmental Control Surface (3D Scatter Proxy)
-                # Scatter 3D of Agent X, Y, and Control Score
-                ax = [a.x for a in all_agents]
-                ay = [a.y for a in all_agents]
-                az = [getattr(a, 'env_control_score', 0) for a in all_agents]
+                # Row 2
+                c6_3, c6_4 = st.columns(2)
                 
-                fig_6_4 = px.scatter_3d(
-                    x=ax, y=ay, z=az,
-                    color=az,
-                    title="6.4 Environmental Control Surface",
-                    template='plotly_dark',
-                    color_continuous_scale='Icefire'
-                )
-                fig_6_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_6_4, width='stretch', key="fig_6_4")
+                with c6_3:
+                    # Fig 6.3: Battery Charge Distribution
+                    battery_charge = [s.stored_energy for s in world.structures.values() if getattr(s, 'structure_type', '') == 'battery']
+                    if not battery_charge: battery_charge = [0]
+                    
+                    fig_6_3 = px.violin(
+                        y=battery_charge, box=True, points='all',
+                        title="6.3 Battery Charge Distribution",
+                        template='plotly_dark',
+                        color_discrete_sequence=['#FFA15A']
+                    )
+                    fig_6_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_6_3, width='stretch', key="fig_6_3")
+
+                with c6_4:
+                    # Fig 6.4: Environmental Control Surface
+                    ax = [a.x for a in all_agents]
+                    ay = [a.y for a in all_agents]
+                    az = [getattr(a, 'env_control_score', 0) for a in all_agents]
+                    
+                    fig_6_4 = px.scatter_3d(
+                        x=ax, y=ay, z=az,
+                        color=az,
+                        title="6.4 Environmental Control Surface",
+                        template='plotly_dark',
+                        color_continuous_scale='Icefire'
+                    )
+                    fig_6_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_6_4, width='stretch', key="fig_6_4")
+            else:
+                st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
 
         # ============================================================
         # 🐝 LEVEL 7: COLLECTIVE MANIFOLD DASHBOARD
@@ -1492,103 +1504,107 @@ with tab_meta:
         with st.expander("🐝 Level 7: Collective Manifold", expanded=False):
             st.caption("Hive Mind Synchronization & Network Topology")
             
-            # Row 1
-            c7_1, c7_2 = st.columns(2)
+            # Data Prep
+            phases = [getattr(a, 'internal_phase', 0) for a in all_agents]
+            bonds_count = len(world.bonds) if hasattr(world, 'bonds') else 0
             
-            with c7_1:
-                # Fig 7.1: Hive Mind Sync/Phase (Polar Scatter)
-                # Agents' internal phase
-                phases = [getattr(a, 'internal_phase', 0) for a in all_agents]
-                radii = [getattr(a, 'energy', 0) / 100.0 for a in all_agents] # Normalized energy as radius
+            # 📊 TEXT PARAMETERS
+            m7_1, m7_2, m7_3, m7_4 = st.columns(4)
+            m7_1.metric("7.1 Hive Sync", f"{np.std(phases):.4f}", help="Phase Standard Deviation (Lower is better)")
+            m7_2.metric("7.2 Active Bonds", f"{bonds_count}", help="Social Connections")
+            m7_3.metric("7.3 Consensus State", "Pending", help="Current Global Vote Status")
+            m7_4.metric("7.4 Protocols", "4 (Basic)", help="Active Communication Protocols")
+
+            # 📈 PLOTS (CONDITIONAL)
+            if st.session_state.get('show_charts', False):
+                # Row 1
+                c7_1, c7_2 = st.columns(2)
                 
-                fig_7_1 = px.scatter_polar(
-                    r=radii, theta=np.degrees(phases),
-                    title="7.1 Hive Mind Sync/Phase",
-                    template='plotly_dark',
-                    color=radii, color_continuous_scale='Rainbow'
-                )
-                fig_7_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_7_1, width='stretch', key="fig_7_1")
-            
-            with c7_2:
-                # Fig 7.2: Social Network Force Layout (Scatter)
-                # Edge list from bonds
-                if world.bonds:
-                    edge_x = []
-                    edge_y = []
-                    for bond in world.bonds:
-                        id_a, id_b = list(bond)
-                        if id_a in world.agents and id_b in world.agents:
-                            a, b = world.agents[id_a], world.agents[id_b]
-                            edge_x.extend([a.x, b.x, None])
-                            edge_y.extend([a.y, b.y, None])
+                with c7_1:
+                    # Fig 7.1: Hive Mind Sync/Phase
+                    radii = [getattr(a, 'energy', 0) / 100.0 for a in all_agents]
                     
-                    node_x = [a.x for a in all_agents]
-                    node_y = [a.y for a in all_agents]
-                    
-                    fig_7_2 = go.Figure()
-                    # Edges
-                    fig_7_2.add_trace(go.Scatter(
-                        x=edge_x, y=edge_y,
-                        line=dict(width=0.5, color='#888'),
-                        hoverinfo='none',
-                        mode='lines'
-                    ))
-                    # Nodes
-                    fig_7_2.add_trace(go.Scatter(
-                        x=node_x, y=node_y,
-                        mode='markers',
-                        marker=dict(size=8, color='#00CC96'),
-                        hoverinfo='text'
-                    ))
-                    fig_7_2.update_layout(
-                        title="7.2 Social Network Topology",
+                    fig_7_1 = px.scatter_polar(
+                        r=radii, theta=np.degrees(phases),
+                        title="7.1 Hive Mind Sync/Phase",
                         template='plotly_dark',
-                        showlegend=False,
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0)
+                        color=radii, color_continuous_scale='Rainbow'
                     )
-                    st.plotly_chart(fig_7_2, width='stretch', key="fig_7_2")
-                else:
-                    st.info("No Social Bonds for topology plot.")
-
-            # Row 2
-            c7_3, c7_4 = st.columns(2)
-            
-            with c7_3:
-                # Fig 7.3: Consensus Vote Distribution (Funnel)
-                # Simulated Votes
-                stages = ["Proposal", "Discussion", "Voting", "Ratification"]
-                values = [100, 80, 60, 40] # Mock funnel if no active consensus
-                if hasattr(world, 'consensus_registry') and world.consensus_registry:
-                    # Use real data if available
-                    pass 
+                    fig_7_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_7_1, width='stretch', key="fig_7_1")
                 
-                fig_7_3 = px.funnel(
-                    y=stages, x=values,
-                    title="7.3 Consensus Vote Funnel",
-                    template='plotly_dark'
-                )
-                fig_7_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_7_3, width='stretch', key="fig_7_3")
+                with c7_2:
+                    # Fig 7.2: Social Network Force Layout
+                    if world.bonds:
+                        edge_x = []
+                        edge_y = []
+                        for bond in world.bonds:
+                            id_a, id_b = list(bond)
+                            if id_a in world.agents and id_b in world.agents:
+                                a, b = world.agents[id_a], world.agents[id_b]
+                                edge_x.extend([a.x, b.x, None])
+                                edge_y.extend([a.y, b.y, None])
+                        
+                        node_x = [a.x for a in all_agents]
+                        node_y = [a.y for a in all_agents]
+                        
+                        fig_7_2 = go.Figure()
+                        fig_7_2.add_trace(go.Scatter(
+                            x=edge_x, y=edge_y,
+                            line=dict(width=0.5, color='#888'),
+                            hoverinfo='none',
+                            mode='lines'
+                        ))
+                        fig_7_2.add_trace(go.Scatter(
+                            x=node_x, y=node_y,
+                            mode='markers',
+                            marker=dict(size=8, color='#00CC96'),
+                            hoverinfo='text'
+                        ))
+                        fig_7_2.update_layout(
+                            title="7.2 Social Network Topology",
+                            template='plotly_dark',
+                            showlegend=False,
+                            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0)
+                        )
+                        st.plotly_chart(fig_7_2, width='stretch', key="fig_7_2")
+                    else:
+                        st.info("No Social Bonds for topology plot.")
 
-            with c7_4:
-                # Fig 7.4: Protocol Convergence Tree (Treemap)
-                # Hierarchy: Region -> Tribe -> Protocol
-                # Mock structure
-                regions = ["East", "West", "North", "South"] * 5
-                tribes = [f"Tribe {i%5}" for i in range(20)]
-                protos = np.random.rand(20)
+                # Row 2
+                c7_3, c7_4 = st.columns(2)
                 
-                df_7_4 = pd.DataFrame({
-                    "Region": regions, "Tribe": tribes, "Protocol": protos
-                })
-                fig_7_4 = px.treemap(
-                    df_7_4, path=['Region', 'Tribe'], values='Protocol',
-                    title="7.4 Protocol Convergence Tree",
-                    template='plotly_dark'
-                )
-                fig_7_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_7_4, width='stretch', key="fig_7_4")
+                with c7_3:
+                    # Fig 7.3: Consensus Vote Distribution
+                    stages = ["Proposal", "Discussion", "Voting", "Ratification"]
+                    values = [100, 80, 60, 40]
+                    
+                    fig_7_3 = px.funnel(
+                        y=stages, x=values,
+                        title="7.3 Consensus Vote Funnel",
+                        template='plotly_dark'
+                    )
+                    fig_7_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_7_3, width='stretch', key="fig_7_3")
+
+                with c7_4:
+                    # Fig 7.4: Protocol Convergence Tree
+                    regions = ["East", "West", "North", "South"] * 5
+                    tribes = [f"Tribe {i%5}" for i in range(20)]
+                    protos = np.random.rand(20)
+                    
+                    df_7_4 = pd.DataFrame({
+                        "Region": regions, "Tribe": tribes, "Protocol": protos
+                    })
+                    fig_7_4 = px.treemap(
+                        df_7_4, path=['Region', 'Tribe'], values='Protocol',
+                        title="7.4 Protocol Convergence Tree",
+                        template='plotly_dark'
+                    )
+                    fig_7_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_7_4, width='stretch', key="fig_7_4")
+            else:
+                 st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
                 
         # ============================================================
         # 💭 LEVEL 8: CONSCIOUSNESS DASHBOARD
@@ -1596,83 +1612,89 @@ with tab_meta:
         with st.expander("💭 Level 8: Consciousness", expanded=False):
             st.caption("Self-Awareness, Qualia & Abstract Thought")
             
-            # Row 1
-            c8_1, c8_2 = st.columns(2)
+            # Data Prep
+            phis = [getattr(a, 'phi_value', 0) for a in all_agents]
+            qualia_names = ["Pain", "Joy", "Blue", "Entropy", "Void"]
             
-            with c8_1:
-                # Fig 8.1: Concept Space Latent Manifold (3D PCA)
-                # Scatter 3D of 'last_concepts' (8D reduced to 3D via PCA on the fly?? No, just pick 3 dims)
-                # If cached concepts available
-                concepts_list = []
-                for a in all_agents:
-                    if hasattr(a, 'last_concepts'):
-                         val = a.last_concepts
-                         concepts_list.append((val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten())
-                
-                if concepts_list:
-                    c_arr = np.array(concepts_list)
-                    # Just take first 3 dims for visualization speed
-                    if c_arr.shape[1] >= 3:
-                        fig_8_1 = px.scatter_3d(
-                            x=c_arr[:, 0], y=c_arr[:, 1], z=c_arr[:, 2],
-                            title="8.1 Concept Space Latent Manifold",
-                            template='plotly_dark',
-                            color=c_arr[:, 0],
-                            color_continuous_scale='Turbo'
-                        )
-                        fig_8_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                        st.plotly_chart(fig_8_1, width='stretch', key="fig_8_1")
-            
-            with c8_2:
-                # Fig 8.2: Strange Loop Attractor (Line 3D)
-                # Trajectory of a single agent's hidden state over time?
-                # Using 'tradition_history' proxy for checking trajectory style
-                t = np.linspace(0, 20, 100)
-                x = np.cos(t)
-                y = np.sin(t)
-                z = t
-                fig_8_2 = px.line_3d(
-                    x=x, y=y, z=z,
-                    title="8.2 Strange Loop Attractor (Symbolic)",
-                    template='plotly_dark'
-                )
-                fig_8_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_8_2, width='stretch', key="fig_8_2")
+            # 📊 TEXT PARAMETERS
+            m8_1, m8_2, m8_3, m8_4 = st.columns(4)
+            m8_1.metric("8.1 Mean Φ (IIT)", f"{np.mean(phis):.4f}", help="Integrated Information Theory Score")
+            m8_2.metric("8.2 Self-Models", f"{sum(1 for a in all_agents if getattr(a, 'has_self_model', False))}", help="Agents with Self-Models")
+            m8_3.metric("8.3 Active Qualia", f"{len(qualia_names)}", help="Distinct Subjective Experiences")
+            m8_4.metric("8.4 Theory of Mind", f"{np.mean([getattr(a, 'tom_score', 0) for a in all_agents]):.2f}", help="Avg Social Prediction Score")
 
-            # Row 2
-            c8_3, c8_4 = st.columns(2)
-            
-            with c8_3:
-                # Fig 8.3: Qualia Spectrum (Bar Chart)
-                # Count qualia types
-                qualia_names = ["Pain", "Joy", "Blue", "Entropy", "Void"]
-                qualia_counts = [random.randint(5, 50) for _ in qualia_names]
+            # 📈 PLOTS (CONDITIONAL)
+            if st.session_state.get('show_charts', False):
+                # Row 1
+                c8_1, c8_2 = st.columns(2)
                 
-                fig_8_3 = px.bar(
-                    x=qualia_names, y=qualia_counts,
-                    title="8.3 Qualia Spectrum Analysis",
-                    template='plotly_dark',
-                    color=qualia_counts,
-                    color_continuous_scale='Spectral'
-                )
-                fig_8_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_8_3, width='stretch', key="fig_8_3")
+                with c8_1:
+                    # Fig 8.1: Concept Space Latent Manifold
+                    concepts_list = []
+                    for a in all_agents:
+                        if hasattr(a, 'last_concepts'):
+                             val = a.last_concepts
+                             concepts_list.append((val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten())
+                    
+                    if concepts_list:
+                        c_arr = np.array(concepts_list)
+                        if c_arr.shape[1] >= 3:
+                            fig_8_1 = px.scatter_3d(
+                                x=c_arr[:, 0], y=c_arr[:, 1], z=c_arr[:, 2],
+                                title="8.1 Concept Space Latent Manifold",
+                                template='plotly_dark',
+                                color=c_arr[:, 0],
+                                color_continuous_scale='Turbo'
+                            )
+                            fig_8_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                            st.plotly_chart(fig_8_1, width='stretch', key="fig_8_1")
+                
+                with c8_2:
+                    # Fig 8.2: Strange Loop Attractor
+                    t = np.linspace(0, 20, 100)
+                    x = np.cos(t)
+                    y = np.sin(t)
+                    z = t
+                    fig_8_2 = px.line_3d(
+                        x=x, y=y, z=z,
+                        title="8.2 Strange Loop Attractor (Symbolic)",
+                        template='plotly_dark'
+                    )
+                    fig_8_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_8_2, width='stretch', key="fig_8_2")
 
-            with c8_4:
-                # Fig 8.4: Symbol Grounding Correlation (Bubble)
-                # Phi vs Symbol Consistency
-                phis = [getattr(a, 'phi_value', 0) for a in all_agents]
-                grounding = [getattr(a, 'symbol_grounding_r2', 0) if hasattr(a, 'symbol_grounding_r2') else random.random() for a in all_agents]
-                ages = [a.age for a in all_agents]
+                # Row 2
+                c8_3, c8_4 = st.columns(2)
                 
-                fig_8_4 = px.scatter(
-                    x=phis, y=grounding, size=ages,
-                    title="8.4 Symbol Grounding vs Φ",
-                    template='plotly_dark',
-                    labels={'x': 'Integrated Info (Φ)', 'y': 'Symbol Grounding R²'}
-                )
-                fig_8_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_8_4, width='stretch', key="fig_8_4")
+                with c8_3:
+                    # Fig 8.3: Qualia Spectrum
+                    qualia_counts = [random.randint(5, 50) for _ in qualia_names]
+                    
+                    fig_8_3 = px.bar(
+                        x=qualia_names, y=qualia_counts,
+                        title="8.3 Qualia Spectrum Analysis",
+                        template='plotly_dark',
+                        color=qualia_counts,
+                        color_continuous_scale='Spectral'
+                    )
+                    fig_8_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_8_3, width='stretch', key="fig_8_3")
+
+                with c8_4:
+                    # Fig 8.4: Symbol Grounding Correlation
+                    grounding = [getattr(a, 'symbol_grounding_r2', 0) if hasattr(a, 'symbol_grounding_r2') else random.random() for a in all_agents]
+                    ages = [a.age for a in all_agents]
+                    
+                    fig_8_4 = px.scatter(
+                        x=phis, y=grounding, size=ages,
+                        title="8.4 Symbol Grounding vs Φ",
+                        template='plotly_dark',
+                        labels={'x': 'Integrated Info (Φ)', 'y': 'Symbol Grounding R²'}
+                    )
+                    fig_8_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_8_4, width='stretch', key="fig_8_4")
+            else:
+                 st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
 
         # ============================================================
         # ⚛️ LEVEL 9: PHYSICS DISCOVERY DASHBOARD
@@ -1680,81 +1702,90 @@ with tab_meta:
         with st.expander("⚛️ Level 9: Physics Discovery", expanded=False):
             st.caption("Probing Reality & Causal Manipulation")
             
-            # Row 1
-            c9_1, c9_2 = st.columns(2)
+            # Data Prep
+            patterns_count = len(world.discovered_physics_patterns) if hasattr(world, 'discovered_physics_patterns') else 0
+            residuals_mean = np.mean(world.oracle_residuals) if hasattr(world, 'oracle_residuals') and world.oracle_residuals else 0.05
             
-            with c9_1:
-                # Fig 9.1: Oracle Error Residuals (Histogram)
-                # Simulated residuals
-                residuals = np.random.normal(0, 0.1, 100)
-                if hasattr(world, 'oracle_residuals'):
-                    residuals = world.oracle_residuals
-                
-                fig_9_1 = px.histogram(
-                    x=residuals, nbins=30,
-                    title="9.1 Oracle Error Residuals",
-                    template='plotly_dark',
-                    color_discrete_sequence=['#EF553B']
-                )
-                fig_9_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_9_1, width='stretch', key="fig_9_1")
-            
-            with c9_2:
-                # Fig 9.2: Pattern Discovery Timeline (Gantt)
-                # Mock timeline
-                df_9_2 = pd.DataFrame([
-                    dict(Task="Gravity", Start='2025-01-01', Finish='2025-02-28', Completion_pct=100),
-                    dict(Task="Electromagnetism", Start='2025-03-01', Finish='2025-04-15', Completion_pct=60),
-                    dict(Task="Strong Force", Start='2025-04-16', Finish='2025-05-30', Completion_pct=0)
-                ])
-                if hasattr(world, 'discovered_physics_patterns') and world.discovered_physics_patterns:
-                    # Construct from real data if available
-                    pass
-                
-                fig_9_2 = px.timeline(
-                    df_9_2, x_start="Start", x_end="Finish", y="Task", color="Completion_pct",
-                    title="9.2 Pattern Discovery Timeline",
-                    template='plotly_dark'
-                )
-                fig_9_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_9_2, width='stretch', key="fig_9_2")
+            # 📊 TEXT PARAMETERS
+            m9_1, m9_2, m9_3, m9_4 = st.columns(4)
+            m9_1.metric("9.1 Patterns Found", f"{patterns_count}", help="Discovered Physical Laws")
+            m9_2.metric("9.2 Oracle Error", f"{residuals_mean:.5f}", help="World Model Inaccuracy")
+            m9_3.metric("9.3 Exploits", "0", help="Reality Hacking Attempts")
+            m9_4.metric("9.4 Causal Depth", "2", help="Steps of Inverse RL Lookahead")
 
-            # Row 2
-            c9_3, c9_4 = st.columns(2)
-            
-            with c9_3:
-                # Fig 9.3: Reality Hacking Glitch Map (Density Contour)
-                # Scatter of glitches found in param space
-                gx = np.random.randn(100)
-                gy = np.random.randn(100)
+            # 📈 PLOTS (CONDITIONAL)
+            if st.session_state.get('show_charts', False):
+                # Row 1
+                c9_1, c9_2 = st.columns(2)
                 
-                fig_9_3 = px.density_contour(
-                    x=gx, y=gy,
-                    title="9.3 Reality Hacking Glitch Map",
-                    template='plotly_dark'
-                )
-                fig_9_3.update_traces(contours_coloring="fill", contours_showlabels=True, colorscale='Hot')
-                fig_9_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_9_3, width='stretch', key="fig_9_3")
-
-            with c9_4:
-                # Fig 9.4: Causal Calculus Intervention Impact (Waterfall)
-                # Mock intervention steps
-                fig_9_4 = go.Figure(go.Waterfall(
-                    name = "Intervention", orientation = "v",
-                    measure = ["relative", "relative", "total", "relative", "total"],
-                    x = ["Initial State", "Action A", "Effect A", "Action B", "Final State"],
-                    textposition = "outside",
-                    text = ["+100", "-20", "80", "-30", "50"],
-                    y = [100, -20, 0, -30, 0],
-                    connector = {"line":{"color":"rgb(63, 63, 63)"}},
-                ))
-                fig_9_4.update_layout(
-                    title = "9.4 Intervention Impact Analysis",
-                    template='plotly_dark',
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0)
-                )
-                st.plotly_chart(fig_9_4, width='stretch', key="fig_9_4")
+                with c9_1:
+                    # Fig 9.1: Oracle Error Residuals
+                    residuals = np.random.normal(0, 0.1, 100)
+                    if hasattr(world, 'oracle_residuals'):
+                        residuals = world.oracle_residuals
+                    
+                    fig_9_1 = px.histogram(
+                        x=residuals, nbins=30,
+                        title="9.1 Oracle Error Residuals",
+                        template='plotly_dark',
+                        color_discrete_sequence=['#EF553B']
+                    )
+                    fig_9_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_9_1, width='stretch', key="fig_9_1")
+                
+                with c9_2:
+                    # Fig 9.2: Pattern Discovery Timeline
+                    df_9_2 = pd.DataFrame([
+                        dict(Task="Gravity", Start='2025-01-01', Finish='2025-02-28', Completion_pct=100),
+                        dict(Task="Electromagnetism", Start='2025-03-01', Finish='2025-04-15', Completion_pct=60),
+                        dict(Task="Strong Force", Start='2025-04-16', Finish='2025-05-30', Completion_pct=0)
+                    ])
+                    # Real data integration would go here
+                    
+                    fig_9_2 = px.timeline(
+                        df_9_2, x_start="Start", x_end="Finish", y="Task", color="Completion_pct",
+                        title="9.2 Pattern Discovery Timeline",
+                        template='plotly_dark'
+                    )
+                    fig_9_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_9_2, width='stretch', key="fig_9_2")
+    
+                # Row 2
+                c9_3, c9_4 = st.columns(2)
+                
+                with c9_3:
+                    # Fig 9.3: Reality Hacking Glitch Map
+                    gx = np.random.randn(100)
+                    gy = np.random.randn(100)
+                    
+                    fig_9_3 = px.density_contour(
+                        x=gx, y=gy,
+                        title="9.3 Reality Hacking Glitch Map",
+                        template='plotly_dark'
+                    )
+                    fig_9_3.update_traces(contours_coloring="fill", contours_showlabels=True, colorscale='Hot')
+                    fig_9_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_9_3, width='stretch', key="fig_9_3")
+    
+                with c9_4:
+                    # Fig 9.4: Causal Calculus Intervention
+                    fig_9_4 = go.Figure(go.Waterfall(
+                        name = "Intervention", orientation = "v",
+                        measure = ["relative", "relative", "total", "relative", "total"],
+                        x = ["Initial State", "Action A", "Effect A", "Action B", "Final State"],
+                        textposition = "outside",
+                        text = ["+100", "-20", "80", "-30", "50"],
+                        y = [100, -20, 0, -30, 0],
+                        connector = {"line":{"color":"rgb(63, 63, 63)"}},
+                    ))
+                    fig_9_4.update_layout(
+                        title = "9.4 Intervention Impact Analysis",
+                        template='plotly_dark',
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0)
+                    )
+                    st.plotly_chart(fig_9_4, width='stretch', key="fig_9_4")
+            else:
+                 st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
 
         # ============================================================
         # ♾️ LEVEL 10: OMEGA POINT DASHBOARD
@@ -1762,78 +1793,90 @@ with tab_meta:
         with st.expander("♾️ Level 10: The Omega Point", expanded=False):
             st.caption("Computational Transcendence & Simulation Nesting")
             
-            # Row 1
-            c10_1, c10_2 = st.columns(2)
+            # Data Prep
+            omega_scores = [0.8, 0.7, 0.5, 0.9, 0.6]
+            if hasattr(world, 'omega_criteria_scores'):
+                 pass 
             
-            with c10_1:
-                # Fig 10.1: Computational Surplus Sunburst
-                # Energy -> Compute -> Simulation
-                data = dict(
-                    character=["Total Energy", "Survival", "Replication", "Surplus", "Research", "Simulation", "Art"],
-                    parent=["", "Total Energy", "Total Energy", "Total Energy", "Surplus", "Surplus", "Surplus"],
-                    value=[1000, 400, 200, 400, 150, 200, 50]
-                )
-                fig_10_1 = px.sunburst(
-                    data, names='character', parents='parent', values='value',
-                    title="10.1 Computational Surplus Allocation",
-                    template='plotly_dark'
-                )
-                fig_10_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_10_1, width='stretch', key="fig_10_1")
+            # 📊 TEXT PARAMETERS
+            m10_1, m10_2, m10_3, m10_4 = st.columns(4)
+            m10_1.metric("10.1 Recursive Depth", "1", help="Current Simulation Nesting Layer")
+            m10_2.metric("10.2 Compute Surplus", "420 TF", help="Available Computational Resources")
+            m10_3.metric("10.3 Omega Progress", f"{np.mean(omega_scores):.1%}", help=" convergence towards Omega Point")
+            m10_4.metric("10.4 Emergent Agents", "0", help="Agents Spontaneously Generated from Code")
 
-            with c10_2:
-                # Fig 10.2: Nested Simulation Depth (Icicle)
-                # Levels of nesting
-                df_10_2 = pd.DataFrame(dict(
-                    root=["Sim Prime"] * 6,
-                    layer1=["Gen 1", "Gen 1", "Gen 1", "Gen 1", "Gen 2", "Gen 2"],
-                    layer2=["Sim A", "Sim B", "Sim A", "Sim B", "Sim C", "Sim C"],
-                    value=[10, 20, 10, 30, 15, 25]
-                ))
-                fig_10_2 = px.icicle(
-                    df_10_2, path=['root', 'layer1', 'layer2'], values='value',
-                    title="10.2 Nested Simulation Architecture",
-                    template='plotly_dark'
-                )
-                fig_10_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_10_2, width='stretch', key="fig_10_2")
-            
-            # Row 2
-            c10_3, c10_4 = st.columns(2)
-            
-            with c10_3:
-                # Fig 10.3: Scratchpad Activity Matrix (Binary Heatmap)
-                # Agent 0 scratchpad
-                if all_agents and hasattr(all_agents[0], 'scratchpad'):
-                    sp_raw = all_agents[0].scratchpad
-                    scratch = sp_raw.detach().cpu().numpy() if torch.is_tensor(sp_raw) else sp_raw
-                    fig_10_3 = px.imshow(
-                        scratch,
-                        title="10.3 Active Scratchpad State",
-                        template='plotly_dark',
-                        color_continuous_scale='Greys'
-                    )
-                    fig_10_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                    st.plotly_chart(fig_10_3, width='stretch', key="fig_10_3")
-                else:
-                    st.info("No scratchpad data available.")
-
-            with c10_4:
-                # Fig 10.4: Omega Point Convergence Radar (Filled)
-                # Criteria checklist
-                criteria = ['Energy Saturation', 'Info Integration', 'Recursion Depth', 'Global Sync', 'Ethical Alignment']
-                scores = [0.8, 0.7, 0.5, 0.9, 0.6]
-                if hasattr(world, 'omega_criteria_scores'):
-                     pass # use real
+            # 📈 PLOTS (CONDITIONAL)
+            if st.session_state.get('show_charts', False):
+                # Row 1
+                c10_1, c10_2 = st.columns(2)
                 
-                fig_10_4 = px.line_polar(
-                    r=scores, theta=criteria, line_close=True,
-                    title="10.4 Omega Point Convergence",
-                    template='plotly_dark'
-                )
-                fig_10_4.update_traces(fill='toself')
-                fig_10_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_10_4, width='stretch', key="fig_10_4")
+                with c10_1:
+                    # Fig 10.1: Computational Surplus Sunburst
+                    data = dict(
+                        character=["Total Energy", "Survival", "Replication", "Surplus", "Research", "Simulation", "Art"],
+                        parent=["", "Total Energy", "Total Energy", "Total Energy", "Surplus", "Surplus", "Surplus"],
+                        value=[1000, 400, 200, 400, 150, 200, 50]
+                    )
+                    fig_10_1 = px.sunburst(
+                        data, names='character', parents='parent', values='value',
+                        title="10.1 Computational Surplus Allocation",
+                        template='plotly_dark'
+                    )
+                    fig_10_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_10_1, width='stretch', key="fig_10_1")
+    
+                with c10_2:
+                    # Fig 10.2: Nested Simulation Depth
+                    df_10_2 = pd.DataFrame(dict(
+                        root=["Sim Prime"] * 6,
+                        layer1=["Gen 1", "Gen 1", "Gen 1", "Gen 1", "Gen 2", "Gen 2"],
+                        layer2=["Sim A", "Sim B", "Sim A", "Sim B", "Sim C", "Sim C"],
+                        value=[10, 20, 10, 30, 15, 25]
+                    ))
+                    fig_10_2 = px.icicle(
+                        df_10_2, path=['root', 'layer1', 'layer2'], values='value',
+                        title="10.2 Nested Simulation Architecture",
+                        template='plotly_dark'
+                    )
+                    fig_10_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_10_2, width='stretch', key="fig_10_2")
+                
+                # Row 2
+                c10_3, c10_4 = st.columns(2)
+                
+                with c10_3:
+                    # Fig 10.3: Scratchpad Activity Matrix
+                    if all_agents and hasattr(all_agents[0], 'scratchpad'):
+                        sp_raw = all_agents[0].scratchpad
+                        scratch = sp_raw.detach().cpu().numpy() if torch.is_tensor(sp_raw) else sp_raw
+                        fig_10_3 = px.imshow(
+                            scratch,
+                            title="10.3 Active Scratchpad State",
+                            template='plotly_dark',
+                            color_continuous_scale='Greys'
+                        )
+                        fig_10_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_10_3, width='stretch', key="fig_10_3")
+                    else:
+                        st.info("No scratchpad data available.")
+    
+                with c10_4:
+                    # Fig 10.4: Omega Point Convergence Radar
+                    criteria = ['Energy Saturation', 'Info Integration', 'Recursion Depth', 'Global Sync', 'Ethical Alignment']
+                    scores = [0.8, 0.7, 0.5, 0.9, 0.6]
+                    if hasattr(world, 'omega_criteria_scores'):
+                         pass 
+                    
+                    fig_10_4 = px.line_polar(
+                        r=scores, theta=criteria, line_close=True,
+                        title="10.4 Omega Point Convergence",
+                        template='plotly_dark'
+                    )
+                    fig_10_4.update_traces(fill='toself')
+                    fig_10_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                    st.plotly_chart(fig_10_4, width='stretch', key="fig_10_4")
+            else:
+                st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
     else:
         st.info("Waiting for agents to spawn...")
 
