@@ -660,6 +660,34 @@ with tab_macro:
                 ac.append(f"rgb({rgb[0]},{rgb[1]},{rgb[2]})")
                 at.append(f"{agent.id[:4]} ({agent.energy:.0f}E)")
                 
+            # 1.5 Draw Structures (Level 6)
+            if hasattr(st.session_state.world, 'structures') and st.session_state.world.structures:
+                sx, sy, stext, smarkers, scolors = [], [], [], [], []
+                
+                # Mapper for structure visuals
+                struct_map = {
+                    "trap": {"symbol": "x", "color": "red", "icon": "🕸️"},
+                    "barrier": {"symbol": "square", "color": "blue", "icon": "🛡️"},
+                    "battery": {"symbol": "circle", "color": "yellow", "icon": "🔋"},
+                    "cultivator": {"symbol": "diamond", "color": "green", "icon": "🌱"},
+                    "generic": {"symbol": "triangle-up", "color": "grey", "icon": "🏗️"}
+                }
+                
+                for (x, y), struct in st.session_state.world.structures.items():
+                    sx.append(x)
+                    sy.append(y)
+                    meta = struct_map.get(struct.structure_type, struct_map["generic"])
+                    stext.append(f"{meta['icon']} {struct.structure_type.title()} (HP: {struct.durability:.0f})")
+                    smarkers.append(meta["symbol"])
+                    scolors.append(meta["color"])
+                    
+                fig_map.add_trace(go.Scatter(
+                    x=sx, y=sy, mode='markers',
+                    marker=dict(symbol=smarkers, color=scolors, size=12, line=dict(width=1, color='white')),
+                    text=stext, hoverinfo='text',
+                    name="Structures"
+                ))
+
             fig_map.add_trace(go.Scatter(
                 x=ax, y=ay, mode='markers',
                 marker=dict(color=ac, size=8, line=dict(width=1, color='white')),
