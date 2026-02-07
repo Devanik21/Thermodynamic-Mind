@@ -1132,31 +1132,41 @@ with tab_culture:
             sg_c1, sg_c2 = st.columns(2)
             
             def generate_procedural_map(freq, offset):
-                # Use freq + offset as a seed for a 3x3 transformation matrix
-                # This ensures infinite unique but stable combinations
+                # We use a deterministic but unique shuffling and mixing logic
                 state = np.random.RandomState(freq + offset)
-                matrix = state.randn(3, 3) * 2.5
                 
-                # Apply transformation: (40, 40, 3) @ (3, 3) -> (40, 40, 3)
-                transformed = np.dot(grid_data, matrix)
+                # Permutation of channels for diverse but structured color palettes
+                perm = state.permutation(3)
+                base = grid_data[:, :, perm]
                 
-                # Nonlinear enhancement for "colorful pixels" vibe on dark background
-                transformed = np.abs(transformed) 
-                transformed = np.power(transformed, 1.3) # Boost contrast
+                # Create a vibrancy matrix that mixes channels but keeps them distinct
+                # We want high peaks to stay colorful (not white)
+                mix_matrix = state.uniform(0.5, 3.0, (3, 3))
+                # Diagonally dominant matrix ensures the "core" color of the channel remains
+                mix_matrix += np.eye(3) * 2.0
+                mix_matrix /= mix_matrix.sum(axis=1, keepdims=True)
                 
-                # Final RGB conversion
+                # Apply procedural mix
+                transformed = np.dot(base, mix_matrix)
+                
+                # 🚀 NOBEL VIBRANCY BOOST
+                # Power scaling makes the background dark while making 'hot' pixels pop
+                transformed = np.power(transformed, 1.2)
+                transformed *= 2.5 # Brightness multiplier
+                
+                # Final RGB conversion with pixelated integer clipping
                 rgb = np.clip(transformed * 255, 0, 255).astype(np.uint8)
                 return rgb
 
             with sg_c1:
-                rgb_v1 = generate_procedural_map(garden_freq, 0)
-                fig_sg1 = px.imshow(rgb_v1, title=f"💠 Resonance Alpha ({garden_freq})", template='plotly_dark')
+                rgb_v1 = generate_procedural_map(garden_freq, 101)
+                fig_sg1 = px.imshow(rgb_v1, title=f"🔮 Spectral Phase Alpha ({garden_freq})", template='plotly_dark')
                 fig_sg1.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg1, width='stretch', key=f"fig_sg1_{garden_freq}")
                 
             with sg_c2:
-                rgb_v2 = generate_procedural_map(garden_freq, 1337)
-                fig_sg2 = px.imshow(rgb_v2, title=f"💠 Resonance Beta ({garden_freq+1})", template='plotly_dark')
+                rgb_v2 = generate_procedural_map(garden_freq, 202)
+                fig_sg2 = px.imshow(rgb_v2, title=f"🔮 Spectral Phase Beta ({garden_freq+1})", template='plotly_dark')
                 fig_sg2.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg2, width='stretch', key=f"fig_sg2_{garden_freq}")
                 
@@ -1164,14 +1174,14 @@ with tab_culture:
             sg_c3, sg_c4 = st.columns(2)
             
             with sg_c3:
-                rgb_v3 = generate_procedural_map(garden_freq, 777)
-                fig_sg3 = px.imshow(rgb_v3, title=f"💠 Resonance Gamma ({garden_freq+2})", template='plotly_dark')
+                rgb_v3 = generate_procedural_map(garden_freq, 303)
+                fig_sg3 = px.imshow(rgb_v3, title=f"🔮 Spectral Phase Gamma ({garden_freq+2})", template='plotly_dark')
                 fig_sg3.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg3, width='stretch', key=f"fig_sg3_{garden_freq}")
                 
             with sg_c4:
-                rgb_v4 = generate_procedural_map(garden_freq, 9999)
-                fig_sg4 = px.imshow(rgb_v4, title=f"💠 Resonance Delta ({garden_freq+3})", template='plotly_dark')
+                rgb_v4 = generate_procedural_map(garden_freq, 404)
+                fig_sg4 = px.imshow(rgb_v4, title=f"🔮 Spectral Phase Delta ({garden_freq+3})", template='plotly_dark')
                 fig_sg4.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_sg4, width='stretch', key=f"fig_sg4_{garden_freq}")
     else:
