@@ -751,6 +751,13 @@ with tab_macro:
         with col_m4: st.metric("Net Flux", f"{latest['pos_flux'] - latest['neg_flux']:.1f}")
         
         st.markdown("---")
+
+        with st.expander("📝 Recent Discovery Logs", expanded=False):
+            if st.session_state.event_log:
+                for event in st.session_state.event_log[:10]:
+                    st.write(f"**Tick {event['Tick']}**: {event['Event']}")
+            else:
+                st.info("Awaiting simulation events...")
         
         if st.session_state.get("show_charts", False):
             # Row 1: Graphs
