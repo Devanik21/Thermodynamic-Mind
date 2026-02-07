@@ -1117,76 +1117,65 @@ with tab_culture:
              st.dataframe(log_df[["Agent", "Event"]], width='stretch', height=400)
 
     st.markdown("---")
-    st.markdown("### 🗺️ Stigmergy Garden")
+    st.markdown("### ♾️ Infinite Stigmergy Garden")
+    st.caption("A Nobel-level procedural visualization of collective knowledge. Cycle through infinite spectral perspectives using the slider.")
     
     if st.session_state.get("show_charts", False):
         if hasattr(st.session_state.world, 'meme_grid'):
             # Base Grid: (40, 40, 3) -> R(Danger), G(Food), B(Sacred)
             grid_data = st.session_state.world.meme_grid
             
+            # 🎨 INFINITE GENERATOR
+            garden_freq = st.slider("Garden Resonance Frequency", 0, 1000, 42, help="Procedurally mixes the 21D meme manifold into RGB space.")
+            
             # Row 1
             sg_c1, sg_c2 = st.columns(2)
             
-            with sg_c1:
-                # Variant 1: "Neon Cyberpunk" - Amplify Green & Blue, suppress Red
-                # Mapping: R=Sacred, G=Resource, B=Danger (Color Swap)
-                grid_v1 = np.zeros_like(grid_data)
-                grid_v1[:,:,0] = grid_data[:,:,2] * 2.0  # R <- Sacred (Boosted)
-                grid_v1[:,:,1] = grid_data[:,:,1] * 1.5  # G <- Resource
-                grid_v1[:,:,2] = grid_data[:,:,0] * 0.5  # B <- Danger
-                rgb_v1 = np.clip(grid_v1 * 255, 0, 255).astype(np.uint8)
+            def generate_procedural_map(freq, offset):
+                # Use freq + offset as a seed for a 3x3 transformation matrix
+                # This ensures infinite unique but stable combinations
+                state = np.random.RandomState(freq + offset)
+                matrix = state.randn(3, 3) * 2.5
                 
-                fig_sg1 = px.imshow(rgb_v1, title="🏙️ Neon Stigmergy (Cyberpunk)", template='plotly_dark')
-                fig_sg1.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_sg1, width='stretch', key="fig_sg1")
+                # Apply transformation: (40, 40, 3) @ (3, 3) -> (40, 40, 3)
+                transformed = np.dot(grid_data, matrix)
+                
+                # Nonlinear enhancement for "colorful pixels" vibe on dark background
+                transformed = np.abs(transformed) 
+                transformed = np.power(transformed, 1.3) # Boost contrast
+                
+                # Final RGB conversion
+                rgb = np.clip(transformed * 255, 0, 255).astype(np.uint8)
+                return rgb
+
+            with sg_c1:
+                rgb_v1 = generate_procedural_map(garden_freq, 0)
+                fig_sg1 = px.imshow(rgb_v1, title=f"💠 Resonance Alpha ({garden_freq})", template='plotly_dark')
+                fig_sg1.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
+                st.plotly_chart(fig_sg1, width='stretch', key=f"fig_sg1_{garden_freq}")
                 
             with sg_c2:
-                # Variant 2: "Thermal Hunter" - High contrast Red/Yellow
-                # Mapping: R=Danger+Resource, G=Danger, B=0
-                grid_v2 = np.zeros_like(grid_data)
-                grid_v2[:,:,0] = (grid_data[:,:,0] + grid_data[:,:,1])  # R <- Activity
-                grid_v2[:,:,1] = grid_data[:,:,0] * 0.8  # G <- Danger (Yellows)
-                grid_v2[:,:,2] = 0  # No Blue
-                rgb_v2 = np.clip(grid_v2 * 255, 0, 255).astype(np.uint8)
-                
-                fig_sg2 = px.imshow(rgb_v2, title="🔥 Thermal Activity Scan", template='plotly_dark')
-                fig_sg2.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_sg2, width='stretch', key="fig_sg2")
+                rgb_v2 = generate_procedural_map(garden_freq, 1337)
+                fig_sg2 = px.imshow(rgb_v2, title=f"💠 Resonance Beta ({garden_freq+1})", template='plotly_dark')
+                fig_sg2.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
+                st.plotly_chart(fig_sg2, width='stretch', key=f"fig_sg2_{garden_freq}")
                 
             # Row 2
             sg_c3, sg_c4 = st.columns(2)
             
             with sg_c3:
-                # Variant 3: "Deep Ocean" - Blue/Teal dominance
-                # Mapping: R=0, G=Sacred, B=Resource+Sacred
-                grid_v3 = np.zeros_like(grid_data)
-                grid_v3[:,:,0] = 0
-                grid_v3[:,:,1] = grid_data[:,:,2] * 0.8  # G <- Sacred
-                grid_v3[:,:,2] = (grid_data[:,:,1] + grid_data[:,:,2]) # B <- All Good Stuff
-                rgb_v3 = np.clip(grid_v3 * 255, 0, 255).astype(np.uint8)
-                
-                fig_sg3 = px.imshow(rgb_v3, title="🌊 Deep Ocean Data", template='plotly_dark')
-                fig_sg3.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_sg3, width='stretch', key="fig_sg3")
+                rgb_v3 = generate_procedural_map(garden_freq, 777)
+                fig_sg3 = px.imshow(rgb_v3, title=f"💠 Resonance Gamma ({garden_freq+2})", template='plotly_dark')
+                fig_sg3.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
+                st.plotly_chart(fig_sg3, width='stretch', key=f"fig_sg3_{garden_freq}")
                 
             with sg_c4:
-                # Variant 4: "Negative Zone" - Inverted colors
-                # White background, dark traces? Or just inverted channels
-                grid_v4 = 1.0 - grid_data # Invert
-                # Mask out empty space (where sum is near 0 in original)? 
-                # Better: Invert channels but keep black bg? No, lets do "Alien X-Ray"
-                # R=Resource, G=Danger, B=Sacred (Total Swap)
-                grid_v4 = np.zeros_like(grid_data)
-                grid_v4[:,:,0] = grid_data[:,:,1] # R <- Food (Red Meat)
-                grid_v4[:,:,1] = grid_data[:,:,0] # G <- Danger (Toxic Green)
-                grid_v4[:,:,2] = grid_data[:,:,2] # B <- Sacred
-                rgb_v4 = np.clip(grid_v4 * 255, 0, 255).astype(np.uint8)
-                
-                fig_sg4 = px.imshow(rgb_v4, title="👽 Alien X-Ray Spectrum", template='plotly_dark')
-                fig_sg4.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig_sg4, width='stretch', key="fig_sg4")
+                rgb_v4 = generate_procedural_map(garden_freq, 9999)
+                fig_sg4 = px.imshow(rgb_v4, title=f"💠 Resonance Delta ({garden_freq+3})", template='plotly_dark')
+                fig_sg4.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
+                st.plotly_chart(fig_sg4, width='stretch', key=f"fig_sg4_{garden_freq}")
     else:
-        st.info("Enable 'Show Live Charts' to enter the Stigmergy Garden.")
+        st.info("Enable 'Show Live Charts' to enter the Infinite Garden.")
 
 with tab_omega:
     col_civ, col_agent = st.columns([1, 2])
