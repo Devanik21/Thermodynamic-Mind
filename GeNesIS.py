@@ -1729,10 +1729,9 @@ with tab_meta:
                 fig_9_3 = px.density_contour(
                     x=gx, y=gy,
                     title="9.3 Reality Hacking Glitch Map",
-                    template='plotly_dark',
-                    color_continuous_scale='Hot'
+                    template='plotly_dark'
                 )
-                fig_9_3.update_traces(contours_coloring="fill", contours_showlabels = True)
+                fig_9_3.update_traces(contours_coloring="fill", contours_showlabels=True, colorscale='Hot')
                 fig_9_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                 st.plotly_chart(fig_9_3, width='stretch', key="fig_9_3")
 
