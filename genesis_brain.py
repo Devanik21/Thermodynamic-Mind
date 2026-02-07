@@ -648,7 +648,7 @@ class GenesisAgent:
 
         # 9.7 Reality Hacking (Glitch Search)
         # Check for floating point anomalies in own action
-        self.find_glitch(self.last_hidden, vector, self.last_reward)
+        self.find_glitch(self.hidden_state, vector, self.last_reward)
 
         # 7.7 Distributed Memory (Rare social event)
         if social_trust > 0.8 and random.random() < 0.05:
