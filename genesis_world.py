@@ -376,6 +376,38 @@ class GenesisWorld:
         self.omega_achieved = False  # Global verification flag
         self.global_scratchpad_activity = 0  # Total scratchpad writes
         self.nested_simulation_depth_max = 0  # Maximum nesting observed
+        
+        # ============================================================
+        # 🔧 AUDIT FIX: NEW STATE VARIABLES
+        # ============================================================
+        # 1.10 Enhanced Entropy Verification
+        self.entropy_verification_count = 0
+        
+        # 3.4 Tradition Persistence Tracking
+        self.tradition_tracker = {}  # {generation: [behavior_vectors]}
+        self.tradition_persistence_verified = False
+        
+        # 3.5 Cultural Drift
+        self.cultural_divergence = 0.0  # KL divergence between spatial groups
+        
+        # 3.8 Cultural Ratchet
+        self.invention_history = []  # [{type: 'discovery'/'loss', tick, count}]
+        self.cultural_ratchet_verified = False
+        
+        # 4.9 Leadership Tracking
+        self.current_alphas = []  # List of alpha agent IDs
+        
+        # 6.9 Planetary Engineering
+        self.planetary_structure_coverage = 0.0
+        self.planetary_engineering_verified = False
+        
+        # 6.10 Type II Civilization
+        self.structure_energy_ratio = 0.0
+        self.type_ii_verified = False
+        
+        # 8.0 Symbol Grounding
+        self.symbol_grounding_r2 = 0.0
+        self.symbol_grounding_verified = False
 
     def collective_memory_retrieval(self):
         """4.9 Collective Memory: Agents with low confidence query the hive."""
@@ -1211,3 +1243,247 @@ class GenesisWorld:
         # Level 10: Omega Point (every 20 ticks)
         if self.time_step % 20 == 0:
             self.update_omega_tracking()
+        
+        # ============================================================
+        # 🔧 AUDIT FIX: RUN VERIFICATION CHECKS
+        # ============================================================
+        if self.time_step % 100 == 0:
+            self.verify_tradition_persistence()
+            self.measure_cultural_drift()
+            self.verify_cultural_ratchet()
+            self.compute_planetary_coverage()
+            self.verify_type_ii_civilization()
+            self.verify_symbol_grounding()
+            self._update_leadership()
+
+    # ============================================================
+    # 🔧 AUDIT FIX: NEW METHODS FOR MISSING FEATURES
+    # ============================================================
+    
+    def verify_tradition_persistence(self):
+        """3.4 Verify behavior autocorrelation > 0.7 at lag=10 generations."""
+        if not self.agents:
+            return False
+        
+        # Get current population's average behavior
+        current_behaviors = []
+        max_gen = max(a.generation for a in self.agents.values())
+        
+        for agent in self.agents.values():
+            if hasattr(agent, 'tradition_history') and agent.tradition_history:
+                current_behaviors.append(agent.tradition_history[-1])
+        
+        if not current_behaviors:
+            return False
+        
+        # Store in tracker by generation
+        self.tradition_tracker[max_gen] = current_behaviors
+        
+        # Clean old entries
+        if len(self.tradition_tracker) > 20:
+            oldest = min(self.tradition_tracker.keys())
+            del self.tradition_tracker[oldest]
+        
+        # Check autocorrelation at lag=10
+        gen_keys = sorted(self.tradition_tracker.keys())
+        if len(gen_keys) < 10:
+            return False
+        
+        behaviors_now = self.tradition_tracker.get(gen_keys[-1], [])
+        behaviors_lag = self.tradition_tracker.get(gen_keys[-10], [])
+        
+        if not behaviors_now or not behaviors_lag:
+            return False
+        
+        try:
+            avg_now = np.mean(behaviors_now, axis=0)
+            avg_lag = np.mean(behaviors_lag, axis=0)
+            
+            if len(avg_now) != len(avg_lag):
+                return False
+            
+            correlation = np.corrcoef(avg_now, avg_lag)[0, 1]
+            self.tradition_persistence_verified = correlation > 0.7
+            return self.tradition_persistence_verified
+        except:
+            return False
+    
+    def measure_cultural_drift(self):
+        """3.5 Cultural Drift: Measure KL divergence between spatial groups."""
+        if len(self.agents) < 20:
+            self.cultural_divergence = 0.0
+            return 0.0
+        
+        # Divide agents into quadrants
+        quadrants = {0: [], 1: [], 2: [], 3: []}
+        mid = self.size // 2
+        
+        for agent in self.agents.values():
+            q = (0 if agent.x < mid else 1) + (0 if agent.y < mid else 2)
+            quadrants[q].append(agent.tag)
+        
+        # Calculate tag distribution divergence
+        divergences = []
+        for i in range(4):
+            for j in range(i+1, 4):
+                if quadrants[i] and quadrants[j]:
+                    mean_i = np.mean(quadrants[i], axis=0)
+                    mean_j = np.mean(quadrants[j], axis=0)
+                    # Symmetric KL approximation
+                    kl = np.sum(np.abs(mean_i - mean_j))
+                    divergences.append(kl)
+        
+        self.cultural_divergence = np.mean(divergences) if divergences else 0.0
+        return self.cultural_divergence
+    
+    def verify_cultural_ratchet(self):
+        """3.8 Check if invention loss rate < discovery rate."""
+        # Track discoveries vs losses
+        current_inventions = sum(len(getattr(a, 'inventions', [])) for a in self.agents.values())
+        
+        if not hasattr(self, '_last_invention_count'):
+            self._last_invention_count = current_inventions
+            return False
+        
+        delta = current_inventions - self._last_invention_count
+        self._last_invention_count = current_inventions
+        
+        event_type = 'discovery' if delta > 0 else 'loss' if delta < 0 else 'stable'
+        self.invention_history.append({
+            'type': event_type,
+            'tick': self.time_step,
+            'delta': delta
+        })
+        
+        # Keep only last 100 entries
+        if len(self.invention_history) > 100:
+            self.invention_history.pop(0)
+        
+        discoveries = sum(1 for e in self.invention_history if e['type'] == 'discovery')
+        losses = sum(1 for e in self.invention_history if e['type'] == 'loss')
+        
+        self.cultural_ratchet_verified = discoveries > losses
+        return self.cultural_ratchet_verified
+    
+    def _update_leadership(self):
+        """4.9 Update alpha/leadership based on influence."""
+        if not self.agents:
+            self.current_alphas = []
+            return
+        
+        agents_list = list(self.agents.values())
+        agents_list.sort(key=lambda a: getattr(a, 'influence', 0), reverse=True)
+        
+        new_alphas = []
+        for agent in agents_list[:3]:
+            agent.is_alpha = True
+            new_alphas.append(agent.id)
+        
+        for agent in agents_list[3:]:
+            if hasattr(agent, 'is_alpha'):
+                agent.is_alpha = False
+        
+        # Check for leadership turnover
+        if self.current_alphas and set(new_alphas) != set(self.current_alphas):
+            # Leadership changed - log event
+            if hasattr(st, 'session_state') and hasattr(st.session_state, 'event_log'):
+                st.session_state.event_log.insert(0, {
+                    "Tick": self.time_step,
+                    "Agent": "HIVE",
+                    "Event": f"👑 LEADERSHIP TURNOVER",
+                    "Vector": [0]*21
+                })
+        
+        self.current_alphas = new_alphas
+    
+    def compute_planetary_coverage(self):
+        """6.9 Calculate structure coverage."""
+        total_tiles = self.size * self.size
+        structure_tiles = len(self.structures)
+        self.planetary_structure_coverage = structure_tiles / total_tiles
+        self.planetary_engineering_verified = self.planetary_structure_coverage > 0.01
+        return self.planetary_engineering_verified
+    
+    def verify_type_ii_civilization(self):
+        """6.10 Check if >50% energy from structures."""
+        total_agent_energy = sum(a.energy for a in self.agents.values())
+        structure_energy = sum(
+            getattr(s, 'stored_energy', 0) for s in self.structures.values()
+        )
+        
+        total = total_agent_energy + structure_energy
+        if total > 0:
+            self.structure_energy_ratio = structure_energy / total
+        else:
+            self.structure_energy_ratio = 0.0
+        
+        self.type_ii_verified = self.structure_energy_ratio > 0.5
+        return self.type_ii_verified
+    
+    def verify_symbol_grounding(self):
+        """8.0 Verify concept→environment R² > 0.7."""
+        if len(self.agents) < 10:
+            return False
+        
+        concepts = []
+        env_states = []
+        
+        for agent in list(self.agents.values())[:30]:
+            if hasattr(agent, 'last_concepts') and agent.last_concepts is not None:
+                try:
+                    c = agent.last_concepts.detach().cpu().numpy().flatten()
+                    concepts.append(c)
+                    env_sig = self.get_local_signal(agent.x, agent.y)
+                    env_states.append(env_sig.numpy())
+                except:
+                    pass
+        
+        if len(concepts) < 10:
+            return False
+        
+        try:
+            X = np.array(concepts)
+            Y = np.array(env_states)
+            
+            correlations = []
+            min_dim = min(X.shape[1], Y.shape[1])
+            for i in range(min_dim):
+                corr = np.corrcoef(X[:, i], Y[:, i])[0, 1]
+                if not np.isnan(corr):
+                    correlations.append(corr ** 2)
+            
+            self.symbol_grounding_r2 = np.mean(correlations) if correlations else 0.0
+            self.symbol_grounding_verified = self.symbol_grounding_r2 > 0.7
+            return self.symbol_grounding_verified
+        except:
+            return False
+    
+    def handle_agent_death(self, dying_agent):
+        """1.9 Apoptotic Information Transfer: Handle death broadcasts."""
+        if not hasattr(dying_agent, 'broadcast_death_packet'):
+            return
+        
+        # Create death packet
+        death_packet = dying_agent.broadcast_death_packet()
+        
+        # Broadcast to nearby neighbors
+        neighbors = [
+            a for a in self.agents.values()
+            if a.id != dying_agent.id 
+            and abs(a.x - dying_agent.x) <= 3 
+            and abs(a.y - dying_agent.y) <= 3
+        ]
+        
+        for neighbor in neighbors:
+            if hasattr(neighbor, 'receive_death_wisdom'):
+                neighbor.receive_death_wisdom(death_packet, blend_rate=0.15)
+        
+        # Log the event
+        if hasattr(st, 'session_state') and hasattr(st.session_state, 'event_log'):
+            st.session_state.event_log.insert(0, {
+                "Tick": self.time_step,
+                "Agent": dying_agent.id[:8],
+                "Event": f"💀 DEATH BROADCAST → {len(neighbors)} receivers",
+                "Vector": [0]*21
+            })
+
