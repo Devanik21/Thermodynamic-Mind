@@ -1052,18 +1052,18 @@ with tab_culture:
                  st.metric("East-West Divergence (KL)", f"{kl:.4f}")
                  if kl > 2.0: st.success("✅ Milestone 3.5 Reached!")
 
-         # 3.10 Cultural Speciation
-         st.markdown("### 🗣️ Cultural Speciation (3.10)")
-         if len(st.session_state.world.agents) > 10:
-             # Measure protocol compatibility between East/West
-             pop_A = [a for a in st.session_state.world.agents.values() if a.x < 20]
-             pop_B = [a for a in st.session_state.world.agents.values() if a.x >= 20]
-             if pop_A and pop_B:
-                 proto_A = np.mean([getattr(a, 'protocol_version', 0) for a in pop_A])
-                 proto_B = np.mean([getattr(a, 'protocol_version', 0) for a in pop_B])
-                 cross_compat = 1.0 - abs(proto_A - proto_B)
-                 st.metric("Cross-Group Protocol", f"{cross_compat:.2f}")
-                 if cross_compat < 0.3: st.success("✅ Speciation Diverged!")
+        # 3.10 Cultural Speciation
+        st.markdown("### 🗣️ Cultural Speciation (3.10)")
+        if len(st.session_state.world.agents) > 10:
+            # Measure protocol compatibility between East/West
+            pop_A = [a for a in st.session_state.world.agents.values() if a.x < 20]
+            pop_B = [a for a in st.session_state.world.agents.values() if a.x >= 20]
+            if pop_A and pop_B:
+                proto_A = np.mean([getattr(a, 'protocol_version', 0) for a in pop_A])
+                proto_B = np.mean([getattr(a, 'protocol_version', 0) for a in pop_B])
+                cross_compat = 1.0 - abs(proto_A - proto_B)
+                st.metric("Cross-Group Protocol", f"{cross_compat:.2f}")
+                if cross_compat < 0.3: st.success("✅ Speciation Diverged!")
 
         # 3.6 Innovation Diffusion (S-Curve)
         st.markdown("### 📈 Innovation Diffusion (S-Curve 3.6)")
