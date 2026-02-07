@@ -1121,30 +1121,35 @@ with tab_culture:
     
     if st.session_state.get("show_charts", False):
         if hasattr(st.session_state.world, 'meme_grid'):
+            # Base Grid: (40, 40, 3) -> R(Danger), G(Food), B(Sacred)
             grid_data = st.session_state.world.meme_grid
             
             # Row 1
             sg_c1, sg_c2 = st.columns(2)
             
             with sg_c1:
-                # Plot 1: Danger/Usage - Inferno for Heat/Intensity
-                fig_sg1 = px.imshow(
-                    grid_data[:, :, 0], 
-                    title="🔥 Usage Intensity (Inferno)",
-                    color_continuous_scale='Inferno',
-                    template='plotly_dark'
-                )
+                # Variant 1: "Neon Cyberpunk" - Amplify Green & Blue, suppress Red
+                # Mapping: R=Sacred, G=Resource, B=Danger (Color Swap)
+                grid_v1 = np.zeros_like(grid_data)
+                grid_v1[:,:,0] = grid_data[:,:,2] * 2.0  # R <- Sacred (Boosted)
+                grid_v1[:,:,1] = grid_data[:,:,1] * 1.5  # G <- Resource
+                grid_v1[:,:,2] = grid_data[:,:,0] * 0.5  # B <- Danger
+                rgb_v1 = np.clip(grid_v1 * 255, 0, 255).astype(np.uint8)
+                
+                fig_sg1 = px.imshow(rgb_v1, title="🏙️ Neon Stigmergy (Cyberpunk)", template='plotly_dark')
                 fig_sg1.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig_sg1, width='stretch', key="fig_sg1")
                 
             with sg_c2:
-                # Plot 2: Resources - Viridis for Biological/Quantum vibe
-                fig_sg2 = px.imshow(
-                    grid_data[:, :, 1], 
-                    title="🌿 Bio-Availability (Viridis)",
-                    color_continuous_scale='Viridis',
-                    template='plotly_dark'
-                )
+                # Variant 2: "Thermal Hunter" - High contrast Red/Yellow
+                # Mapping: R=Danger+Resource, G=Danger, B=0
+                grid_v2 = np.zeros_like(grid_data)
+                grid_v2[:,:,0] = (grid_data[:,:,0] + grid_data[:,:,1])  # R <- Activity
+                grid_v2[:,:,1] = grid_data[:,:,0] * 0.8  # G <- Danger (Yellows)
+                grid_v2[:,:,2] = 0  # No Blue
+                rgb_v2 = np.clip(grid_v2 * 255, 0, 255).astype(np.uint8)
+                
+                fig_sg2 = px.imshow(rgb_v2, title="🔥 Thermal Activity Scan", template='plotly_dark')
                 fig_sg2.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig_sg2, width='stretch', key="fig_sg2")
                 
@@ -1152,25 +1157,32 @@ with tab_culture:
             sg_c3, sg_c4 = st.columns(2)
             
             with sg_c3:
-                # Plot 3: Sacred - Icefire for Mystical Duality
-                fig_sg3 = px.imshow(
-                    grid_data[:, :, 2], 
-                    title="💧 Tradition Field (Icefire)",
-                    color_continuous_scale='Icefire',
-                    template='plotly_dark'
-                )
+                # Variant 3: "Deep Ocean" - Blue/Teal dominance
+                # Mapping: R=0, G=Sacred, B=Resource+Sacred
+                grid_v3 = np.zeros_like(grid_data)
+                grid_v3[:,:,0] = 0
+                grid_v3[:,:,1] = grid_data[:,:,2] * 0.8  # G <- Sacred
+                grid_v3[:,:,2] = (grid_data[:,:,1] + grid_data[:,:,2]) # B <- All Good Stuff
+                rgb_v3 = np.clip(grid_v3 * 255, 0, 255).astype(np.uint8)
+                
+                fig_sg3 = px.imshow(rgb_v3, title="🌊 Deep Ocean Data", template='plotly_dark')
                 fig_sg3.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig_sg3, width='stretch', key="fig_sg3")
                 
             with sg_c4:
-                # Plot 4: Composite - Turbo for Full Spectrum Analysis
-                diff_map = grid_data[:, :, 1] - grid_data[:, :, 0] + (grid_data[:, :, 2] * 0.5)
-                fig_sg4 = px.imshow(
-                    diff_map, 
-                    title="🌈 Net Stigmergy Resonance (Turbo)",
-                    color_continuous_scale='Turbo',
-                    template='plotly_dark'
-                )
+                # Variant 4: "Negative Zone" - Inverted colors
+                # White background, dark traces? Or just inverted channels
+                grid_v4 = 1.0 - grid_data # Invert
+                # Mask out empty space (where sum is near 0 in original)? 
+                # Better: Invert channels but keep black bg? No, lets do "Alien X-Ray"
+                # R=Resource, G=Danger, B=Sacred (Total Swap)
+                grid_v4 = np.zeros_like(grid_data)
+                grid_v4[:,:,0] = grid_data[:,:,1] # R <- Food (Red Meat)
+                grid_v4[:,:,1] = grid_data[:,:,0] # G <- Danger (Toxic Green)
+                grid_v4[:,:,2] = grid_data[:,:,2] # B <- Sacred
+                rgb_v4 = np.clip(grid_v4 * 255, 0, 255).astype(np.uint8)
+                
+                fig_sg4 = px.imshow(rgb_v4, title="👽 Alien X-Ray Spectrum", template='plotly_dark')
                 fig_sg4.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig_sg4, width='stretch', key="fig_sg4")
     else:
