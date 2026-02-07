@@ -1127,12 +1127,24 @@ with tab_culture:
             sg_c1, sg_c2 = st.columns(2)
             
             with sg_c1:
-                fig_sg1 = px.imshow(grid_data[:, :, 0], title="🔥 Usage/Danger Stigmergy", color_continuous_scale='Reds', template='plotly_dark')
+                # Plot 1: Danger/Usage - Inferno for Heat/Intensity
+                fig_sg1 = px.imshow(
+                    grid_data[:, :, 0], 
+                    title="🔥 Usage Intensity (Inferno)",
+                    color_continuous_scale='Inferno',
+                    template='plotly_dark'
+                )
                 fig_sg1.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig_sg1, width='stretch', key="fig_sg1")
                 
             with sg_c2:
-                fig_sg2 = px.imshow(grid_data[:, :, 1], title="🌿 Resource/Growth Stigmergy", color_continuous_scale='Greens', template='plotly_dark')
+                # Plot 2: Resources - Viridis for Biological/Quantum vibe
+                fig_sg2 = px.imshow(
+                    grid_data[:, :, 1], 
+                    title="🌿 Bio-Availability (Viridis)",
+                    color_continuous_scale='Viridis',
+                    template='plotly_dark'
+                )
                 fig_sg2.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig_sg2, width='stretch', key="fig_sg2")
                 
@@ -1140,13 +1152,25 @@ with tab_culture:
             sg_c3, sg_c4 = st.columns(2)
             
             with sg_c3:
-                fig_sg3 = px.imshow(grid_data[:, :, 2], title="💧 Sacred/Tradition Stigmergy", color_continuous_scale='Blues', template='plotly_dark')
+                # Plot 3: Sacred - Icefire for Mystical Duality
+                fig_sg3 = px.imshow(
+                    grid_data[:, :, 2], 
+                    title="💧 Tradition Field (Icefire)",
+                    color_continuous_scale='Icefire',
+                    template='plotly_dark'
+                )
                 fig_sg3.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig_sg3, width='stretch', key="fig_sg3")
                 
             with sg_c4:
-                diff_map = grid_data[:, :, 1] - grid_data[:, :, 0]
-                fig_sg4 = px.imshow(diff_map, title="🌗 Net Survival Gradient (Safe - Danger)", color_continuous_scale='RdBu', template='plotly_dark')
+                # Plot 4: Composite - Turbo for Full Spectrum Analysis
+                diff_map = grid_data[:, :, 1] - grid_data[:, :, 0] + (grid_data[:, :, 2] * 0.5)
+                fig_sg4 = px.imshow(
+                    diff_map, 
+                    title="🌈 Net Stigmergy Resonance (Turbo)",
+                    color_continuous_scale='Turbo',
+                    template='plotly_dark'
+                )
                 fig_sg4.update_layout(height=300, margin=dict(l=0,r=0,t=30,b=0))
                 st.plotly_chart(fig_sg4, width='stretch', key="fig_sg4")
     else:
