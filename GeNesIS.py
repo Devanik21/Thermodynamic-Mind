@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "11.1.21" # Level 10: The Omega Point - Complete Implementation
+SYSTEM_VERSION = "11.0.6" # Level 10: The Omega Point - Complete Implementation
 
 def init_system():
     # Force reset if version mismatch
@@ -389,7 +389,7 @@ def update_simulation():
             # 💡 INVENTION DISCOVERY
             # "Genius" is not just about raw power (flux), but about consistent positive yield.
             # Lowering the bar so that 'smart' but small optimizations count as patents.
-            if flux > 12.0:
+            if flux > 10.0:
                 inv_name = classify_invention(agent.last_vector.tolist()[0])
                 if not any(inv['name'] == inv_name for inv in agent.inventions):
                     agent.inventions.append({
@@ -597,36 +597,78 @@ with st.container():
     with col_h4:
         # Global Chart Toggle for Performance
         st.session_state.show_charts = st.checkbox("Show Live Charts", value=False, help="Enable heavy plots. Keep off for speed.")
-        # Optimized Report Generator
-        # No cache here to avoid filling media storage with high-frequency updates
-        def generate_report(stats, genes, events):
-            stats_json = json.dumps(stats, indent=2)
-            gene_json = json.dumps(genes)
-            events_json = json.dumps(events, indent=2)
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr("stats.json", stats_json)
-                zf.writestr("genes.json", gene_json)
-                zf.writestr("events.json", events_json)
-            return zip_buffer.getvalue()
 
-        # We convert complex objects to simpler ones for caching if needed, but for now passing session state contents directly
-        # To avoid caching issues with mutable objects, we clone them or just run generate_report on click.
-        # Streamlit's new button callback pattern is cleaner.
-        
-        if st.button("📦 PREPARE EXPORT", help="Collects simulation data and creates a download link."):
-            encoded_pool_clean = [{k: v.cpu().tolist() for k, v in g.items()} for g in st.session_state.gene_pool]
-            st.session_state.export_zip = generate_report(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log)
-            st.toast("Export ready!", icon="✅")
+    # 💾 PLUG-N-PLAY PERSISTENCE EXPANDER
+    with st.expander("💾 SAVE / LOAD SIMULATION STATE (Plug-n-Play Forever)", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("#### 📤 Export State")
+            st.caption("Serialize the entire simulation (Agents, World, History) to a portable ZIP.")
+            if st.button("📦 BUNDLE STATE", help="Serialize current world state to ZIP."):
+                 try:
+                    # 1. World State
+                    world_data = st.session_state.world.to_json()
+                    world_json = json.dumps(world_data)
+                    
+                    # 2. Session Stats
+                    stats_json = json.dumps(st.session_state.stats_history)
+                    events_json = json.dumps(st.session_state.event_log)
+                    registry_json = json.dumps(st.session_state.global_registry)
+                    culture_json = json.dumps(st.session_state.culture_history)
+                    
+                    # 3. Zip it (No Pickle!)
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                        zf.writestr("world.json", world_json)
+                        zf.writestr("stats.json", stats_json)
+                        zf.writestr("events.json", events_json)
+                        zf.writestr("registry.json", registry_json)
+                        zf.writestr("culture.json", culture_json)
+                        
+                    st.session_state.save_zip = zip_buffer.getvalue()
+                    st.toast("State Bundled! Download below.", icon="✅")
+                 except Exception as e:
+                    st.error(f"Bundle Error: {e}")
+            
+            if "save_zip" in st.session_state:
+                st.download_button(
+                    "💾 DOWNLOAD ZIP", 
+                    st.session_state.save_zip, 
+                    f"genesis_state_{int(time.time())}.zip", 
+                    "application/zip", 
+                    type="primary"
+                )
 
-        if "export_zip" in st.session_state:
-            st.download_button(
-                "💾 DOWNLOAD NOW", 
-                st.session_state.export_zip, 
-                "genesis_data.zip", 
-                "application/zip", 
-                width='stretch'
-            )
+        with c2:
+            st.markdown("#### 📥 Import State")
+            st.caption("Upload a previously saved 'genesis_state.zip' to resume.")
+            uploaded_file = st.file_uploader("Upload State", type="zip", label_visibility="collapsed")
+            if uploaded_file is not None:
+                if st.button("♻️ RESTORE FROM FILE", type="primary"):
+                     try:
+                         with zipfile.ZipFile(uploaded_file) as zf:
+                             # Load JSONs
+                             world_data = json.loads(zf.read("world.json"))
+                             stats_history = json.loads(zf.read("stats.json"))
+                             event_log = json.loads(zf.read("events.json"))
+                             global_registry = json.loads(zf.read("registry.json"))
+                             culture_history = json.loads(zf.read("culture.json"))
+                             
+                             # Reconstruct World
+                             st.session_state.world = GenesisWorld(size=40)
+                             st.session_state.world.from_json(world_data)
+                             
+                             # Restore Stats
+                             st.session_state.stats_history = stats_history
+                             st.session_state.event_log = event_log
+                             st.session_state.global_registry = global_registry
+                             st.session_state.culture_history = culture_history
+                             
+                             st.success("State Restored! Resuming...")
+                             time.sleep(1)
+                             st.rerun()
+                     except Exception as e:
+                         st.error(f"Restore Error: {e}")
 
 # --- MAIN TABS FRAGMENT ---
 tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st.tabs([
@@ -2540,9 +2582,6 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
-
-
 
 
 

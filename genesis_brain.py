@@ -2220,5 +2220,97 @@ class GenesisAgent:
             self.role_history.append(self.role)
             if len(self.role_history) > 100: self.role_history.pop(0)
 
+    # ============================================================
+    # 💾 PLUG-N-PLAY SERIALIZATION
+    # ============================================================
+    def to_json(self):
+        """Serialize agent to JSON-compatible dictionary (No Pickle)."""
+        data = {
+            "id": self.id,
+            "parent_id": self.parent_id,
+            "x": int(self.x),
+            "y": int(self.y),
+            "generation": int(self.generation),
+            "age": int(self.age),
+            "dialect_id": int(self.dialect_id),
+            "energy": float(self.energy),
+            "inventory": [int(x) for x in self.inventory],
+            "role": self.role,
+            "tag": self.tag.tolist() if isinstance(self.tag, np.ndarray) else list(self.tag),
+            "caste_gene": self.caste_gene.tolist() if isinstance(self.caste_gene, np.ndarray) else list(self.caste_gene),
+            "is_fertile": bool(self.is_fertile),
+            "confidence": float(self.confidence),
+            "meta_lr": float(self.meta_lr),
+            
+            # Complex Structures
+            "inventions": self.inventions, 
+            "research_log": self.research_log,
+            "discovered_patterns": self.discovered_patterns,
+            "discovered_exploits": self.discovered_exploits,
+            "discovered_glitches": self.discovered_glitches,
+            
+            # Neural Weights (Flattened to list of floats, precision reduced)
+            "brain_weights": {k: v.cpu().numpy().tolist() for k, v in self.brain.state_dict().items()},
+            
+            # Critical State Tensors
+            "hidden_state": self.hidden_state.cpu().numpy().tolist() if self.hidden_state is not None else None,
+            "last_vector": self.last_vector.cpu().numpy().tolist() if self.last_vector is not None else None,
+            
+            # Level 10
+            "internal_agents": [], # Simplify: Don't serialize nested agents fully yet, just their existence
+            "omega_verified": self.omega_verified
+        }
+        
+        # Simplify internal agents to basic stats to avoid recursion hell
+        if self.internal_agents:
+            data["internal_agents"] = [
+                {"id": a["id"], "goal": float(a["goal"])} for (a) in self.internal_agents
+            ]
+            
+        return data
+
+    @staticmethod
+    def from_json(data):
+        """Reconstruct agent from JSON data."""
+        # Create blank agent
+        agent = GenesisAgent(data["x"], data["y"], generation=data["generation"])
+        
+        # Restore Basic Stats
+        agent.id = data["id"]
+        agent.parent_id = data["parent_id"]
+        agent.age = data["age"]
+        agent.dialect_id = data["dialect_id"]
+        agent.energy = data["energy"]
+        agent.inventory = data["inventory"]
+        agent.role = data["role"]
+        agent.tag = np.array(data["tag"])
+        agent.caste_gene = np.array(data["caste_gene"])
+        agent.is_fertile = data["is_fertile"]
+        agent.confidence = data["confidence"]
+        agent.meta_lr = data["meta_lr"]
+        
+        # Restore Lists
+        agent.inventions = data.get("inventions", [])
+        agent.research_log = data.get("research_log", [])
+        agent.discovered_patterns = data.get("discovered_patterns", [])
+        agent.discovered_exploits = data.get("discovered_exploits", [])
+        agent.discovered_glitches = data.get("discovered_glitches", [])
+        agent.omega_verified = data.get("omega_verified", False)
+        
+        # Restore Neural Weights
+        if "brain_weights" in data:
+            state_dict = {}
+            for k, v in data["brain_weights"].items():
+                state_dict[k] = torch.tensor(v)
+            agent.brain.load_state_dict(state_dict)
+            
+        # Restore Hidden State
+        if data.get("hidden_state"):
+            agent.hidden_state = torch.tensor(data["hidden_state"])
+        if data.get("last_vector"):
+            agent.last_vector = torch.tensor(data["last_vector"])
+            
+        return agent
+
 
 
