@@ -281,6 +281,11 @@ def update_simulation():
                 # Action is technically the vector.
                 agent.probe_physics(reality_vector_tensor, reality_vector_tensor, flux)
                 
+                # 9.4 Causal Data Collection (Fix)
+                # Use argmax to get the dominant action index for the causal graph
+                action_idx = torch.argmax(reality_vector_tensor).item()
+                agent.do_calculus_intervention(action_idx, flux)
+                
                 # 9.1 Detect Patterns (Occasional)
                 if agent.age % 50 == 0:
                     patterns = agent.detect_patterns()
@@ -358,7 +363,7 @@ def update_simulation():
                 # 3.0 Epigenetics: Inherit average hidden state
                 parent_hidden_avg = (agent.hidden_state + partner.hidden_state) / 2.0
                 
-                child = GenesisAgent(new_x, new_y, genome=child_genome, generation=max(agent.generation, partner.generation) + 1, parent_hidden=parent_hidden_avg)
+                child = GenesisAgent(new_x, new_y, genome=child_genome, generation=max(agent.generation, partner.generation) + 1, parent_hidden=parent_hidden_avg, parent_id=agent.id)
                 world.agents[child.id] = child
                 
                 # Cost
@@ -2523,5 +2528,6 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 

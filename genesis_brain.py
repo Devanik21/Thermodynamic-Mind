@@ -141,8 +141,9 @@ class GenesisBrain(nn.Module):
 # 🤖 THE AGENT
 # ============================================================
 class GenesisAgent:
-    def __init__(self, x, y, genome=None, generation=0, parent_hidden=None, parent_inventory=None):
+    def __init__(self, x, y, genome=None, generation=0, parent_hidden=None, parent_inventory=None, parent_id=None):
         self.id = str(uuid.uuid4())
+        self.parent_id = parent_id if parent_id else "World"
         self.x = x
         self.y = y
         self.generation = generation

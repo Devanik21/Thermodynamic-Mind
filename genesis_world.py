@@ -1190,6 +1190,19 @@ class GenesisWorld:
         self.collective_oracle_model_accuracy = best_oracle_acc
         self.collective_simulation_awareness = max_awareness
         self.discovered_physics_patterns = list(set(all_patterns))
+        
+        # 9.2 Discovery Log Update
+        if not hasattr(self, 'discovery_log'):
+             self.discovery_log = []
+             
+        # Check for new patterns to log
+        known_patterns = set(entry['Pattern'] for entry in self.discovery_log)
+        for p in self.discovered_physics_patterns:
+            if p not in known_patterns:
+                self.discovery_log.append({
+                    'Time': self.time_step,
+                    'Pattern': p
+                })
 
     # ============================================================
     # ♾️ LEVEL 10: THE OMEGA POINT METHODS
