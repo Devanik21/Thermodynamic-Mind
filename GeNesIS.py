@@ -1459,11 +1459,9 @@ with tab_meta:
 
                 loss_conv = f"{avg_error:.4f}"
                 
-                # Inference Time Proxy (Dynamic)
-                # Fluctuates with system load and agent complexity
+                # Inference Time Proxy (Estimated based on agent count)
                 base_inf = 10 + (len(all_agents) * 0.05)
-                jitter = random.uniform(-2, 2)
-                inference_time = f"{base_inf + jitter:.1f}ms"
+                inference_time = f"{base_inf:.1f}ms (Est)"
                 
                 st.session_state.l5_cache = {
                     'errors': errors,
@@ -1483,7 +1481,6 @@ with tab_meta:
                     'curiosity': curiosity,
                     'grad_norm': grad_norm,
                     'weight_decay': weight_decay,
-                    'grad_norm': grad_norm,
                     'loss_conv': loss_conv,
                     'model_complexity': model_complexity,
                     'inference_time': inference_time,
@@ -1638,7 +1635,7 @@ with tab_meta:
                 current_bonds = len(world.bonds) * 2 if hasattr(world, 'bonds') else 0
                 network_conn = min(1.0, current_bonds / (total_possible_bonds + 1))
                 
-                maint_cost = f"{int(total_structs * 0.5)}/tick" # Assuming 0.5 decay
+                maint_cost = f"{int(total_structs * 0.05)}/tick" # Actual decay rate (0.05)
                 build_rate = f"{len([s for s in world.structures.values() if s.age < 20]) / 20:.2f}/tick"
                 
                 mining_rate = f"{len([s for s in world.structures.values() if getattr(s, 'structure_type', '') == 'cultivator']) * 2}/tick"
@@ -1827,10 +1824,10 @@ with tab_meta:
                 active_leaders = len([a for a in all_agents if getattr(a, 'is_leader', False)])
                 
                 # Signal to Noise Ratio (Coherence / Entropy)
-                sn_ratio_val = swarm_coherence / (soc_entropy + 0.01)
-                sn_ratio = f"{sn_ratio_val:.1f} dB"
                 hist, _ = np.histogram(phases, bins=10, density=True)
                 soc_entropy = -np.sum(hist * np.log(hist + 1e-9))
+                sn_ratio_val = swarm_coherence / (soc_entropy + 0.01)
+                sn_ratio = f"{sn_ratio_val:.1f} dB"
                 
                 st.session_state.l7_cache = {
                     'phases': phases,
@@ -1845,7 +1842,6 @@ with tab_meta:
                     'info_velocity': info_velocity,
                     'cluster_coeff': cluster_coeff,
                     'small_world': small_world,
-                    'leader_rot': f"{active_leaders} active",
                     'leader_rot': f"{active_leaders} active",
                     'soc_entropy': soc_entropy,
                     'net_diameter': net_diameter,
@@ -2341,7 +2337,7 @@ with tab_meta:
                 
                 # Real Metrics
                 rec_depth = world.nested_simulation_depth_max if hasattr(world, 'nested_simulation_depth_max') else 0
-                compute_surplus = f"{np.mean([a.energy for a in all_agents if a.energy > 80]) * 10:.0f} FLOPS" if any(a.energy > 80 for a in all_agents) else "0 FLOPS"
+                # Rec Depth checked above
                 
                 # Omega Progress (Aggregation of proof keys)
                 total_proofs = sum([len(getattr(a, 'omega_evidence', {})) for a in all_agents])
