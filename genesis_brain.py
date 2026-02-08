@@ -732,13 +732,6 @@ class GenesisAgent:
         # 5.2 Sparsity Loss
         sparsity_loss = self.brain.actor_mask.sparsity() * 0.01
         
-        # 9.3 Train Oracle Model (Level 9 Metric)
-        # Inputs: 21D Action Vector + 16D Matter Signal -> Predicted Flux
-        # We need the local signal that was used for the action (self.last_input)
-        if self.last_input is not None:
-             # Extract 16D Matter Signal from input (first 16 channels)
-             matter_signal = self.last_input[:, :16]
-             self.train_oracle_model(self.last_vector, matter_signal, torch.tensor([[flux]]))
 
         reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
@@ -779,6 +772,14 @@ class GenesisAgent:
                  pass
 
         self.optimizer.step()
+        
+        # 9.3 Train Oracle Model (Level 9 Metric)
+        # MOVED to after step() to prevent "modified in place" errors during brain backward
+        # Inputs: 21D Action Vector + 16D Matter Signal -> Predicted Flux
+        if self.last_input is not None:
+             # Extract 16D Matter Signal from input (first 16 channels)
+             matter_signal = self.last_input[:, :16]
+             self.train_oracle_model(self.last_vector, matter_signal, torch.tensor([[flux]]))
         
         # 4.9 Collective Memory: Natural Forgetting (Weight Decay)
         # MOVED to AFTER step() to prevent "modified in place" errors during backward
