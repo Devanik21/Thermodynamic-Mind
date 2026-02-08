@@ -143,6 +143,7 @@ class GenesisBrain(nn.Module):
 class GenesisAgent:
     def __init__(self, x, y, genome=None, generation=0, parent_hidden=None, parent_inventory=None):
         self.id = str(uuid.uuid4())
+        self.x = x
         self.y = y
         self.generation = generation
         self.age = 0
