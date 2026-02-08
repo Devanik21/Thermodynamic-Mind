@@ -1134,7 +1134,7 @@ class GenesisWorld:
         conscious_count = 0
         loop_count = 0
         
-        for agent in self.agents.values():
+        for agent in list(self.agents.values()):
             if hasattr(agent, 'compute_phi'):
                 phi = agent.compute_phi()
                 phi_values.append(phi)
