@@ -112,6 +112,7 @@ def init_system():
     if "culture_history" not in st.session_state: st.session_state.culture_history = {} # {gen: [vector]}
 
 init_system()
+update_simulation()
 
 # ============================================================
 # 🔄 SIMULATION LOGIC LOOP
@@ -558,7 +559,7 @@ def update_simulation():
         st.session_state.total_events_count += 1 # Global discovery counter
     st.session_state.event_log = st.session_state.event_log[:20]
 
-update_simulation()
+# The update_simulation() call was here, but we move it up to be more robust.
 
 # ============================================================
 # 🖥️ UI RENDERER
