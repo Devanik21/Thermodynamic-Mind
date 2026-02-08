@@ -1393,7 +1393,7 @@ with tab_meta:
         # ============================================================
         # 🧠 LEVEL 5: META-LEARNING DASHBOARD
         # ============================================================
-        with st.expander("🧠 Level 5: Meta-Learning & Architecture", expanded=False):
+        with st.expander("🧠 Level 5: Meta-Learning & Architecture", expanded=True):
             st.caption("Visualizing the Agent's Learning Process & Brain Structure")
             
             # Data Prep (Cached - Spaced out updates to avoid spike at % 20)
@@ -1602,7 +1602,7 @@ with tab_meta:
         # ============================================================
         # 🌍 LEVEL 6: GEO-ENGINEERING DASHBOARD
         # ============================================================
-        with st.expander("🌍 Level 6: Geo-Engineering", expanded=False):
+        with st.expander("🌍 Level 6: Geo-Engineering", expanded=True):
             st.caption("Planetary Modification & Infrastructure Analysis")
 
             # Data Prep (Cached - Offset 2)
@@ -1772,7 +1772,7 @@ with tab_meta:
         # ============================================================
         # 🐝 LEVEL 7: COLLECTIVE MANIFOLD DASHBOARD
         # ============================================================
-        with st.expander("🐝 Level 7: Collective Manifold", expanded=False):
+        with st.expander("🐝 Level 7: Collective Manifold", expanded=True):
             st.caption("Hive Mind Synchronization & Network Topology")
             
             # Data Prep (Cached - Offset 4)
@@ -1966,7 +1966,7 @@ with tab_meta:
         # ============================================================
         # 💭 LEVEL 8: CONSCIOUSNESS DASHBOARD
         # ============================================================
-        with st.expander("💭 Level 8: Consciousness", expanded=False):
+        with st.expander("💭 Level 8: Consciousness", expanded=True):
             st.caption("Self-Awareness, Qualia & Abstract Thought")
             
             # Data Prep (Cached - Offset 6)
@@ -2156,7 +2156,7 @@ with tab_meta:
         # ============================================================
         # ⚛️ LEVEL 9: PHYSICS DISCOVERY & REALITY HACKING
         # ============================================================
-        with st.expander("⚛️ Level 9: Physics Discovery & Reality Hacking", expanded=False):
+        with st.expander("⚛️ Level 9: Physics Discovery & Reality Hacking", expanded=True):
             st.caption("Agent Scientific Discovery & Causal Manipulations")
             
             # Data Prep (Cached - Offset 8)
@@ -2345,7 +2345,7 @@ with tab_meta:
         # ============================================================
         # ♾️ LEVEL 10: OMEGA POINT & RECURSION
         # ============================================================
-        with st.expander("♾️ Level 10: Omega Point & Recursion", expanded=False):
+        with st.expander("♾️ Level 10: Omega Point & Recursion", expanded=True):
             st.caption("The End of History & Beginning of Infinity")
             
             # Data Prep (Cached - Offset 10)
@@ -2523,4 +2523,5 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
