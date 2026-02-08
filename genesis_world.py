@@ -318,6 +318,7 @@ class GenesisWorld:
         
         # 1.4 Scarcity Scaling
         self.scarcity_lambda = 0.01
+        self.discovered_physics_exploits = [] # 9.2 Collective Exploit Tracking
         self.base_spawn_rate = 15 # GOLDEN ERA: Increased from 10 to 15
         
         # 1.10 Entropy Tracking
@@ -1191,6 +1192,22 @@ class GenesisWorld:
         self.collective_simulation_awareness = max_awareness
         self.discovered_physics_patterns = list(set(all_patterns))
         
+        # Merge exploits
+        all_exploits = []
+        for agent in self.agents.values():
+            if hasattr(agent, 'discovered_exploits'):
+                all_exploits.extend(agent.discovered_exploits)
+        
+        # Deduplicate exploits by state_hash and action_pattern
+        unique_exploits = []
+        seen_exploits = set()
+        for e in all_exploits:
+            key = (e.get('state_hash'), e.get('action_pattern'))
+            if key not in seen_exploits:
+                unique_exploits.append(e)
+                seen_exploits.add(key)
+        self.discovered_physics_exploits = unique_exploits
+        
         # 9.2 Discovery Log Update
         if not hasattr(self, 'discovery_log'):
              self.discovery_log = []
@@ -1203,6 +1220,16 @@ class GenesisWorld:
                     'Time': self.time_step,
                     'Pattern': p
                 })
+        
+        # Check for new exploits to log
+        for e in self.discovered_physics_exploits:
+            pattern_name = f"exploit_{e.get('state_hash', 0) % 1000}"
+            if pattern_name not in known_patterns:
+                self.discovery_log.append({
+                    'Time': self.time_step,
+                    'Pattern': pattern_name
+                })
+                known_patterns.add(pattern_name)
 
     # ============================================================
     # ♾️ LEVEL 10: THE OMEGA POINT METHODS
