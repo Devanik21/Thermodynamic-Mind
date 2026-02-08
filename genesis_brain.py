@@ -584,7 +584,7 @@ class GenesisAgent:
         # 6.2 - 6.5 Structure Building (Energy Threshold + Vector Intent)
         # Use Reality Vector channels 18, 19, 20 as "Construction Will"
         construct_will = vector[0, 18:].mean().item()
-        if self.energy > 60.0 and construct_will > 0.5:
+        if self.energy > 60.0 and construct_will > 0.45:
             # Channel 18 decides type
             struct_type_val = vector[0, 18].item()
             # Normalize to 0-1 if not already (it's from ReLU/Sigmoid mix?) 
@@ -673,8 +673,6 @@ class GenesisAgent:
         if self.last_value is None:
             return False
 
-        # 4.0 Dynamic Role Assignment (Added by User Request)
-        self.update_role()
 
         # 1.3 AUDIT FIX: STRONGER Landauer enforcement: E += k_B * T * ΔH(W)
         current_entropy = self.calculate_weight_entropy()
@@ -788,8 +786,12 @@ class GenesisAgent:
         # MOVED to AFTER step() to prevent "modified in place" errors during backward
         with torch.no_grad():
             for p in self.brain.parameters():
-                p.mul_(0.9999) # In-place is safe here because we just stepped and cleared graph
+                p.mul_(0.999) # Slow decay (1 - 1e-3)
         
+        # 4.0 Dynamic Role Assignment (Moved here to ensure safety)
+        with torch.no_grad():
+            self.update_role()
+            
         # 5.10 Autonomous Research (Sensitivity Analysis)
         if random.random() < 0.01:
             self.conduct_experiment()
