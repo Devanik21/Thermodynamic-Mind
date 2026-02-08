@@ -1809,10 +1809,11 @@ with tab_meta:
                     consensus_state = f"Ratified {len(world.global_registry)}"
                 
                 # Protocol Dialects
-                dialects = set()
+                dialect_counts = {}
                 for a in all_agents:
-                    if hasattr(a, 'dialect_id'): dialects.add(a.dialect_id)
-                protocol_count = len(dialects) if dialects else 1
+                    d_id = getattr(a, 'dialect_id', 0)
+                    dialect_counts[d_id] = dialect_counts.get(d_id, 0) + 1
+                protocol_count = len(dialect_counts) if dialect_counts else 1
                 
                 info_velocity = f"{bonds_count / (len(all_agents)+1):.1f} hop/t"
                 
@@ -1839,6 +1840,7 @@ with tab_meta:
                     'swarm_coherence': swarm_coherence,
                     'consensus_state': consensus_state,
                     'protocol_count': protocol_count,
+                    'dialect_counts': dialect_counts,
                     'info_velocity': info_velocity,
                     'cluster_coeff': cluster_coeff,
                     'small_world': small_world,
@@ -1944,11 +1946,10 @@ with tab_meta:
                 with c7_4:
                     # Fig 7.4: Protocol Tree (Real Dialect Clusters)
                     # If no hierarchy exists, show flat map of dialects
-                    if c7['protocol_count'] > 0:
-                         # Mock hierarchy just for visualization of real counts
+                    if c7.get('dialect_counts'):
                          df_7_4 = pd.DataFrame({
-                             "Dialect": [f"Dialect {i}" for i in range(c7['protocol_count'])],
-                             "Count": [10] * c7['protocol_count'] # Placeholder magnitude
+                             "Dialect": [f"Dialect {k}" for k in c7['dialect_counts'].keys()],
+                             "Count": list(c7['dialect_counts'].values())
                          })
                          fig_7_4 = px.treemap(
                             df_7_4, path=['Dialect'], values='Count',

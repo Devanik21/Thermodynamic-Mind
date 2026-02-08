@@ -143,10 +143,10 @@ class GenesisBrain(nn.Module):
 class GenesisAgent:
     def __init__(self, x, y, genome=None, generation=0, parent_hidden=None, parent_inventory=None):
         self.id = str(uuid.uuid4())
-        self.x = x
         self.y = y
         self.generation = generation
         self.age = 0
+        self.dialect_id = 0 # Level 7.9 Protocol Cluster
         self.energy = 120.0 # Increased starting energy (Survival Buffer)
         self.energy_stored = 0.0 # 1.5 Homeostasis
         self.inventory = [0, 0, 0] if parent_inventory is None else parent_inventory
@@ -649,6 +649,9 @@ class GenesisAgent:
         # 9.7 Reality Hacking (Glitch Search)
         # Check for floating point anomalies in own action
         self.find_glitch(self.hidden_state, vector, self.last_reward)
+
+        # 7.9 Update Protocol Dialect (Simple Clustering)
+        self.dialect_id = int(torch.sum(self.protocol_version).item() * 10) % 8
 
         # 7.7 Distributed Memory (Rare social event)
         if social_trust > 0.8 and random.random() < 0.05:

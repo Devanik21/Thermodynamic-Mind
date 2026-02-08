@@ -984,6 +984,15 @@ class GenesisWorld:
                     if agent.x == x and agent.y == y:
                         struct.harvest(agent)
         
+            # Level 6.8: Battery Interactions (Tiny Fix)
+            if isinstance(struct, Battery):
+                for agent in self.agents.values():
+                    if agent.x == x and agent.y == y:
+                        if agent.energy > 150: # Surplus
+                            struct.deposit(agent, 20)
+                        elif agent.energy < 50: # Need
+                            struct.withdraw(agent)
+        
         # Level 6.7: Update terrain aging
         for mod in self.terrain_modifications.values():
             mod.update_age()
