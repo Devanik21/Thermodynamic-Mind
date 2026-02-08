@@ -607,17 +607,24 @@ with st.container():
             st.caption("Serialize the entire simulation (Agents, World, History) to a portable ZIP.")
             if st.button("📦 BUNDLE STATE", help="Serialize current world state to ZIP."):
                  try:
-                    # 1. World State
+                    # 1. World State (Rounded weights inside)
                     world_data = st.session_state.world.to_json()
-                    world_json = json.dumps(world_data)
                     
-                    # 2. Session Stats
-                    stats_json = json.dumps(st.session_state.stats_history)
-                    events_json = json.dumps(st.session_state.event_log)
-                    registry_json = json.dumps(st.session_state.global_registry)
-                    culture_json = json.dumps(st.session_state.culture_history)
+                    # 2. Gene Pool (Convert tensors to lists and round)
+                    clean_gene_pool = []
+                    for genome in st.session_state.gene_pool:
+                        clean_genome = {k: np.round(v.detach().cpu().numpy(), 4).tolist() for k, v in genome.items()}
+                        clean_gene_pool.append(clean_genome)
                     
-                    # 3. Zip it (No Pickle!)
+                    # 3. Compact Serialization (No spaces)
+                    world_json = json.dumps(world_data, separators=(',', ':'))
+                    stats_json = json.dumps(st.session_state.stats_history, separators=(',', ':'))
+                    events_json = json.dumps(st.session_state.event_log, separators=(',', ':'))
+                    registry_json = json.dumps(st.session_state.global_registry, separators=(',', ':'))
+                    culture_json = json.dumps(st.session_state.culture_history, separators=(',', ':'))
+                    gene_pool_json = json.dumps(clean_gene_pool, separators=(',', ':'))
+                    
+                    # 4. Zip it
                     zip_buffer = io.BytesIO()
                     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                         zf.writestr("world.json", world_json)
@@ -625,9 +632,11 @@ with st.container():
                         zf.writestr("events.json", events_json)
                         zf.writestr("registry.json", registry_json)
                         zf.writestr("culture.json", culture_json)
+                        zf.writestr("gene_pool.json", gene_pool_json)
+                        zf.writestr("meta.json", json.dumps({"max_gen": st.session_state.max_generation}))
                         
                     st.session_state.save_zip = zip_buffer.getvalue()
-                    st.toast("State Bundled! Download below.", icon="✅")
+                    st.toast("Optimized State Bundled!", icon="⚡")
                  except Exception as e:
                     st.error(f"Bundle Error: {e}")
             
@@ -665,7 +674,20 @@ with st.container():
                              st.session_state.global_registry = global_registry
                              st.session_state.culture_history = culture_history
                              
-                             st.success("State Restored! Resuming...")
+                             # Restore Gene Pool
+                             if "gene_pool.json" in zf.namelist():
+                                 raw_pool = json.loads(zf.read("gene_pool.json"))
+                                 restored_pool = []
+                                 for genome in raw_pool:
+                                     restored_pool.append({k: torch.tensor(v) for k, v in genome.items()})
+                                 st.session_state.gene_pool = restored_pool
+                                 
+                             # Restore Meta
+                             if "meta.json" in zf.namelist():
+                                 meta = json.loads(zf.read("meta.json"))
+                                 st.session_state.max_generation = meta.get("max_gen", 0)
+                             
+                             st.success("Full Application State Restored! Resuming...")
                              time.sleep(1)
                              st.rerun()
                      except Exception as e:

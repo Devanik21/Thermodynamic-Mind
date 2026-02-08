@@ -2247,12 +2247,12 @@ class GenesisAgent:
             "discovered_exploits": self.discovered_exploits,
             "discovered_glitches": self.discovered_glitches,
             
-            # Neural Weights (Flattened to list of floats, precision reduced)
-            "brain_weights": {k: v.detach().cpu().numpy().tolist() for k, v in self.brain.state_dict().items()},
+            # Neural Weights (Flattened to list of floats, precision reduced for size)
+            "brain_weights": {k: np.round(v.detach().cpu().numpy(), 4).tolist() for k, v in self.brain.state_dict().items()},
             
             # Critical State Tensors
-            "hidden_state": self.hidden_state.detach().cpu().numpy().tolist() if self.hidden_state is not None else None,
-            "last_vector": self.last_vector.detach().cpu().numpy().tolist() if self.last_vector is not None else None,
+            "hidden_state": np.round(self.hidden_state.detach().cpu().numpy(), 4).tolist() if self.hidden_state is not None else None,
+            "last_vector": np.round(self.last_vector.detach().cpu().numpy(), 4).tolist() if self.last_vector is not None else None,
             
             # Level 10
             "internal_agents": [], # Simplify: Don't serialize nested agents fully yet, just their existence

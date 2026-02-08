@@ -1585,9 +1585,9 @@ class GenesisWorld:
             "agent_entropy": float(self.agent_entropy),
             "dissipated_energy": float(self.dissipated_energy),
             
-            # Grids
-            "pheromone_grid": self.pheromone_grid.tolist(),
-            "meme_grid": self.meme_grid.tolist(),
+            # Grids (High spatial resolution, lower precision needed)
+            "pheromone_grid": np.round(self.pheromone_grid, 3).tolist(),
+            "meme_grid": np.round(self.meme_grid, 3).tolist(),
             
             # Lists
             "agents": agents_data,
