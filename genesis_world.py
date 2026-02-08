@@ -115,6 +115,7 @@ class Structure(Entity):
         super().__init__(x, y, structure_type)
         self.structure_type = structure_type
         self.builder_id = builder_id
+        self.age = 0
         self.created_tick = 0
         self.durability = 100.0
         self.signal = torch.zeros(SIGNAL_DIM)
@@ -122,6 +123,7 @@ class Structure(Entity):
     
     def decay(self, rate=0.1):
         """Structures decay over time."""
+        self.age += 1
         self.durability -= rate
         if self.durability <= 0:
             self.exists = False
@@ -265,6 +267,9 @@ class TerrainModification:
         self.terrain_type = terrain_type  # "fertile", "barren", "water", "elevated"
         self.modifier_id = modifier_id
         self.age = 0
+
+    def update_age(self):
+        self.age += 1
     
     def get_spawn_modifier(self):
         """Return spawn rate modifier for this terrain."""
@@ -896,6 +901,7 @@ class GenesisWorld:
         else:
             self.structures[(x, y)] = Structure(x, y, struct_type, builder_id)
         
+        self.structures[(x, y)].created_tick = self.time_step
         return True
     
     def add_terrain_modification(self, terraform_info):
@@ -977,6 +983,10 @@ class GenesisWorld:
                 for agent in self.agents.values():
                     if agent.x == x and agent.y == y:
                         struct.harvest(agent)
+        
+        # Level 6.7: Update terrain aging
+        for mod in self.terrain_modifications.values():
+            mod.update_age()
         
         for pos in to_remove:
             del self.structures[pos]
