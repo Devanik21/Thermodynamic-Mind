@@ -67,7 +67,7 @@ class Resource(Entity):
         super().__init__(x, y, 'resource')
         # Level 2.8: Trade Emergence (Resource Types)
         # 0: Red (Standard), 1: Green (Rich), 2: Blue (Rare/Catalyst)
-        self.type = np.random.choice([0, 1, 2], p=[0.7, 0.2, 0.1])
+        self.type = int(np.random.choice([0, 1, 2], p=[0.7, 0.2, 0.1]))
         
         # Signal Spectrum based on type
         self.signal = torch.zeros(SIGNAL_DIM)
@@ -1559,31 +1559,31 @@ class GenesisWorld:
         grid_data = []
         for (x, y), res in self.grid.items():
             grid_data.append({
-                "x": x, "y": y, 
-                "type": res.type if hasattr(res, 'type') else 'resource'
+                "x": int(x), "y": int(y), 
+                "type": int(res.type) if hasattr(res, 'type') and not isinstance(res.type, str) else res.type
             })
             
         # 3. Serialize Structures
         structures_data = []
         for (x, y), struct in self.structures.items():
             s_data = {
-                "x": x, "y": y,
+                "x": int(x), "y": int(y),
                 "type": struct.structure_type,
                 "builder_id": struct.builder_id,
-                "age": struct.age,
-                "durability": struct.durability,
-                "stored_energy": getattr(struct, 'stored_energy', 0.0)
+                "age": int(struct.age),
+                "durability": float(struct.durability),
+                "stored_energy": float(getattr(struct, 'stored_energy', 0.0))
             }
             structures_data.append(s_data)
             
         data = {
-            "time_step": self.time_step,
-            "current_season": self.current_season,
-            "season_timer": self.season_timer,
-            "scarcity_lambda": self.scarcity_lambda,
-            "system_entropy": self.system_entropy,
-            "agent_entropy": self.agent_entropy,
-            "dissipated_energy": self.dissipated_energy,
+            "time_step": int(self.time_step),
+            "current_season": int(self.current_season),
+            "season_timer": int(self.season_timer),
+            "scarcity_lambda": float(self.scarcity_lambda),
+            "system_entropy": float(self.system_entropy),
+            "agent_entropy": float(self.agent_entropy),
+            "dissipated_energy": float(self.dissipated_energy),
             
             # Grids
             "pheromone_grid": self.pheromone_grid.tolist(),
@@ -1595,8 +1595,8 @@ class GenesisWorld:
             "structures": structures_data,
             
             # Complex Stats
-            "omega_achieved": self.omega_achieved,
-            "global_scratchpad_activity": self.global_scratchpad_activity,
+            "omega_achieved": bool(self.omega_achieved),
+            "global_scratchpad_activity": int(self.global_scratchpad_activity),
             "invention_history": self.invention_history
         }
         return data

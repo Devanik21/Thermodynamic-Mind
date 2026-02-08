@@ -527,14 +527,14 @@ def update_simulation():
 
     # Update Stats
     stats = {
-        "tick": world.time_step,
-        "population": len(world.agents),
-        "thoughts": current_thoughts,
-        "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
-        "pos_flux": total_pos_flux,
-        "neg_flux": total_neg_flux,
-        "scarcity": np.exp(-world.scarcity_lambda * world.time_step),
-        "agent_entropy": ent_val
+        "tick": int(world.time_step),
+        "population": int(len(world.agents)),
+        "thoughts": int(current_thoughts),
+        "avg_energy": float(np.mean([a.energy for a in world.agents.values()])) if world.agents else 0.0,
+        "pos_flux": float(total_pos_flux),
+        "neg_flux": float(total_neg_flux),
+        "scarcity": float(np.exp(-world.scarcity_lambda * world.time_step)),
+        "agent_entropy": float(ent_val)
     }
     
     st.session_state.stats_history.append(stats)
@@ -553,7 +553,8 @@ def update_simulation():
         
         # Update Global History
         for g, vecs in gen_map.items():
-            avg_vec = np.mean(vecs, axis=0).tolist()
+            # Explicitly cast to float to be 100% safe from int64/float64 issues
+            avg_vec = [float(x) for x in np.mean(vecs, axis=0)]
             if g not in st.session_state.culture_history:
                 st.session_state.culture_history[g] = []
             st.session_state.culture_history[g].append(avg_vec)

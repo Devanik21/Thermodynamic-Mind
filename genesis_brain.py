@@ -8,9 +8,6 @@ import uuid
 # ============================================================
 # 🧬 NEURAL ARCHITECTURE
 # ============================================================
-# ============================================================
-# 🧬 NEURAL ARCHITECTURE
-# ============================================================
 class GradientCompressor(nn.Module):
     """
     5.7 Cognitive Compression: Learned Low-Rank Approximation of Gradients.
@@ -2236,8 +2233,9 @@ class GenesisAgent:
             "energy": float(self.energy),
             "inventory": [int(x) for x in self.inventory],
             "role": self.role,
-            "tag": self.tag.tolist() if isinstance(self.tag, np.ndarray) else list(self.tag),
-            "caste_gene": self.caste_gene.tolist() if isinstance(self.caste_gene, np.ndarray) else list(self.caste_gene),
+            "tag": [float(x) for x in self.tag],
+            "caste_gene": [float(x) for x in self.caste_gene],
+
             "is_fertile": bool(self.is_fertile),
             "confidence": float(self.confidence),
             "meta_lr": float(self.meta_lr),
