@@ -1616,7 +1616,7 @@ with tab_meta:
                 sy = [s.y for s in world.structures.values()]
                 if not sx: sx, sy = [0], [0]
                 
-                battery_charge = [s.stored_energy for s in world.structures.values() if getattr(s, 'structure_type', '') == 'battery']
+                battery_charge = [getattr(s, 'stored_energy', 0.0) for s in world.structures.values() if getattr(s, 'structure_type', '') == 'battery']
                 if not battery_charge: battery_charge = [0]
                 
                 # Environmental Control Score
@@ -1627,8 +1627,8 @@ with tab_meta:
                 total_structs = len(world.structures)
                 
                 # Real Metrics
-                terraform_efficiency = (sum([s.stored_energy for s in world.structures.values()]) / (total_structs + 1)) * 0.01
-                energy_density = f"{int(sum([s.stored_energy for s in world.structures.values()]) / (40*40))} J/m²"
+                terraform_efficiency = (sum([getattr(s, 'stored_energy', 0.0) for s in world.structures.values()]) / (total_structs + 1)) * 0.01
+                energy_density = f"{int(sum([getattr(s, 'stored_energy', 0.0) for s in world.structures.values()]) / (40*40))} J/m²"
                 
                 # Network Connectivity (Real Bond Density)
                 total_possible_bonds = len(all_agents) * 3 # Assuming avg degree 3 cap is healthy
@@ -2213,7 +2213,7 @@ with tab_meta:
                 vac_decay = f"{vac_decay_prob:.1%}" if hasattr(world, 'vacuum_decay_prob') else "0.0%"
                 
                 # Dark Energy ~ Inverse Energy Density
-                energy_den_val = int(sum([s.stored_energy for s in world.structures.values()]) / (40*40))
+                energy_den_val = int(sum([getattr(s, 'stored_energy', 0.0) for s in world.structures.values()]) / (40*40))
                 dark_energy = f"{1000.0 / (energy_den_val + 1):.2f}"
                 
                 tachyon_flux = getattr(world, 'quantum_tunneling_events', 0)
