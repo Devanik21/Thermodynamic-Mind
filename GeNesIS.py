@@ -112,7 +112,7 @@ def init_system():
     if "culture_history" not in st.session_state: st.session_state.culture_history = {} # {gen: [vector]}
 
 init_system()
-update_simulation()
+
 
 # ============================================================
 # 🔄 SIMULATION LOGIC LOOP
@@ -2522,5 +2522,6 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
