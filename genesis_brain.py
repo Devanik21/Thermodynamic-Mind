@@ -652,7 +652,9 @@ class GenesisAgent:
         self.find_glitch(self.hidden_state, vector, self.last_reward)
 
         # 7.9 Update Protocol Dialect (Simple Clustering)
-        self.dialect_id = int(torch.sum(self.protocol_version).item() * 10) % 8
+        # Using a type-agnostic sum to avoid TypeError between torch and numpy
+        p_sum = self.protocol_version.sum()
+        self.dialect_id = int((p_sum.item() if hasattr(p_sum, 'item') else p_sum) * 10) % 8
 
         # 7.7 Distributed Memory (Rare social event)
         if social_trust > 0.8 and random.random() < 0.05:
