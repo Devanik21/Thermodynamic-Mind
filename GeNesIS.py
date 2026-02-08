@@ -1607,7 +1607,7 @@ with tab_meta:
             st.caption("Planetary Modification & Infrastructure Analysis")
 
             # Data Prep (Cached)
-            if 'l6_cache' not in st.session_state or 'sx' not in st.session_state.l6_cache or world.time_step % 20 == 0:
+            if 'l6_cache' not in st.session_state or 'sx' not in st.session_state.l6_cache or world.time_step % 20 == 3:
                 struct_types = [getattr(s, 'structure_type', 'generic') for s in world.structures.values()]
                 struct_counts = {k: struct_types.count(k) for k in set(struct_types)}
                 land_usage = len(world.structures)/(40*40)
@@ -1777,7 +1777,7 @@ with tab_meta:
             st.caption("Hive Mind Synchronization & Network Topology")
             
             # Data Prep (Cached)
-            if 'l7_cache' not in st.session_state or 'node_x' not in st.session_state.l7_cache or world.time_step % 20 == 0:
+            if 'l7_cache' not in st.session_state or 'node_x' not in st.session_state.l7_cache or world.time_step % 20 == 6:
                 phases = [getattr(a, 'internal_phase', 0) for a in all_agents]
                 bonds_count = len(world.bonds) if hasattr(world, 'bonds') else 0
                 
@@ -1970,7 +1970,7 @@ with tab_meta:
             st.caption("Self-Awareness, Qualia & Abstract Thought")
             
             # Data Prep (Cached)
-            if 'l8_cache' not in st.session_state or 'concepts_list' not in st.session_state.l8_cache or world.time_step % 20 == 0:
+            if 'l8_cache' not in st.session_state or 'concepts_list' not in st.session_state.l8_cache or world.time_step % 20 == 9:
                 phis = []
                 concepts_list = []
                 qualia_counts = {}
@@ -2160,7 +2160,7 @@ with tab_meta:
             st.caption("Agent Scientific Discovery & Causal Manipulations")
             
             # Data Prep (Cached)
-            if 'l9_cache' not in st.session_state or 'residuals' not in st.session_state.l9_cache or world.time_step % 20 == 0:
+            if 'l9_cache' not in st.session_state or 'residuals' not in st.session_state.l9_cache or world.time_step % 20 == 12:
                 residuals = []
                 causal_depths = []
                 glitch_x = []
@@ -2349,7 +2349,7 @@ with tab_meta:
             st.caption("The End of History & Beginning of Infinity")
             
             # Data Prep (Cached)
-            if 'l10_cache' not in st.session_state or 'scratch_len' not in st.session_state.l10_cache or world.time_step % 20 == 0:
+            if 'l10_cache' not in st.session_state or 'scratch_len' not in st.session_state.l10_cache or world.time_step % 20 == 15:
                 # System Stats (Real Compute Surplus)
                 import psutil
                 cpu_load = psutil.cpu_percent()
@@ -2522,4 +2522,5 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
