@@ -1445,7 +1445,7 @@ with tab_meta:
                 transfer_score = avg_sparsity * 2.0 # Sparsity aids transfer
                 curiosity = np.mean(epsilons) if epsilons else 0.0
                 grad_norm = avg_error * 0.5 # Proxy for gradient magnitude
-                weight_decay = 1e-4 # Constant hyperparam usually
+                weight_decay = 0.0001 # Real decay rate from brain.py (1 - 0.9999)
                 
                 avg_epochs = int(np.mean(ages)) if ages else 0
                 
@@ -2208,7 +2208,7 @@ with tab_meta:
                 symm_break = "Broken" if len(all_agents) % 2 != 0 else "None"
                 gauge_inv = "Stable" if world.dissipated_energy < 5000 else "Flux"
                 renorm_group = "Active" if len(all_agents) > 50 else "Inactive"
-                planck_scale = "1.0" # simulation constant
+                planck_scale = f"{1.0/world.size:.3f}" # Real spatial resolution (1/GridSize)
                 vac_decay_prob = getattr(world, 'vacuum_decay_prob', 0.0)
                 vac_decay = f"{vac_decay_prob:.1%}" if hasattr(world, 'vacuum_decay_prob') else "0.0%"
                 
@@ -2317,8 +2317,28 @@ with tab_meta:
                         st.success("No Reality Glitches (High Error) Detected.")
 
                 with c9_4:
-                     # Fig 9.4: Causal Calculus
-                     st.info("Causal Calculus Visualization requires causality graph (Not yet implemented).")
+                            # Fig 9.4: Causal Calculus (REAL)
+                    if all_agents:
+                         sample = all_agents[0]
+                         if hasattr(sample, 'causal_bayesian_network') and sample.causal_bayesian_network:
+                             data_9_4 = []
+                             for act, res in sample.causal_bayesian_network.items():
+                                 data_9_4.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
+                                 data_9_4.append({"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)})
+                             
+                             df_9_4 = pd.DataFrame(data_9_4)
+                             fig_9_4 = px.bar(
+                                 df_9_4, x='Action', y='Count', color='Outcome',
+                                 title="9.4 Causal Calculus: P(Outcome|Do(Action))",
+                                 barmode='group', template='plotly_dark',
+                                 color_discrete_map={"Positive": "#00ffa3", "Negative": "#ff4b4b"}
+                             )
+                             fig_9_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                             st.plotly_chart(fig_9_4, width='stretch', key="fig_9_4")
+                         else:
+                             st.info("Awaiting Causal Data (Requires Agent Interventions)")
+                    else:
+                        st.info("No Agents Found.")
 
 
         # ============================================================
@@ -2429,10 +2449,21 @@ with tab_meta:
                     fig_10_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                     st.plotly_chart(fig_10_1, width='stretch', key="fig_10_1")
 
-                with c10_2:
-                    # Fig 10.2: Ouroboros Self-Correction
-                    # Tracking system stability vs complexity
-                    st.info("Self-Correction topology requires metagame history.")
+                    # Fig 10.2: Ouroboros Self-Correction (REAL)
+                    # Use real agent self-modeling accuracy scores
+                    if all_agents:
+                        self_accs = [getattr(a, 'self_model_accuracy', 0.0) for a in all_agents]
+                        fig_10_2 = px.histogram(
+                            x=self_accs, nbins=20,
+                            title="10.2 Ouroboros: Self-Modeling Accuracy",
+                            labels={'x': 'Accuracy Score (0-1)'},
+                            template='plotly_dark',
+                            color_discrete_sequence=['#45b6fe']
+                        )
+                        fig_10_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_10_2, width='stretch', key="fig_10_2")
+                    else:
+                        st.info("No agents for self-correction plot.")
 
                 c10_3, c10_4 = st.columns(2)
                 
