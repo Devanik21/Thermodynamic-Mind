@@ -785,17 +785,25 @@ with tab_hive:
             
             # 2.9 Social Network Topology (Added)
             st.markdown("### 🌐 Social Network (2.9)")
-            if st.session_state.get("show_charts", False) and st.session_state.world.bonds:
+            should_show_charts = st.session_state.get("show_charts", False)
+            
+            if st.session_state.world.bonds:
+                # Always calculate basic metrics
                 G = nx.Graph()
                 active_ids = list(st.session_state.world.agents.keys())
                 G.add_nodes_from(active_ids)
+                edge_count = 0
                 for bond in st.session_state.world.bonds:
                     id_a, id_b = list(bond)
                     if id_a in active_ids and id_b in active_ids: # Verify existence
                         G.add_edge(id_a, id_b)
+                        edge_count += 1
                 
-                # 1. Newman Modularity
-                if G.number_of_edges() > 0:
+                # 1. Newman Modularity (Fast enough to run?)
+                # If too slow, keep in show_charts. But user wants it visible.
+                # Let's try running it. If it's slow, we might need a separate "Show Metrics" toggle.
+                # For now, we assume it's part of the requested "fix".
+                if edge_count > 0:
                     try:
                          # Use greedy modularity
                          c = list(nx.community.greedy_modularity_communities(G))
@@ -805,16 +813,17 @@ with tab_hive:
                          st.metric("Modularity Q", "0.000")
                     
                     # 2. Small World Sigma (Approximate)
-                    # Requires connected graph for strict sigma, we skip if disconnected
-                    if len(G) < 200 and G.number_of_edges() > len(G): # Basic check
+                    # This IS expensive. Let's keep this one conditional or simplified.
+                    if should_show_charts and len(G) < 200 and edge_count > len(G): 
                         try:
-                            # Use networkx smallworld sigma if available, else omit
                             sigma = nx.algorithms.smallworld.sigma(G, niter=5, nrand=5)
                             st.metric("Small-world σ", f"{sigma:.2f}")
                         except:
                             st.metric("Small-world σ", "Calc Pending...")
                 else:
                     st.info("No social bonds formed yet.")
+            else:
+                 st.info("No social bonds formed yet.")
 
         with st.expander("🔬 Caste Genetic Audit (4.6)"):
             if st.button("Run Heritability Analysis", key="caste_audit", width='stretch'):
