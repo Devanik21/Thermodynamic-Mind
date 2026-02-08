@@ -12,7 +12,7 @@ GRID_SIZE = 40
 SIGNAL_DIM = 16
 MAX_ENERGY = 100000.0 # Effectively Infinite (Type II Civilization Potential)
 # "Easy mode" - metabolic cost is low, but stupidity kills
-METABOLIC_COST = 0.1 
+METABOLIC_COST = 0.08 
 SEASON_LENGTH = 20 # Shortened winter (Nobel Optimization)
 
 # ============================================================
@@ -1546,4 +1546,5 @@ class GenesisWorld:
                 "Event": f"💀 DEATH BROADCAST → {len(neighbors)} receivers",
                 "Vector": [0]*21
             })
+
 
