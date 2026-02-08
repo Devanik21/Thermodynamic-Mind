@@ -584,7 +584,7 @@ class GenesisAgent:
         # 6.2 - 6.5 Structure Building (Energy Threshold + Vector Intent)
         # Use Reality Vector channels 18, 19, 20 as "Construction Will"
         construct_will = vector[0, 18:].mean().item()
-        if self.energy > 80.0 and construct_will > 0.6:
+        if self.energy > 60.0 and construct_will > 0.5:
             # Channel 18 decides type
             struct_type_val = vector[0, 18].item()
             # Normalize to 0-1 if not already (it's from ReLU/Sigmoid mix?) 
@@ -593,7 +593,7 @@ class GenesisAgent:
             # But let's just use raw value thresholds
             
             if struct_type_val < -0.5: s_type = "barrier" # Negative value
-            elif struct_type_val < 0.0: s_type = "trap"
+            elif struct_type_val < 0.2: s_type = "trap"
             elif struct_type_val < 0.5: s_type = "battery"
             elif struct_type_val < 1.0: s_type = "cultivator"
             else: s_type = "generic"
@@ -628,11 +628,11 @@ class GenesisAgent:
             self.run_gol_step()
             
             # 10.2 Create Internal Agents (If space allows)
-            if len(self.internal_agents) < 5 and self.energy > 80.0:
+            if len(self.internal_agents) < 5 and self.energy > 60.0:
                  self.create_internal_agent(self)
             
             # 10.5 Recursive Depth (If already have internal agents)
-            if len(self.internal_agents) >= 2 and self.energy > 90.0:
+            if len(self.internal_agents) >= 2 and self.energy > 70.0:
                 self.create_nested_simulation()
             
             # Write to scratchpad if inspired (Channel 15 > 0.7)
@@ -672,6 +672,9 @@ class GenesisAgent:
         """
         if self.last_value is None:
             return False
+
+        # 4.0 Dynamic Role Assignment (Added by User Request)
+        self.update_role()
 
         # 1.3 AUDIT FIX: STRONGER Landauer enforcement: E += k_B * T * ΔH(W)
         current_entropy = self.calculate_weight_entropy()
@@ -1047,7 +1050,7 @@ class GenesisAgent:
     
     def build_structure(self, x, y, structure_type, world):
         """6.2 Structure Building: Create persistent environmental feature."""
-        cost = {"generic": 10.0, "trap": 15.0, "barrier": 12.0, "battery": 20.0, "cultivator": 18.0}
+        cost = {"generic": 20.0, "trap": 12.0, "barrier": 12.0, "battery": 10.0, "cultivator": 12.0}
         if self.energy > cost.get(structure_type, 10.0):
             self.energy -= cost[structure_type]
             struct_id = f"{self.id[:8]}_{len(self.structures_built)}"
@@ -2176,4 +2179,37 @@ class GenesisAgent:
         # Keep only last 20 entries
         if len(self.tradition_history) > 20:
             self.tradition_history.pop(0)
+
+    
+    def update_role(self):
+        """
+        4.0 Dynamic Role Assignment:
+        Roles evolve based on behavior and status.
+        - Queen: Fertile, High Energy (+120), Old (+50)
+        - Processor: Has resources in inventory
+        - Warrior: High Energy (+90), Aggressive (Gene > 0.5)
+        - Forager: Default
+        """
+        # Stickiness: Don't flip-flop too easily (hysteresis)
+        if hasattr(self, 'role') and self.role == "Queen" and self.energy > 80:
+             return # Queens stay queens until they starve or die
+             
+        if self.is_fertile and self.energy > 120 and self.age > 50:
+             self.role = "Queen"
+        elif any(v > 0 for v in self.inventory): # Has gathered resources
+             self.role = "Processor"
+        elif self.energy > 90.0:
+             # Check caste gene for predispositions
+             if self.caste_gene[2] > 0.5: # Warrior gene
+                  self.role = "Warrior"
+             else:
+                  self.role = "Forager"
+        else:
+             self.role = "Forager"
+        
+        # Update history for stability tracking
+        if hasattr(self, 'role_history'):
+            self.role_history.append(self.role)
+            if len(self.role_history) > 100: self.role_history.pop(0)
+
 
