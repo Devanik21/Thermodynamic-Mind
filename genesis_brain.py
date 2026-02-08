@@ -701,12 +701,17 @@ class GenesisAgent:
         iq_reward = self.last_vector.std() * 5.0 # Punish uniform thinking
         
         # 5.3 Free Energy Reward (FRISTONIAN OVERRIDE) - v5.0.4 "GHOST FORWARD"
+        # CRITICAL FIX: Re-run forward pass to get fresh graph for backprop
         predictor_loss = torch.tensor(0.0)
+        recalc_vector = self.last_vector # Default to stored if reconstruction fails
+        recalc_value = self.last_value
+        
         if self.prev_input is not None and self.prev_hidden is not None:
-             # Fresh forward pass on the SAME transition
-             _, _, _, _, _, ghost_prediction, _ = self.brain(self.prev_input, self.prev_hidden)
+             # Fresh forward pass using cached inputs from decide()
+             recalc_vector, _, _, recalc_value, _, ghost_prediction, _ = self.brain(self.prev_input, self.prev_hidden)
+             
              pred_loss_fn = nn.MSELoss()
-             # Compare ghost prediction (made from t-1) with the ACTUAL current input (t)
+             # Compare ghost prediction with the ACTUAL current input
              predictor_loss = pred_loss_fn(ghost_prediction, self.last_input.detach())
              
              # 5.0 Self-Monitoring
@@ -724,35 +729,36 @@ class GenesisAgent:
              for param_group in self.optimizer.param_groups:
                  param_group['lr'] = self.meta_lr
              
-             # 1.8 AUDIT FIX: Phenotypic Plasticity - context-dependent learning
-             # Uses energy, prediction error gradient, and season to modulate learning
+             # 1.8 AUDIT FIX: Phenotypic Plasticity
              gradient_magnitude = abs(self.prediction_errors[-1] - self.prediction_errors[-2]) if len(self.prediction_errors) > 1 else 0.0
-             season_proxy = (self.age // 20) % 2  # Alternates every 20 ticks
+             season_proxy = (self.age // 20) % 2 
              self.update_learning_rate_contextual(self.energy, gradient_magnitude, season_proxy)
 
         # 5.2 Sparsity Loss
         sparsity_loss = self.brain.actor_mask.sparsity() * 0.01
         
+        # Recalculate IQ Reward on fresh graph for gradients
+        iq_reward = recalc_vector.std() * 5.0
 
         reward = torch.tensor([[flux]], dtype=torch.float32) + iq_reward
         
         # Advantage Calculation
-        # Detach everything from previous steps to ensure we only learn from THIS tick
-        advantage = reward.detach() - self.last_value.detach()
-        
-        # Losses
-        # 1. Critic Loss: Mean Squared Error between prediction and actual flux
-        critic_loss = 0.5 * (reward - self.last_value).pow(2)
-        
-        # 2. Actor Loss: Policy Gradient (Surrogate objective)
-        # Simplified: Move weights to make 'last_vector' more likely if advantage is positive
-        # Added regularization to prevent activation explosion
-        actor_loss = -(advantage * self.last_vector.sum()) + 0.01 * self.last_vector.pow(2).sum()
-        
-        # 5.3 Consolidated Loss: A2C + Active Inference Predictor + Sparsity
-        # STANDARD A2C: Critic learns to predict reward, Actor learns to maximize advantage
-        # Detach advantage to prevent actor gradients from flowing into critic via 'reward'
-        total_loss = actor_loss + critic_loss + predictor_loss + sparsity_loss
+        if recalc_value is not None:
+            # Detach everything from previous steps to ensure we only learn from THIS tick
+            advantage = reward.detach() - recalc_value.detach()
+            
+            # Losses
+            # 1. Critic Loss: Mean Squared Error between prediction and actual flux
+            critic_loss = 0.5 * (reward - recalc_value).pow(2)
+            
+            # 2. Actor Loss: Policy Gradient (Surrogate objective)
+            # Simplified: Move weights to make 'vector' more likely if advantage is positive
+            actor_loss = -(advantage * recalc_vector.sum()) + 0.01 * recalc_vector.pow(2).sum()
+            
+            # 5.3 Consolidated Loss: A2C + Active Inference Predictor + Sparsity
+            total_loss = actor_loss + critic_loss + predictor_loss + sparsity_loss
+        else:
+            total_loss = predictor_loss + sparsity_loss
         
         # Backprop (Online Learning)
         self.optimizer.zero_grad()
