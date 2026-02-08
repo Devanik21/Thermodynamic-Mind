@@ -286,6 +286,9 @@ def update_simulation():
                 action_idx = torch.argmax(reality_vector_tensor).item()
                 agent.do_calculus_intervention(action_idx, flux)
                 
+                # 9.2 Exploit discovery (Fix)
+                agent.identify_exploit(reality_vector_tensor, reality_vector_tensor, flux)
+                
                 # 9.1 Detect Patterns (Occasional)
                 if agent.age % 50 == 0:
                     patterns = agent.detect_patterns()
@@ -2199,7 +2202,7 @@ with tab_meta:
                 # Real Metrics
                 found_patterns = len(world.discovered_physics_patterns) if hasattr(world, 'discovered_physics_patterns') else 0
                 avg_residual = world.collective_oracle_model_accuracy if hasattr(world, 'collective_oracle_model_accuracy') else 0.5
-                exploits = len([p for p in world.discovered_physics_patterns if p.get('type') == 'exploit']) if hasattr(world, 'discovered_physics_patterns') else 0
+                exploits = len(world.discovered_physics_exploits) if hasattr(world, 'discovered_physics_exploits') else 0
                 max_depth = max([len(a.causal_graph) for a in all_agents]) if all_agents else 0
                 
                 law_consistency = 1.0 - (avg_residual * 0.5)
