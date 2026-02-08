@@ -1228,7 +1228,8 @@ class GenesisWorld:
         self.kuramoto_global_step()
         self.federated_gradient_step()
         self.update_cognitive_modules()
-        self.update_protocol_convergence()
+        if self.time_step % 20 == 0:
+            self.update_protocol_convergence()
         if self.time_step % 10 == 0:
             self.compute_hive_phi()
         
