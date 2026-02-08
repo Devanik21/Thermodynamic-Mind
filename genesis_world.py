@@ -67,7 +67,7 @@ class Resource(Entity):
         super().__init__(x, y, 'resource')
         # Level 2.8: Trade Emergence (Resource Types)
         # 0: Red (Standard), 1: Green (Rich), 2: Blue (Rare/Catalyst)
-        self.type = int(np.random.choice([0, 1, 2], p=[0.7, 0.2, 0.1]))
+        self.type = np.random.choice([0, 1, 2], p=[0.7, 0.2, 0.1])
         
         # Signal Spectrum based on type
         self.signal = torch.zeros(SIGNAL_DIM)
@@ -1546,116 +1546,5 @@ class GenesisWorld:
                 "Event": f"💀 DEATH BROADCAST → {len(neighbors)} receivers",
                 "Vector": [0]*21
             })
-
-    # ============================================================
-    # 💾 PLUG-N-PLAY SERIALIZATION
-    # ============================================================
-    def to_json(self):
-        """Serialize world state to JSON-compatible dictionary."""
-        # 1. Serialize Agents
-        agents_data = [a.to_json() for a in self.agents.values()]
-        
-        # 2. Serialize Grid (Resources)
-        grid_data = []
-        for (x, y), res in self.grid.items():
-            grid_data.append({
-                "x": int(x), "y": int(y), 
-                "type": int(res.type) if hasattr(res, 'type') and not isinstance(res.type, str) else res.type
-            })
-            
-        # 3. Serialize Structures
-        structures_data = []
-        for (x, y), struct in self.structures.items():
-            s_data = {
-                "x": int(x), "y": int(y),
-                "type": struct.structure_type,
-                "builder_id": struct.builder_id,
-                "age": int(struct.age),
-                "durability": float(struct.durability),
-                "stored_energy": float(getattr(struct, 'stored_energy', 0.0))
-            }
-            structures_data.append(s_data)
-            
-        data = {
-            "time_step": int(self.time_step),
-            "current_season": int(self.current_season),
-            "season_timer": int(self.season_timer),
-            "scarcity_lambda": float(self.scarcity_lambda),
-            "system_entropy": float(self.system_entropy),
-            "agent_entropy": float(self.agent_entropy),
-            "dissipated_energy": float(self.dissipated_energy),
-            
-            # Grids (High spatial resolution, lower precision needed)
-            "pheromone_grid": np.round(self.pheromone_grid, 3).tolist(),
-            "meme_grid": np.round(self.meme_grid, 3).tolist(),
-            
-            # Lists
-            "agents": agents_data,
-            "grid_resources": grid_data,
-            "structures": structures_data,
-            
-            # Complex Stats
-            "omega_achieved": bool(self.omega_achieved),
-            "global_scratchpad_activity": int(self.global_scratchpad_activity),
-            "invention_history": self.invention_history
-        }
-        return data
-
-    def from_json(self, data):
-        """Restore world state from JSON data."""
-        self.time_step = data["time_step"]
-        self.current_season = data["current_season"]
-        self.season_timer = data["season_timer"]
-        self.scarcity_lambda = data["scarcity_lambda"]
-        self.system_entropy = data["system_entropy"]
-        self.agent_entropy = data["agent_entropy"]
-        self.dissipated_energy = data["dissipated_energy"]
-        
-        # Restore Grids
-        self.pheromone_grid = np.array(data["pheromone_grid"])
-        self.meme_grid = np.array(data["meme_grid"])
-        
-        # Restore Resources
-        self.grid = {}
-        for r in data["grid_resources"]:
-            res = Resource(r["x"], r["y"])
-            # Handle MegaResource if type is 'mega_resource' or weird int
-            if r["type"] == 'mega_resource':
-                 res = MegaResource(r["x"], r["y"])
-            else:
-                 res.type = r["type"] 
-            self.grid[(r["x"], r["y"])] = res
-            
-        # Restore Structures
-        self.structures = {}
-        for s in data["structures"]:
-            if s["type"] == "trap":
-                struct = Trap(s["x"], s["y"], s["builder_id"])
-            elif s["type"] == "barrier":
-                struct = Barrier(s["x"], s["y"], s["builder_id"])
-            elif s["type"] == "battery":
-                struct = Battery(s["x"], s["y"], s["builder_id"])
-            elif s["type"] == "cultivator":
-                struct = Cultivator(s["x"], s["y"], s["builder_id"])
-            else:
-                struct = Structure(s["x"], s["y"], s["type"], s["builder_id"])
-            
-            struct.age = s["age"]
-            struct.durability = s["durability"]
-            if "stored_energy" in s:
-                struct.stored_energy = s["stored_energy"]
-            self.structures[(s["x"], s["y"])] = struct
-            
-        # Restore Agents
-        from genesis_brain import GenesisAgent
-        self.agents = {}
-        for a_data in data["agents"]:
-            agent = GenesisAgent.from_json(a_data)
-            self.agents[agent.id] = agent
-            
-        # Restore Stats
-        self.omega_achieved = data.get("omega_achieved", False)
-        self.global_scratchpad_activity = data.get("global_scratchpad_activity", 0)
-        self.invention_history = data.get("invention_history", [])
 
 
