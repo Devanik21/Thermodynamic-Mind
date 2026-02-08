@@ -84,7 +84,7 @@ st.markdown("""
 # ============================================================
 # 🛠️ INITIALIZATION HOOKS
 # ============================================================
-SYSTEM_VERSION = "11.0.21" # Level 10: The Omega Point - Complete Implementation
+SYSTEM_VERSION = "11.0.6" # Level 10: The Omega Point - Complete Implementation
 
 def init_system():
     # Force reset if version mismatch
@@ -197,7 +197,7 @@ def update_simulation():
         
         # 2.6 Reciprocal Altruism: Social Trust Context
         # Mean trust for visible neighbors
-        neighbors = [world.agents[oid] for oid in world.agents if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
+        neighbors = [world.agents[oid] for oid in list(world.agents.keys()) if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
         social_trust = 0.0
         if neighbors:
             trust_values = [agent.social_memory.get(n.id, 0.5) for n in neighbors]
@@ -258,7 +258,7 @@ def update_simulation():
             
             # 7.0 Neural Bridging
             if 'share_knowledge' in special_intent:
-                neighbors = [world.agents[oid] for oid in world.agents 
+                neighbors = [world.agents[oid] for oid in list(world.agents.keys()) 
                              if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 1 and abs(world.agents[oid].y - agent.y) <= 1]
                 if neighbors:
                     partner = random.choice(neighbors)
@@ -266,7 +266,7 @@ def update_simulation():
             
             # 7.7 Distributed Memory
             if 'distribute_memory' in special_intent:
-                neighbors = [world.agents[oid] for oid in world.agents 
+                neighbors = [world.agents[oid] for oid in list(world.agents.keys()) 
                              if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
                 if neighbors:
                     # Create a memory ID based on location and time
@@ -479,7 +479,7 @@ def update_simulation():
                 with torch.no_grad():
                     dead_genome = dead_agent.get_genome()
                     neighbors = [
-                        a for a in world.agents.values() 
+                        a for a in list(world.agents.values()) 
                         if a.id != dead_id and abs(a.x - dead_agent.x) <= 2 and abs(a.y - dead_agent.y) <= 2
                     ]
                     for n in neighbors:
@@ -502,7 +502,7 @@ def update_simulation():
         
     # Global Max Gen Update
     if world.agents:
-        current_max = max(a.generation for a in world.agents.values())
+        current_max = max(a.generation for a in list(world.agents.values()))
         if current_max > st.session_state.max_generation:
             st.session_state.max_generation = current_max
                 
@@ -530,7 +530,7 @@ def update_simulation():
         "tick": world.time_step,
         "population": len(world.agents),
         "thoughts": current_thoughts,
-        "avg_energy": np.mean([a.energy for a in world.agents.values()]) if world.agents else 0,
+        "avg_energy": np.mean([a.energy for a in list(world.agents.values())]) if world.agents else 0,
         "pos_flux": total_pos_flux,
         "neg_flux": total_neg_flux,
         "scarcity": np.exp(-world.scarcity_lambda * world.time_step),
@@ -2540,7 +2540,6 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
 
 
 

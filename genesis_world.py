@@ -420,14 +420,14 @@ class GenesisWorld:
         # Only run occasionally to save compute
         if self.time_step % 10 != 0: return
 
-        for agent in self.agents.values():
+        for agent in list(self.agents.values()):
             if agent.confidence < 0.3: # Confused/Forgetting
                  # Find a confident neighbor (Mentor)
                  best_mentor = None
                  max_conf = 0.5
                  
                  neighbors = [
-                     self.agents[oid] for oid in self.agents 
+                     self.agents[oid] for oid in list(self.agents.keys()) 
                      if oid != agent.id and abs(self.agents[oid].x - agent.x) <= 2 and abs(self.agents[oid].y - agent.y) <= 2
                  ]
                  
@@ -573,7 +573,7 @@ class GenesisWorld:
 
         # 2. 2.4 Coalition & 2.5 Resource Sharing: BOND LOGIC
         if adhesion > 0.5:
-            for other_id, other in self.agents.items():
+            for other_id, other in list(self.agents.items()):
                 if other_id != agent.id:
                     dist = math.sqrt((agent.x - other.x)**2 + (agent.y - other.y)**2)
                     if dist < 1.5:
@@ -593,7 +593,7 @@ class GenesisWorld:
         outcome_log = "✨ IDLE"
         if punish > 0.7:
              # Find a neighbor to punish
-             for other_id, other in self.agents.items():
+             for other_id, other in list(self.agents.items()):
                 if other_id != agent.id:
                     dist = math.sqrt((agent.x - other.x)**2 + (agent.y - other.y)**2)
                     if dist < 1.5:
@@ -717,7 +717,7 @@ class GenesisWorld:
         # If population crashes, everyone becomes a Queen to save the species.
         n_pop = len(self.agents)
         if n_pop < 50:
-            for agent in self.agents.values():
+            for agent in list(self.agents.values()):
                 agent.is_fertile = True
         
         # Nobel Adaptive Spawning: Smooth Continuous Scaling
@@ -753,7 +753,7 @@ class GenesisWorld:
                     packet = agent.create_weight_packet()
                     # Broadcast to neighbors
                     neighbors = [
-                        a for a in self.agents.values() 
+                        a for a in list(self.agents.values()) 
                         if a.id != agent.id and abs(a.x - agent.x) <= 2 and abs(a.y - agent.y) <= 2
                     ]
                     for n in neighbors:
