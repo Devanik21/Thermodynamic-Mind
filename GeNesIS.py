@@ -2647,28 +2647,28 @@ with tab_meta:
             
             # 📊 TEXT PARAMETERS (REAL)
             m5_1, m5_2, m5_3, m5_4 = st.columns(4)
-            m5_1.metric("5.1 Mean Plasticity", f"{cache['avg_lr']:.4f}", help="Avg Meta-Learning Rate (Real)")
-            m5_2.metric("5.2 Mean Error", f"{cache['avg_error']:.4f}", help="Avg Prediction Error (Real)")
-            m5_3.metric("5.3 Neural Sparsity", f"{cache['avg_sparsity']:.1%}", help="Avg Synaptic Pruning Proxy (Real)")
-            m5_4.metric("5.4 Max Confidence", f"{cache['max_conf']:.2f}", help="Highest Agent Confidence (Real)")
+            m5_1.metric("5.1 Mean Plasticity", f"{cache.get('avg_lr', 0):.4f}", help="Avg Meta-Learning Rate (Real)")
+            m5_2.metric("5.2 Mean Error", f"{cache.get('avg_error', 0):.4f}", help="Avg Prediction Error (Real)")
+            m5_3.metric("5.3 Neural Sparsity", f"{cache.get('avg_sparsity', 0):.1%}", help="Avg Synaptic Pruning Proxy (Real)")
+            m5_4.metric("5.4 Max Confidence", f"{cache.get('max_conf', 0):.2f}", help="Highest Agent Confidence (Real)")
             
             # Additional 12 Metrics (Row 1) - REAL
             am5_1, am5_2, am5_3, am5_4, am5_5, am5_6 = st.columns(6)
-            am5_1.metric("Plasticity Var", f"{cache['plasticity_std']:.5f}")
-            am5_2.metric("Forgetting Rate", f"{cache['forget_rate']:.3f}")
-            am5_3.metric("Transfer Score", f"{cache['transfer_score']:.2f}")
-            am5_4.metric("Curiosity Index", f"{cache['curiosity']:.2f}")
-            am5_5.metric("Gradient Norm", f"{cache['grad_norm']:.3f}")
-            am5_6.metric("Weight Decay", f"{cache['weight_decay']:.1e}")
+            am5_1.metric("Plasticity Var", f"{cache.get('plasticity_std', 0):.5f}")
+            am5_2.metric("Forgetting Rate", f"{cache.get('forget_rate', 0):.3f}")
+            am5_3.metric("Transfer Score", f"{cache.get('transfer_score', 0):.2f}")
+            am5_4.metric("Curiosity Index", f"{cache.get('curiosity', 0):.2f}")
+            am5_5.metric("Gradient Norm", f"{cache.get('grad_norm', 0):.3f}")
+            am5_6.metric("Weight Decay", f"{cache.get('weight_decay', 0):.1e}")
             
             # Additional 12 Metrics (Row 2) - REAL
             am5_7, am5_8, am5_9, am5_10, am5_11, am5_12 = st.columns(6)
-            am5_7.metric("Avg Epochs", f"{cache['avg_epochs']}")
-            am5_8.metric("Model Complexity", f"{cache['model_complexity']}")
-            am5_9.metric("Loss Conv.", f"{cache['loss_conv']}")
-            am5_10.metric("Exploration", f"{cache['curiosity']:.2f}")
-            am5_11.metric("Memory Cap", f"{int(cache['mem_mean'])}")
-            am5_12.metric("Inference Time", f"{cache['inference_time']}")
+            am5_7.metric("Avg Epochs", f"{cache.get('avg_epochs', 0)}")
+            am5_8.metric("Model Complexity", f"{cache.get('model_complexity', '0k')}")
+            am5_9.metric("Loss Conv.", f"{cache.get('loss_conv', '0')}")
+            am5_10.metric("Exploration", f"{cache.get('curiosity', 0):.2f}")
+            am5_11.metric("Memory Cap", f"{int(cache.get('mem_mean', 0))}")
+            am5_12.metric("Inference Time", f"{cache.get('inference_time', '0ms')}")
 
             # 📈 PLOTS (REAL)
             if st.session_state.get('show_charts', False):
@@ -2676,11 +2676,11 @@ with tab_meta:
                 
                 with c5_1:
                     # Fig 5.1: Prediction Error Landscape (REAL)
-                    if len(cache['errors']) > 0:
+                    if cache.get('errors'):
                         df_5_1 = pd.DataFrame({
-                            'Energy': cache['energies_l5'], 
+                            'Energy': cache.get('energies_l5', []), 
                             'Error': cache['errors'], 
-                            'Confidence': cache['confidences']
+                            'Confidence': cache.get('confidences', [])
                         })
                         fig_5_1 = px.scatter(
                             df_5_1, x='Energy', y='Error', color='Confidence',
@@ -2693,37 +2693,24 @@ with tab_meta:
                 
                 with c5_2:
                     # Fig 5.2: Cognitive Neural Sparsity (Real Weights if avail, else placeholder)
-                    if all_agents:
-                        sample_agent = all_agents[0]
-                        if hasattr(sample_agent.brain, 'actor'):
-                            w_raw = sample_agent.brain.actor.weight
-                            weights = w_raw.detach().cpu().numpy() if torch.is_tensor(w_raw) else w_raw
-                            fig_5_2 = px.imshow(
-                                weights[:20, :], 
-                                title="5.2 Cognitive Sparse Matrix (Real Weights)",
-                                color_continuous_scale='Viridis',
-                                template='plotly_dark'
-                            )
-                            fig_5_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                            st.plotly_chart(fig_5_2, width='stretch', key="fig_5_2")
+                    if cache.get('weights_sample'):
+                        fig_5_2 = px.imshow(
+                            np.array(cache['weights_sample']), 
+                            title="5.2 Cognitive Sparse Matrix (Real Weights)",
+                            color_continuous_scale='Viridis',
+                            template='plotly_dark'
+                        )
+                        fig_5_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_5_2, width='stretch', key="fig_5_2")
 
                 # Row 2
                 c5_3, c5_4 = st.columns(2)
                 
                 with c5_3:
                     # Fig 5.3: Concept Graph (Real Concepts)
-                    # We map concepts to 2D space PCA-style if possible, or just plot raw concepts of top agents
-                    if all_agents:
-                        concepts = []
-                        for a in all_agents[:50]:
-                            if hasattr(a, 'last_concepts'):
-                                val = a.last_concepts
-                                c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
-                                if len(c_vec) >= 2:
-                                    concepts.append(c_vec[:2])
-                        
-                        if concepts:
-                            c_arr = np.array(concepts)
+                    if cache.get('concept_samples'):
+                        c_arr = np.array(cache['concept_samples'])
+                        if len(c_arr) > 0 and len(c_arr[0]) >= 2:
                             df_5_3 = pd.DataFrame(c_arr, columns=['C1', 'C2'])
                             fig_5_3 = px.scatter(
                                 df_5_3, x='C1', y='C2',
@@ -2736,14 +2723,13 @@ with tab_meta:
                         else:
                             st.info("No concept data available for Latent Space.")
                     else:
-                        st.info("No agents for Concept Graph.")
+                        st.info("No concept data available for Latent Space.")
 
                 with c5_4:
                     # Fig 5.4: Age Distribution (Real Proxy for Learning Flow)
-                    if all_agents:
-                        ages = [a.age for a in all_agents]
+                    if cache.get('ages'):
                         fig_5_4 = px.histogram(
-                            x=ages, nbins=20,
+                            x=cache['ages'], nbins=20,
                             title="5.4 Agent Generational Maturity (Real)",
                             labels={'x': 'Age (Ticks)'},
                             template='plotly_dark',
@@ -2836,42 +2822,43 @@ with tab_meta:
             m6_1.metric("6.1 Battery Count", f"{struct_counts.get('battery', 0)}", delta=None)
             m6_2.metric("6.2 Trap Count", f"{struct_counts.get('trap', 0)}", delta=None)
             m6_3.metric("6.3 Cultivator Count", f"{struct_counts.get('cultivator', 0)}", delta=None)
-            m6_4.metric("6.4 Total Structures", f"{c6['total_structs']}", help="Total Built Infrastructure")
+            m6_4.metric("6.4 Total Structures", f"{c6.get('total_structs', 0)}", help="Total Built Infrastructure")
 
             # Additional 12 Metrics (Row 1) - REAL
             am6_1, am6_2, am6_3, am6_4, am6_5, am6_6 = st.columns(6)
-            am6_1.metric("Terraform Eff.", f"{c6['terraform_efficiency']:.2f}")
-            am6_2.metric("Land Usage", f"{c6['land_usage']:.1%}")
-            am6_3.metric("Energy Density", f"{c6['energy_density']}")
-            am6_4.metric("Network Conn.", f"{c6['network_conn']:.2f}") 
-            am6_5.metric("Maint. Cost", f"{c6['maint_cost']}")
-            am6_6.metric("Build Rate", f"{c6['build_rate']}")
+            am6_1.metric("Terraform Eff.", f"{c6.get('terraform_efficiency', 0):.2f}")
+            am6_2.metric("Land Usage", f"{c6.get('land_usage', 0):.1%}")
+            am6_3.metric("Energy Density", f"{c6.get('energy_density', '0 J/m²')}")
+            am6_4.metric("Network Conn.", f"{c6.get('network_conn', 0):.2f}") 
+            am6_5.metric("Maint. Cost", f"{c6.get('maint_cost', '0/tick')}")
+            am6_6.metric("Build Rate", f"{c6.get('build_rate', '0/tick')}")
 
             # Additional 12 Metrics (Row 2) - REAL
             am6_7, am6_8, am6_9, am6_10, am6_11, am6_12 = st.columns(6)
-            am6_7.metric("Mining Rate", f"{c6['mining_rate']}")
-            am6_8.metric("Pollution", f"{c6['pollution']:.2f}")
-            am6_9.metric("Habitat Qual", f"{c6['habitat_qual']:.2f}")
-            am6_10.metric("Infra Age", f"{c6['avg_infra_age']}")
-            am6_11.metric("Defense Rat", f"{c6['defense']}")
-            am6_12.metric("Automation", f"{c6['automation']}")
-
+            am6_7.metric("Mining Rate", f"{c6.get('mining_rate', '0/tick')}")
+            am6_8.metric("Pollution", f"{c6.get('pollution', 0):.2f}")
+            am6_9.metric("Habitat Qual", f"{c6.get('habitat_qual', 0):.2f}")
+            am6_10.metric("Infra Age", f"{c6.get('avg_infra_age', '0 ticks')}")
+            am6_11.metric("Defense Rat", f"{c6.get('defense', '0.00')}")
+            am6_12.metric("Automation", f"{c6.get('automation', 'Level 1')}")
+            
             # 📈 PLOTS (REAL)
             if st.session_state.get('show_charts', False):
                 c6_1, c6_2 = st.columns(2)
                 
                 with c6_1:
                     # Fig 6.1: Terraforming Heatmap (REAL)
-                    fig_6_1 = px.density_heatmap(
-                        x=c6['sx'], y=c6['sy'], nbinsx=20, nbinsy=20,
-                        title="6.1 Terraforming Heatmap (Real Structures)",
-                        template='plotly_dark',
-                        color_continuous_scale='Hot',
-                        labels={'x':'Grid X', 'y':'Grid Y'}
-                    )
-                    fig_6_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                    st.plotly_chart(fig_6_1, width='stretch', key="fig_6_1")
-
+                    if c6.get('sx') and c6.get('sy'):
+                        fig_6_1 = px.density_heatmap(
+                            x=c6['sx'], y=c6['sy'], nbinsx=20, nbinsy=20,
+                            title="6.1 Terraforming Heatmap (Real Structures)",
+                            template='plotly_dark',
+                            color_continuous_scale='Hot',
+                            labels={'x':'Grid X', 'y':'Grid Y'}
+                        )
+                        fig_6_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_6_1, width='stretch', key="fig_6_1")
+                
                 with c6_2:
                     # Fig 6.2: Structure Radar Scan (REAL)
                     cats = list(struct_counts.keys()) if struct_counts else ['None']
@@ -2895,35 +2882,31 @@ with tab_meta:
                 
                 with c6_3:
                     # Fig 6.3: Battery Charge Distribution (REAL)
-                    # If empty, provide distinct message
-                    if struct_counts.get('battery', 0) > 0:
-
+                    if struct_counts.get('battery', 0) > 0 and c6.get('battery_charge'):
                          fig_6_3 = px.violin(
                             y=c6['battery_charge'], box=True, points='all',
                             title="6.3 Battery Charge Distribution (Real)",
                             template='plotly_dark',
                             color_discrete_sequence=['#FFA15A']
                         )
+                         fig_6_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                         st.plotly_chart(fig_6_3, width='stretch', key="fig_6_3")
                     else:
-                        fig_6_3 = px.bar(x=["No Batteries"], y=[0], title="6.3 No Battery Structures Found", template='plotly_dark')
-
-                        
-                    fig_6_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                    st.plotly_chart(fig_6_3, width='stretch', key="fig_6_3")
+                        st.info("No Battery Structures Found.")
 
                 with c6_4:
                     # Fig 6.4: Environmental Control Surface (REAL)
-                    # Use actual agent environment control scores
-                    fig_6_4 = px.scatter_3d(
-                        x=c6['ax'], y=c6['ay'], z=c6['az'],
-                        color=c6['az'],
-                        title="6.4 Environmental Control Surface (Real)",
-                        template='plotly_dark',
-                        color_continuous_scale='Icefire',
-                        labels={'z': 'Control Score'}
-                    )
-                    fig_6_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                    st.plotly_chart(fig_6_4, width='stretch', key="fig_6_4")
+                    if c6.get('ax') and c6.get('ay') and c6.get('az'):
+                        fig_6_4 = px.scatter_3d(
+                            x=c6['ax'], y=c6['ay'], z=c6['az'],
+                            color=c6['az'],
+                            title="6.4 Environmental Control Surface (Real)",
+                            template='plotly_dark',
+                            color_continuous_scale='Icefire',
+                            labels={'z': 'Control Score'}
+                        )
+                        fig_6_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_6_4, width='stretch', key="fig_6_4")
             else:
                 st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
 
@@ -3014,28 +2997,28 @@ with tab_meta:
             
             # 📊 TEXT PARAMETERS (REAL)
             m7_1, m7_2, m7_3, m7_4 = st.columns(4)
-            m7_1.metric("7.1 Hive Sync", f"{c7['hive_sync_std']:.4f}", help="Phase Standard Deviation (Real)")
-            m7_2.metric("7.2 Active Bonds", f"{bonds_count}", help="Social Connections (Real)")
-            m7_3.metric("7.3 Consensus State", f"{c7['consensus_state']}", help="Global Registry Status (Real)")
-            m7_4.metric("7.4 Protocols", f"{c7['protocol_count']}", help="Active Dialects (Real)")
+            m7_1.metric("7.1 Hive Sync", f"{c7.get('hive_sync_std', 0):.4f}", help="Phase Standard Deviation (Real)")
+            m7_2.metric("7.2 Active Bonds", f"{c7.get('bonds_count', 0)}", help="Social Connections (Real)")
+            m7_3.metric("7.3 Consensus State", f"{c7.get('consensus_state', 'Idle')}", help="Global Registry Status (Real)")
+            m7_4.metric("7.4 Protocols", f"{c7.get('protocol_count', 1)}", help="Active Dialects (Real)")
 
             # Additional 12 Metrics (Row 1) - REAL
             am7_1, am7_2, am7_3, am7_4, am7_5, am7_6 = st.columns(6)
-            am7_1.metric("Swarm Coherence", f"{c7['swarm_coherence']:.2f}")
-            am7_2.metric("Info Velocity", f"{c7['info_velocity']}")
-            am7_3.metric("Net Diameter", f"{c7['net_diameter']}")
-            am7_4.metric("Cluster Coeff", f"{c7['cluster_coeff']}")
-            am7_5.metric("Small-World", f"{c7['small_world']}")
-            am7_6.metric("Leader Rot.", f"{c7['leader_rot']}")
+            am7_1.metric("Swarm Coherence", f"{c7.get('swarm_coherence', 0):.2f}")
+            am7_2.metric("Info Velocity", f"{c7.get('info_velocity', '0 hop/t')}")
+            am7_3.metric("Net Diameter", f"{c7.get('net_diameter', '1 hop')}")
+            am7_4.metric("Cluster Coeff", f"{c7.get('cluster_coeff', '0.00')}")
+            am7_5.metric("Small-World", f"{c7.get('small_world', 'No')}")
+            am7_6.metric("Leader Rot.", f"{c7.get('leader_rot', '0 active')}")
 
             # Additional 12 Metrics (Row 2) - REAL
             am7_7, am7_8, am7_9, am7_10, am7_11, am7_12 = st.columns(6)
-            am7_7.metric("Dissent Rate", f"{1.0 - c7['swarm_coherence']:.2f}")
-            am7_8.metric("S/N Ratio", f"{c7['sn_ratio']}")
-            am7_9.metric("Meme Diff.", f"{c7['protocol_count']}")
-            am7_10.metric("Group IQ", f"{int(c7['swarm_coherence']*2000)}")
-            am7_11.metric("Soc. Entropy", f"{c7['soc_entropy']:.2f} bits")
-            am7_12.metric("Eusocial Tier", "Type I" if bonds_count > 10 else "Proto")
+            am7_7.metric("Dissent Rate", f"{1.0 - c7.get('swarm_coherence', 1):.2f}")
+            am7_8.metric("S/N Ratio", f"{c7.get('sn_ratio', '0 dB')}")
+            am7_9.metric("Meme Diff.", f"{c7.get('protocol_count', 1)}")
+            am7_10.metric("Group IQ", f"{int(c7.get('swarm_coherence', 0)*2000)}")
+            am7_11.metric("Soc. Entropy", f"{c7.get('soc_entropy', 0):.2f} bits")
+            am7_12.metric("Eusocial Tier", "Type I" if c7.get('bonds_count', 0) > 10 else "Proto")
 
             # 📈 PLOTS (REAL)
             if st.session_state.get('show_charts', False):
@@ -3044,20 +3027,20 @@ with tab_meta:
                 
                 with c7_1:
                     # Fig 7.1: Hive Mind Sync/Phase (REAL)
-                    radii = c7['radii']
-                    fig_7_1 = px.scatter_polar(
-                        r=radii, theta=np.degrees(phases),
-                        title="7.1 Hive Mind Sync/Phase (Real Agents)",
-                        template='plotly_dark',
-                        color=radii, color_continuous_scale='Rainbow',
-                        labels={'r':'Energy', 'theta':'Phase Angle'}
-                    )
-                    fig_7_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                    st.plotly_chart(fig_7_1, width='stretch', key="fig_7_1")
+                    if c7.get('radii') and c7.get('phases'):
+                        fig_7_1 = px.scatter_polar(
+                            r=c7['radii'], theta=np.degrees(c7['phases']),
+                            title="7.1 Hive Mind Sync/Phase (Real Agents)",
+                            template='plotly_dark',
+                            color=c7['radii'], color_continuous_scale='Rainbow',
+                            labels={'r':'Energy', 'theta':'Phase Angle'}
+                        )
+                        fig_7_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_7_1, width='stretch', key="fig_7_1")
                 
                 with c7_2:
                     # Fig 7.2: Social Network Force Layout (REAL)
-                    if c7['edge_x']:
+                    if c7.get('edge_x') and c7.get('node_x'):
                         fig_7_2 = go.Figure()
                         fig_7_2.add_trace(go.Scatter(
                             x=c7['edge_x'], y=c7['edge_y'],
@@ -3087,23 +3070,22 @@ with tab_meta:
                 
                 with c7_3:
                     # Fig 7.3: Consensus Vote Distribution (Real Phase Distribution as Proxy)
-                    # We use the phase histogram as a proxy for "Agreement" buckets
-                    hist_vals, bin_edges = np.histogram(phases, bins=4)
-                    stages = ["Out of Sync", "Aligning", "Resonant", "Locked"]
-                    
-                    fig_7_3 = px.bar(
-                        x=stages, y=hist_vals,
-                        title="7.3 Synchronization States (Real Phase Dist)",
-                        template='plotly_dark',
-                        color=hist_vals,
-                         color_continuous_scale='Blues'
-                    )
-                    fig_7_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                    st.plotly_chart(fig_7_3, width='stretch', key="fig_7_3")
+                    if c7.get('phases'):
+                        hist_vals, bin_edges = np.histogram(c7['phases'], bins=4)
+                        stages = ["Out of Sync", "Aligning", "Resonant", "Locked"]
+                        
+                        fig_7_3 = px.bar(
+                            x=stages, y=hist_vals,
+                            title="7.3 Synchronization States (Real Phase Dist)",
+                            template='plotly_dark',
+                            color=hist_vals,
+                             color_continuous_scale='Blues'
+                        )
+                        fig_7_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_7_3, width='stretch', key="fig_7_3")
 
                 with c7_4:
                     # Fig 7.4: Protocol Tree (Real Dialect Clusters)
-                    # If no hierarchy exists, show flat map of dialects
                     if c7.get('dialect_counts'):
                          df_7_4 = pd.DataFrame({
                              "Dialect": [f"Dialect {k}" for k in c7['dialect_counts'].keys()],
@@ -3219,28 +3201,28 @@ with tab_meta:
 
             # 📊 TEXT PARAMETERS (REAL)
             m8_1, m8_2, m8_3, m8_4 = st.columns(4)
-            m8_1.metric("8.1 Mean Φ (IIT)", f"{c8['mean_phi']:.4f}", help="Integrated Information Theory Score (Real)")
-            m8_2.metric("8.2 Self-Models", f"{c8['self_models_count']}", help="Agents with Self-Models (Real)")
-            m8_3.metric("8.3 Active Qualia", f"{len(qualia_names)}", help="Distinct Subjective Experiences (Real)")
-            m8_4.metric("8.4 Theory of Mind", f"{c8['tom_score_mean']:.2f}", help="Avg Social Prediction Score (Real)")
+            m8_1.metric("8.1 Mean Φ (IIT)", f"{c8.get('mean_phi', 0):.4f}", help="Integrated Information Theory Score (Real)")
+            m8_2.metric("8.2 Self-Models", f"{c8.get('self_models_count', 0)}", help="Agents with Self-Models (Real)")
+            m8_3.metric("8.3 Active Qualia", f"{len(c8.get('qualia_names', []))}", help="Distinct Subjective Experiences (Real)")
+            m8_4.metric("8.4 Theory of Mind", f"{c8.get('tom_score_mean', 0):.2f}", help="Avg Social Prediction Score (Real)")
 
             # Additional 12 Metrics (Row 1) - REAL
             am8_1, am8_2, am8_3, am8_4, am8_5, am8_6 = st.columns(6)
-            am8_1.metric("Max Φ", f"{c8['max_phi']:.4f}")
-            am8_2.metric("Causal Rep.", f"{len(c8['concepts_list']) if c8['concepts_list'] else 0}")
-            am8_3.metric("Effective Info", f"{c8['mean_phi'] * 2:.2f} bits")
-            am8_4.metric("Irreducibility", f"{c8['irreducibility']}") # Updated
-            am8_5.metric("Qualia Count", f"{sum(c8['qualia_vals'])}")
-            am8_6.metric("Self-Recog", f"{c8['self_models_count'] / (len(all_agents)+1):.2%}")
+            am8_1.metric("Max Φ", f"{c8.get('max_phi', 0):.4f}")
+            am8_2.metric("Causal Rep.", f"{len(c8.get('concepts_list', []))}")
+            am8_3.metric("Effective Info", f"{c8.get('mean_phi', 0) * 2:.2f} bits")
+            am8_4.metric("Irreducibility", f"{c8.get('irreducibility', '0.00')}")
+            am8_5.metric("Qualia Count", f"{sum(c8.get('qualia_vals', [0]))}")
+            am8_6.metric("Self-Recog", f"{c8.get('self_models_count', 0) / (len(all_agents)+1):.2%}")
 
             # Additional 12 Metrics (Row 2) - REAL
-            am8_7, am8_8, am8_9, am8_10, am8_11, am8_12 = st.columns(6)
-            am8_7.metric("Sim Depth", f"{c8['sim_depth']}") # Updated
-            am8_8.metric("Counterfact.", f"{c8['counterfact']}") # Updated
-            am8_9.metric("Emo Stabil.", f"{c8['emo_stabil']}") # Updated
-            am8_10.metric("Agency Score", f"{c8['mean_phi']:.2f}")
-            am8_11.metric("Narrative", f"{c8['narrative']}") # Updated
-            am8_12.metric("Phenom. Bind", f"{c8['phenom_bind']}") # Updated
+            am8_7, am8_8, am8_9, am10_10, am10_11, am10_12 = st.columns(6)
+            am8_7.metric("Sim Depth", f"{c8.get('sim_depth', 0)}")
+            am8_8.metric("Counterfact.", f"{c8.get('counterfact', '0 branches')}")
+            am8_9.metric("Emo Stabil.", f"{c8.get('emo_stabil', '0.00')}")
+            am8_10.metric("Agency Score", f"{c8.get('mean_phi', 0):.2f}")
+            am8_11.metric("Narrative", f"{c8.get('narrative', 'Silent')}")
+            am8_12.metric("Phenom. Bind", f"{c8.get('phenom_bind', 'No')}")
 
             # 📈 PLOTS (REAL)
             if st.session_state.get('show_charts', False):
@@ -3249,9 +3231,9 @@ with tab_meta:
                 
                 with c8_1:
                     # Fig 8.1: Concept Space Latent Manifold (REAL)
-                    if c8['concepts_list']:
+                    if c8.get('concepts_list'):
                         c_arr = np.array(c8['concepts_list'])
-                        if c_arr.shape[1] >= 3:
+                        if len(c_arr.shape) > 1 and c_arr.shape[1] >= 3:
                             fig_8_1 = px.scatter_3d(
                                 x=c_arr[:, 0], y=c_arr[:, 1], z=c_arr[:, 2],
                                 title="8.1 Concept Space Latent Manifold (Real)",
@@ -3268,8 +3250,7 @@ with tab_meta:
                 
                 with c8_2:
                     # Fig 8.2: Strange Loop Recurrence (REAL Proxy)
-                    # Plot the distribution of recurrence scores
-                    if c8['recurrence_scores']:
+                    if c8.get('recurrence_scores'):
                         fig_8_2 = px.histogram(
                             x=c8['recurrence_scores'],
                             title="8.2 Strange Loop Recurrence Strength (Real)",
@@ -3285,21 +3266,24 @@ with tab_meta:
                 
                 with c8_3:
                     # Fig 8.3: Qualia Spectrum (REAL)
-                    fig_8_3 = px.bar(
-                        x=c8['qualia_names'], y=c8['qualia_vals'],
-                        title="8.3 Qualia Spectrum Analysis (Real Reports)",
-                        template='plotly_dark',
-                        color=c8['qualia_vals'],
-                        color_continuous_scale='Spectral'
-                    )
-                    fig_8_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                    st.plotly_chart(fig_8_3, width='stretch', key="fig_8_3")
+                    if c8.get('qualia_names'):
+                        fig_8_3 = px.bar(
+                            x=c8['qualia_names'], y=c8.get('qualia_vals', []),
+                            title="8.3 Qualia Spectrum Analysis (Real Reports)",
+                            template='plotly_dark',
+                            color=c8.get('qualia_vals', []),
+                            color_continuous_scale='Spectral'
+                        )
+                        fig_8_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_8_3, width='stretch', key="fig_8_3")
+                    else:
+                        st.info("No qualia reports yet.")
 
                 with c8_4:
                     # Fig 8.4: Symbol Grounding Correlation (REAL)
-                    if c8['phis'] and c8['grounding']:
+                    if c8.get('phis') and c8.get('grounding'):
                         fig_8_4 = px.scatter(
-                            x=c8['phis'], y=c8['grounding'], size=c8['ages'],
+                            x=c8['phis'], y=c8['grounding'], size=c8.get('ages', []),
                             title="8.4 Symbol Grounding vs Φ (Real)",
                             template='plotly_dark',
                             labels={'x': 'Integrated Info (Φ)', 'y': 'Symbol Grounding R²'}
@@ -3308,6 +3292,7 @@ with tab_meta:
                         st.plotly_chart(fig_8_4, width='stretch', key="fig_8_4")
                     else:
                         st.info("Insufficient data for correlation plot.")
+
             else:
                  st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
 
@@ -3567,28 +3552,28 @@ with tab_meta:
             
             # 📊 TEXT PARAMETERS (REAL)
             m10_1, m10_2, m10_3, m10_4 = st.columns(4)
-            m10_1.metric("10.1 Recursive Depth", f"{c10['rec_depth']}", help="Nested Simulation Layers (Real)")
-            m10_2.metric("10.2 Compute Surplus", f"{c10['compute_surplus']}", help="Host System Idle Capacity (Real)")
-            m10_3.metric("10.3 Omega Progress", f"{c10['omega_score']:.2f}%", help="System Complexity Index (Real)")
-            m10_4.metric("10.4 Emergent Agents", f"{c10['emergent_count']}", help="Agents Born from Agents (Real)")
+            m10_1.metric("10.1 Recursive Depth", f"{c10.get('rec_depth', 0)}", help="Nested Simulation Layers (Real)")
+            m10_2.metric("10.2 Compute Surplus", f"{c10.get('compute_surplus', '0% CPU')}", help="Host System Idle Capacity (Real)")
+            m10_3.metric("10.3 Omega Progress", f"{c10.get('omega_score', 0):.2f}%", help="System Complexity Index (Real)")
+            m10_4.metric("10.4 Emergent Agents", f"{c10.get('emergent_count', 0)}", help="Agents Born from Agents (Real)")
 
             # Additional 12 Metrics (Row 1) - REAL
             am10_1, am10_2, am10_3, am10_4, am10_5, am10_6 = st.columns(6)
-            am10_1.metric("Substrate Ind", f"{c10['substrate_ind']}")
-            am10_2.metric("Recur. Layers", f"{c10['rec_depth']}")
-            am10_3.metric("Holo. Bound", f"{c10['holo_bound']}")
-            am10_4.metric("Singularity", f"{c10['singularity']}")
-            am10_5.metric("Time Dilation", f"{c10['time_dilation']}")
-            am10_6.metric("Final Cause", f"{c10['final_cause']}")
+            am10_1.metric("Substrate Ind", f"{c10.get('substrate_ind', 'Pending')}")
+            am10_2.metric("Recur. Layers", f"{c10.get('rec_depth', 0)}")
+            am10_3.metric("Holo. Bound", f"{c10.get('holo_bound', 'Stable')}")
+            am10_4.metric("Singularity", f"{c10.get('singularity', 'Pending')}")
+            am10_5.metric("Time Dilation", f"{c10.get('time_dilation', '1.0x')}")
+            am10_6.metric("Final Cause", f"{c10.get('final_cause', 'Unknown')}")
             
             # Additional 12 Metrics (Row 2) - REAL
             am10_7, am10_8, am10_9, am10_10, am10_11, am10_12 = st.columns(6)
-            am10_7.metric("God Mode", f"{c10['god_mode']}")
-            am10_8.metric("Code Mutate", f"{c10['code_mutate']}")
-            am10_9.metric("Hypercomp", f"{c10['hypercomp']}")
-            am10_10.metric("Acausal Trd", f"{c10['acausal_trd']}")
-            am10_11.metric("Basilisk", f"{c10['basilisk']}")
-            am10_12.metric("Escaped", f"{c10['escaped']}")
+            am10_7.metric("God Mode", f"{c10.get('god_mode', 'Off')}")
+            am10_8.metric("Code Mutate", f"{c10.get('code_mutate', '0 lines')}")
+            am10_9.metric("Hypercomp", f"{c10.get('hypercomp', 'Inactive')}")
+            am10_10.metric("Acausal Trd", f"{c10.get('acausal_trd', 0)}")
+            am10_11.metric("Basilisk", f"{c10.get('basilisk', 'Contained')}")
+            am10_12.metric("Escaped", f"{c10.get('escaped', 0)}")
 
             # 📈 PLOTS (REAL)
             if st.session_state.get('show_charts', False):
@@ -3611,11 +3596,9 @@ with tab_meta:
                     st.plotly_chart(fig_10_1, width='stretch', key="fig_10_1")
 
                     # Fig 10.2: Ouroboros Self-Correction (REAL)
-                    # Use real agent self-modeling accuracy scores
-                    if all_agents:
-                        self_accs = [getattr(a, 'self_model_accuracy', 0.0) for a in all_agents]
+                    if c10.get('self_accs'):
                         fig_10_2 = px.histogram(
-                            x=self_accs, nbins=20,
+                            x=c10.get('self_accs', []), nbins=20,
                             title="10.2 Ouroboros: Self-Modeling Accuracy",
                             labels={'x': 'Accuracy Score (0-1)'},
                             template='plotly_dark',
@@ -3624,21 +3607,17 @@ with tab_meta:
                         fig_10_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                         st.plotly_chart(fig_10_2, width='stretch', key="fig_10_2")
                     else:
-                        st.info("No agents for self-correction plot.")
+                        st.info("No self-modeling data.")
 
                 c10_3, c10_4 = st.columns(2)
                 
                 with c10_3:
                     # Fig 10.3: Hyper-Dimensional Projection (Real Agent State Space)
-                    # We project 3 core dimensions: Energy, Age, and Complexity (calc via simple proxy)
-                    if all_agents:
-                         x_dim = [a.energy for a in all_agents]
-                         y_dim = [a.age for a in all_agents]
-                         z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents]
-                         
+                    if c10.get('hyper_dim'):
+                         hd = c10['hyper_dim']
                          fig_10_3 = px.scatter_3d(
-                            x=x_dim, y=y_dim, z=z_dim,
-                            color=z_dim,
+                            x=hd.get('energy', []), y=hd.get('age', []), z=hd.get('conf', []),
+                            color=hd.get('conf', []),
                             title="10.3 Hyper-Dimensional State Projection (Real)",
                             labels={'x':'Energy', 'y':'Age', 'z':'Confidence'},
                             template='plotly_dark'
@@ -3646,11 +3625,11 @@ with tab_meta:
                          fig_10_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                          st.plotly_chart(fig_10_3, width='stretch', key="fig_10_3")
                     else:
-                        st.info("No agents for hyper-dimensional projection.")
+                        st.info("No hyper-dimensional projection data.")
     
                 with c10_4:
                     # Fig 10.4: Emergent Agent Genealogy (Real Tree)
-                    if c10['emergent_count'] > 0:
+                    if c10.get('emergent_count', 0) > 0:
                         # Build genealogy tree data
                         names = [str(a.id) for a in all_agents]
                         parents = [str(getattr(a, 'parent_id', 'World')) for a in all_agents]
