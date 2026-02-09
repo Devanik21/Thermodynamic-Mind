@@ -863,8 +863,7 @@ def collect_full_simulation_dna():
             "symbol_ground": getattr(world, 'symbol_grounding_r2', 0)
         },
         
-        # ==================== TAB 7: METACOGNITION (PRESERVED) ====================
-
+,
 
         
         # ==================== AGENT GRID (Top 50) ====================
@@ -2379,25 +2378,123 @@ with tab_meta:
                                 else: d_val = str(v)
                                 row_cols[j].metric(k.replace('_', ' ').title()[:24], d_val)
                     
-                    # Add a symbolic "Cognitive Scan" chart if data available
                     if st.session_state.get("show_charts", False):
+                        st.markdown("---")
                         
-                        # Extract list-based metrics for plotting (e.g. error history, learning rates)
-                        # These are saved as lists in the JSON
-                        plot_candidates = {}
-                        for k, v in level_data.items():
-                            if isinstance(v, list) and len(v) > 2 and isinstance(v[0], (int, float)):
-                                plot_candidates[k] = v
-                        
-                        if plot_candidates:
-                             # Create a combined chart or small multiples
-                             cols_p = st.columns(3)
-                             idx = 0
-                             for name, data in plot_candidates.items():
-                                 with cols_p[idx % 3]:
-                                     st.caption(f"📈 {name.replace('_', ' ').title()}")
-                                     st.line_chart(data, height=120)
-                                     idx += 1
+                        # --- LEVEL 5 PLOTS ---
+                        if level_num == 5:
+                            c5_1, c5_2 = st.columns(2)
+                            with c5_1:
+                                if level_data.get('errors'):
+                                    df_5_1 = pd.DataFrame({'Energy': level_data.get('energies_l5', []), 'Error': level_data['errors'], 'Confidence': level_data.get('confidences', [])})
+                                    st.plotly_chart(px.scatter(df_5_1, x='Energy', y='Error', color='Confidence', title="5.1 Prediction Error Landscape (Preserved)", color_continuous_scale='Bluered_r', template='plotly_dark'), width='stretch')
+                            with c5_2:
+                                if level_data.get('weights_sample'):
+                                    st.plotly_chart(px.imshow(level_data['weights_sample'], title="5.2 Cognitive Sparse Matrix (Preserved)", color_continuous_scale='Viridis', template='plotly_dark'), width='stretch')
+                            
+                            c5_3, c5_4 = st.columns(2)
+                            with c5_3:
+                                if level_data.get('concept_samples'):
+                                    c_arr = np.array(level_data['concept_samples'])
+                                    if len(c_arr) > 0 and len(c_arr[0]) >= 2:
+                                        st.plotly_chart(px.scatter(pd.DataFrame(c_arr, columns=['C1', 'C2']), x='C1', y='C2', title="5.3 Concept Latent Space (Preserved)", template='plotly_dark', color_discrete_sequence=['#AB63FA']), width='stretch')
+                            with c5_4:
+                                if level_data.get('ages'):
+                                    st.plotly_chart(px.histogram(x=level_data['ages'], nbins=20, title="5.4 Agent Generational Maturity (Preserved)", template='plotly_dark', color_discrete_sequence=['#00CC96']), width='stretch')
+
+                        # --- LEVEL 6 PLOTS ---
+                        elif level_num == 6:
+                            c6_1, c6_2 = st.columns(2)
+                            with c6_1:
+                                if level_data.get('sx'):
+                                    st.plotly_chart(px.density_heatmap(x=level_data['sx'], y=level_data['sy'], nbinsx=20, nbinsy=20, title="6.1 Terraforming Heatmap (Preserved)", template='plotly_dark', color_continuous_scale='Hot'), width='stretch')
+                            with c6_2:
+                                if level_data.get('struct_counts'):
+                                    st.plotly_chart(go.Figure(go.Scatterpolar(r=list(level_data['struct_counts'].values()), theta=list(level_data['struct_counts'].keys()), fill='toself')).update_layout(title="6.2 Structure Radar Scan (Preserved)", template='plotly_dark'), width='stretch')
+                            
+                            c6_3, c6_4 = st.columns(2)
+                            with c6_3:
+                                if level_data.get('battery_charge'):
+                                    st.plotly_chart(px.violin(y=level_data['battery_charge'], box=True, points='all', title="6.3 Battery Charge Distribution (Preserved)", template='plotly_dark', color_discrete_sequence=['#FFA15A']), width='stretch')
+                            with c6_4:
+                                if level_data.get('ax'):
+                                    st.plotly_chart(px.scatter_3d(x=level_data['ax'], y=level_data['ay'], z=level_data['az'], color=level_data['az'], title="6.4 Env Control Surface (Preserved)", template='plotly_dark', color_continuous_scale='Icefire'), width='stretch')
+
+                        # --- LEVEL 7 PLOTS ---
+                        elif level_num == 7:
+                            c7_1, c7_2 = st.columns(2)
+                            with c7_1:
+                                if level_data.get('node_x'):
+                                    st.plotly_chart(px.scatter(x=level_data['node_x'], y=level_data['node_y'], color=level_data.get('phases'), title="7.1 Hive Mind Phase Sync (Preserved)", template='plotly_dark', color_continuous_scale='Twilight'), width='stretch')
+                            with c7_2:
+                                if level_data.get('edge_x'):
+                                    fig_net = go.Figure()
+                                    fig_net.add_trace(go.Scatter(x=level_data['edge_x'], y=level_data['edge_y'], mode='lines', line=dict(color='rgba(255,255,255,0.2)', width=0.5)))
+                                    fig_net.add_trace(go.Scatter(x=level_data['node_x'], y=level_data['node_y'], mode='markers', marker=dict(size=5, color=level_data.get('phases'), colorscale='Viridis')))
+                                    st.plotly_chart(fig_net.update_layout(title="7.2 Neural Topology (Preserved)", template='plotly_dark'), width='stretch')
+                            
+                            c7_3, c7_4 = st.columns(2)
+                            with c7_3:
+                                if level_data.get('phases'):
+                                    st.plotly_chart(px.histogram(x=level_data['phases'], nbins=30, title="7.3 Phase Distribution (Preserved)", template='plotly_dark'), width='stretch')
+                            with c7_4:
+                                if level_data.get('dialect_counts'):
+                                    df_d = pd.DataFrame({"Dialect": [f"D{k}" for k in level_data['dialect_counts'].keys()], "Count": list(level_data['dialect_counts'].values())})
+                                    st.plotly_chart(px.treemap(df_d, path=['Dialect'], values='Count', title="7.4 Protocol Dialects (Preserved)", template='plotly_dark'), width='stretch')
+
+                        # --- LEVEL 8 PLOTS ---
+                        elif level_num == 8:
+                            c8_1, c8_2 = st.columns(2)
+                            with c8_1:
+                                if level_data.get('concepts_list'):
+                                    c_arr = np.array(level_data['concepts_list'])
+                                    if len(c_arr) > 0 and c_arr.shape[1] >= 3:
+                                        st.plotly_chart(px.scatter_3d(x=c_arr[:,0], y=c_arr[:,1], z=c_arr[:,2], color=c_arr[:,0], title="8.1 Concept Manifold (Preserved)", template='plotly_dark', color_continuous_scale='Turbo'), width='stretch')
+                            with c8_2:
+                                if level_data.get('recurrence_scores'):
+                                    st.plotly_chart(px.histogram(x=level_data['recurrence_scores'], title="8.2 Strange Loop Recurrence (Preserved)", template='plotly_dark'), width='stretch')
+                            
+                            if level_data.get('qualia_names'):
+                                st.plotly_chart(px.bar(x=level_data['qualia_names'], y=level_data['qualia_vals'], title="8.3 Qualia Spectrum (Preserved)", template='plotly_dark', color=level_data['qualia_vals'], color_continuous_scale='Spectral'), width='stretch')
+
+                        # --- LEVEL 9 PLOTS ---
+                        elif level_num == 9:
+                            c9_1, c9_2 = st.columns(2)
+                            with c9_1:
+                                if level_data.get('residuals'):
+                                    st.plotly_chart(px.histogram(x=level_data['residuals'], nbins=30, title="9.1 Oracle Residuals (Preserved)", template='plotly_dark', color_discrete_sequence=['#EF553B']), width='stretch')
+                            with c9_2:
+                                if level_data.get('discovery_log'):
+                                    st.plotly_chart(px.scatter(pd.DataFrame(level_data['discovery_log']), x='Time', y='Pattern', title="9.2 Discovery Timeline (Preserved)", template='plotly_dark'), width='stretch')
+                            
+                            c9_3, c9_4 = st.columns(2)
+                            with c9_3:
+                                if level_data.get('glitch_x'):
+                                    st.plotly_chart(px.density_contour(x=level_data['glitch_x'], y=level_data['glitch_y'], title="9.3 Reality Glitch Map (Preserved)", template='plotly_dark'), width='stretch')
+                            with c9_4:
+                                if level_data.get('causal_sample'):
+                                    d_9_4 = []
+                                    for act, res in level_data['causal_sample'].items():
+                                        d_9_4.extend([{"Action": f"Act_{act}", "Outcome": "Pos", "Count": res.get("positive", 0)}, {"Action": f"Act_{act}", "Outcome": "Neg", "Count": res.get("negative", 0)}])
+                                    st.plotly_chart(px.bar(pd.DataFrame(d_9_4), x='Action', y='Count', color='Outcome', barmode='group', title="9.4 Causal Calculus (Preserved)", template='plotly_dark', color_discrete_map={"Pos": "#00ffa3", "Neg": "#ff4b4b"}), width='stretch')
+
+                        # --- LEVEL 10 PLOTS ---
+                        elif level_num == 10:
+                            c10_1, c10_2 = st.columns(2)
+                            with c10_1:
+                                if level_data.get('self_accs'):
+                                    st.plotly_chart(px.histogram(x=level_data['self_accs'], nbins=20, title="10.2 Ouroboros Self-Correction (Preserved)", template='plotly_dark'), width='stretch')
+                            
+                            c10_3, c10_4 = st.columns(2)
+                            with c10_3:
+                                if level_data.get('hyper_dim'):
+                                    hd = level_data['hyper_dim']
+                                    st.plotly_chart(px.scatter_3d(x=hd['energy'], y=hd['age'], z=hd['conf'], color=hd['conf'], title="10.3 Hyper-Dim State (Preserved)", template='plotly_dark'), width='stretch')
+                            with c10_4:
+                                if level_data.get('genealogy'):
+                                    df_g = pd.DataFrame(level_data['genealogy'])
+                                    # Ensure unique ids/parents for treemap
+                                    st.plotly_chart(px.treemap(df_g, names='id', parents='parent', title="10.4 Agent Genealogy (Preserved)", template='plotly_dark'), width='stretch')
 
         
         st.success("✨ ALL 110-FEATURE METRICS ACCESSIBLE VIA DNA ZIP ✨")
@@ -2537,7 +2634,10 @@ with tab_meta:
                     'loss_conv': loss_conv,
                     'model_complexity': model_complexity,
                     'inference_time': inference_time,
-                    'mem_mean': np.mean(mem_sizes) if mem_sizes else 0
+                    'mem_mean': np.mean(mem_sizes) if mem_sizes else 0,
+                    'ages': ages,
+                    'weights_sample': all_agents[0].brain.actor.weight.detach().cpu().numpy()[:20, :].tolist() if all_agents and hasattr(all_agents[0].brain, 'actor') else [],
+                    'concept_samples': [a.last_concepts.detach().cpu().numpy().flatten().tolist()[:2] for a in all_agents[:50] if hasattr(a, 'last_concepts') and a.last_concepts is not None] if all_agents else []
                 }
 
             cache = st.session_state.l5_cache
@@ -3277,13 +3377,11 @@ with tab_meta:
                 simulacra = f"Level {getattr(world, 'nested_simulation_depth_max', 1)}"
                 
                 st.session_state.l9_cache = {
-                    'residuals': residuals,
                     'found_patterns': found_patterns,
                     'avg_residual': avg_residual,
-                    'max_depth': max_depth,
                     'exploits': exploits,
-                    'glitch_x': glitch_x, 'glitch_y': glitch_y,
-                    'law_consistency': law_consistency, # Higher error = lower consistency
+                    'max_depth': max_depth,
+                    'law_consistency': law_consistency,
                     'pred_horizon': pred_horizon,
                     'entropy_delta': entropy_delta,
                     'symm_break': symm_break,
@@ -3294,7 +3392,11 @@ with tab_meta:
                     'dark_energy': dark_energy,
                     'tachyon_flux': tachyon_flux,
                     'boltzmann': boltzmann,
-                    'simulacra': simulacra
+                    'simulacra': simulacra,
+                    'residuals': residuals,
+                    'glitch_x': glitch_x, 'glitch_y': glitch_y,
+                    'discovery_log': getattr(world, 'discovery_log', []),
+                    'causal_sample': all_agents[0].causal_bayesian_network if all_agents and hasattr(all_agents[0], 'causal_bayesian_network') else {}
                 }
             
             c9 = st.session_state.l9_cache
@@ -3344,8 +3446,8 @@ with tab_meta:
 
                 with c9_2:
                     # Fig 9.2: Pattern Discovery Timeline (Real List)
-                    if hasattr(world, 'discovery_log') and world.discovery_log:
-                         df_9_2 = pd.DataFrame(world.discovery_log)
+                    if c9['discovery_log']:
+                         df_9_2 = pd.DataFrame(c9['discovery_log'])
                          # Assuming log has 'Time', 'Pattern'
                          fig_9_2 = px.scatter(
                             df_9_2, x='Time', y='Pattern',
@@ -3374,11 +3476,9 @@ with tab_meta:
 
                 with c9_4:
                             # Fig 9.4: Causal Calculus (REAL)
-                    if all_agents:
-                         sample = all_agents[0]
-                         if hasattr(sample, 'causal_bayesian_network') and sample.causal_bayesian_network:
+                    if c9['causal_sample']:
                              data_9_4 = []
-                             for act, res in sample.causal_bayesian_network.items():
+                             for act, res in c9['causal_sample'].items():
                                  data_9_4.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
                                  data_9_4.append({"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)})
                              
@@ -3391,10 +3491,8 @@ with tab_meta:
                              )
                              fig_9_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                              st.plotly_chart(fig_9_4, width='stretch', key="fig_9_4")
-                         else:
-                             st.info("Awaiting Causal Data (Requires Agent Interventions)")
                     else:
-                        st.info("No Agents Found.")
+                        st.info("Awaiting Causal Data (Requires Agent Interventions)")
 
 
         # ============================================================
@@ -3456,7 +3554,10 @@ with tab_meta:
                     'acausal_trd': acausal_trd,
                     'basilisk': basilisk,
                     'escaped': escaped,
-                    'scratch_len': len(all_agents)
+                    'scratch_len': len(all_agents),
+                    'genealogy': [{'id': str(a.id), 'parent': str(getattr(a, 'parent_id', 'World'))} for a in all_agents],
+                    'hyper_dim': {'energy': [a.energy for a in all_agents], 'age': [a.age for a in all_agents], 'conf': [getattr(a, 'confidence', 0.5) for a in all_agents]},
+                    'self_accs': [getattr(a, 'self_model_accuracy', 0.0) for a in all_agents]
                 }
             
             c10 = st.session_state.l10_cache
@@ -3578,7 +3679,6 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
 
 
 
