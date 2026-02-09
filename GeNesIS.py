@@ -914,6 +914,110 @@ All 110 features across Levels 1-10 are implemented and tracked.
                 width='stretch'
             )
 
+        # ============================================================
+        # 📂 ZIP UPLOAD VIEWER - Load Previous Results
+        # ============================================================
+        with st.expander("📂 UPLOAD PREVIOUS RESULTS", expanded=False):
+            uploaded_zip = st.file_uploader("Upload a genesis_data.zip file", type=['zip'], key="zip_uploader")
+            
+            if uploaded_zip:
+                try:
+                    with zipfile.ZipFile(uploaded_zip, 'r') as zf:
+                        # Read all metrics JSON files
+                        loaded_metrics = {}
+                        readme_content = ""
+                        
+                        for filename in zf.namelist():
+                            if filename.endswith('.json'):
+                                content = zf.read(filename)
+                                loaded_metrics[filename] = json.loads(content)
+                            elif filename == 'README.md':
+                                readme_content = zf.read(filename).decode('utf-8')
+                        
+                        st.success(f"✅ Loaded! Found {len(loaded_metrics)} metric files.")
+                        
+                        # Display in organized tabs
+                        view_tab1, view_tab2, view_tab3 = st.tabs(["📊 Summary", "🔬 All Metrics", "📖 README"])
+                        
+                        with view_tab1:
+                            st.markdown("### Quick Summary")
+                            
+                            # Extract key metrics from omega telemetry
+                            omega = loaded_metrics.get('metrics/omega_telemetry.json', {})
+                            obs = loaded_metrics.get('metrics/observation_deck.json', {})
+                            
+                            sc1, sc2, sc3, sc4 = st.columns(4)
+                            sc1.metric("Population", omega.get('population', obs.get('population', 'N/A')))
+                            sc2.metric("Max Generation", omega.get('max_generation', obs.get('max_generation', 'N/A')))
+                            sc3.metric("Time Step", omega.get('world_time_step', obs.get('world_time_step', 'N/A')))
+                            sc4.metric("Discoveries", omega.get('global_discoveries', 'N/A'))
+                            
+                            sc5, sc6, sc7, sc8 = st.columns(4)
+                            sc5.metric("Structures", omega.get('structures_count', 'N/A'))
+                            sc6.metric("Active Bonds", omega.get('active_bonds', 'N/A'))
+                            sc7.metric("Gene Pool", omega.get('gene_pool_size', 'N/A'))
+                            sc8.metric("Omega Achieved", "✅ YES" if omega.get('omega_achieved') else "❌ NO")
+                            
+                            # Additional key metrics
+                            st.markdown("#### Advanced Metrics")
+                            ac1, ac2, ac3, ac4 = st.columns(4)
+                            ac1.metric("System Entropy", f"{omega.get('system_entropy', 0):.4f}")
+                            ac2.metric("Population Φ", f"{omega.get('population_phi', 0):.4f}")
+                            ac3.metric("Consciousness", omega.get('consciousness_count', 'N/A'))
+                            ac4.metric("Strange Loops", omega.get('strange_loop_count', 'N/A'))
+                        
+                        with view_tab2:
+                            st.markdown("### All Metrics by Tab")
+                            
+                            # Observation Deck
+                            with st.expander("🔭 Observation Deck"):
+                                obs_data = loaded_metrics.get('metrics/observation_deck.json', {})
+                                st.json(obs_data)
+                            
+                            # Quantum Spectrogram
+                            with st.expander("🧬 Quantum Spectrogram"):
+                                q_data = loaded_metrics.get('metrics/quantum_spectrogram.json', {})
+                                st.json(q_data)
+                            
+                            # Hive Structures
+                            with st.expander("🐝 Hive Structures"):
+                                h_data = loaded_metrics.get('metrics/hive_structures.json', {})
+                                st.json(h_data)
+                            
+                            # Culture
+                            with st.expander("🏺 Culture"):
+                                c_data = loaded_metrics.get('metrics/culture.json', {})
+                                st.json(c_data)
+                            
+                            # Nobel Committee
+                            with st.expander("🏆 Nobel Committee"):
+                                n_data = loaded_metrics.get('metrics/nobel_committee.json', {})
+                                st.json(n_data)
+                            
+                            # Omega Telemetry
+                            with st.expander("Ω Omega Telemetry", expanded=True):
+                                o_data = loaded_metrics.get('metrics/omega_telemetry.json', {})
+                                st.json(o_data)
+                            
+                            # Metacognition Levels 5-10
+                            with st.expander("🧠 Metacognition (Levels 5-10)"):
+                                m_data = loaded_metrics.get('metrics/metacognition_levels_5_10.json', {})
+                                st.json(m_data)
+                            
+                            # Legacy Stats
+                            with st.expander("📜 Stats History"):
+                                s_data = loaded_metrics.get('metrics/stats_history.json', {})
+                                st.json(s_data)
+                        
+                        with view_tab3:
+                            if readme_content:
+                                st.markdown(readme_content)
+                            else:
+                                st.info("No README.md found in the zip file.")
+                
+                except Exception as e:
+                    st.error(f"Error loading zip file: {str(e)}")
+
 # --- MAIN TABS FRAGMENT ---
 tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st.tabs([
     "🔭 OBSERVATION DECK", "🧬 QUANTUM SPECTROGRAM", "🐝 HIVE STRUCTURES", "🏺 Culture", "🏆 Nobel Committee", "Ω OMEGA TELEMETRY", "🧠 METACOGNITION"
