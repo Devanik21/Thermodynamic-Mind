@@ -626,7 +626,7 @@ with st.container():
             st.rerun()
     with col_h4:
         # Global Chart Toggle for Performance
-        st.session_state.show_charts = st.checkbox("Show Live Charts", value=False, help="Enable heavy plots. Keep off for speed.")
+        st.session_state.show_charts = st.checkbox("Show Advanced Visualizations", value=True, help="Enable heavy plots for Levels 5-10 and telemetry")
 
 # ============================================================
 # 🧬 COMPLETE DNA PRESERVATION SYSTEM
@@ -2495,6 +2495,10 @@ with tab_meta:
                                     df_g = pd.DataFrame(level_data['genealogy'])
                                     # Ensure unique ids/parents for treemap
                                     st.plotly_chart(px.treemap(df_g, names='id', parents='parent', title="10.4 Agent Genealogy (Preserved)", template='plotly_dark'), width='stretch')
+                    else:
+                        st.info("💡 Enable 'Show Advanced Visualizations' in the orbital header to view preserved plots for this level.")
+
+
 
         
         st.success("✨ ALL 110-FEATURE METRICS ACCESSIBLE VIA DNA ZIP ✨")
@@ -2627,7 +2631,6 @@ with tab_meta:
                     'max_conf': max_conf,
                     'forget_rate': forget_rate,
                     'transfer_score': transfer_score,
-                    'curiosity': curiosity,
                     'curiosity': curiosity,
                     'grad_norm': grad_norm,
                     'weight_decay': weight_decay,
