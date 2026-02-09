@@ -960,7 +960,64 @@ tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st
 ])
 
 with tab_macro:
-    if st.session_state.stats_history:
+    # === VIEWING MODE: Display Loaded DNA ===
+    if st.session_state.get('viewing_loaded_dna', False):
+        loaded = st.session_state.loaded_dna
+        st.info(f"📊 **VIEWING MODE:** Showing preserved results from `{loaded.get('metadata', {}).get('timestamp', 'Unknown')}`")
+        
+        obs = loaded.get('observation_deck', {})
+        st.markdown(f"### 🔭 Observation Deck - Preserved State")
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Season", obs.get('season', 'N/A'))
+        col2.metric("Gene Pool Size", obs.get('gene_pool_size', 0))
+        col3.metric("Bonds Count", obs.get('bonds_count', 0))
+        
+        # Display stats history if charts enabled
+        if st.session_state.get("show_charts", False) and obs.get('stats_history'):
+            st.markdown("#### 📈 Evolutionary Trajectory (Preserved)")
+            df = pd.DataFrame(obs['stats_history'])
+            
+            col_g1, col_g2, col_g3 = st.columns(3)
+            with col_g1:
+                fig = go.Figure()
+                if 'population' in df.columns:
+                    fig.add_trace(go.Scatter(x=df['tick'], y=df['population'], name="Population", line=dict(color='#00ffa3')))
+                if 'thoughts' in df.columns:
+                    fig.add_trace(go.Scatter(x=df['tick'], y=df['thoughts'], name="Thoughts", line=dict(color='#ff4b4b')))
+                fig.update_layout(title="Population & Thoughts", height=230, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col_g2:
+                fig2 = go.Figure()
+                if 'pos_flux' in df.columns:
+                    fig2.add_trace(go.Scatter(x=df['tick'], y=df['pos_flux'], name="Inventions", line=dict(color='yellow'), fill='tozeroy'))
+                if 'neg_flux' in df.columns:
+                    fig2.add_trace(go.Scatter(x=df['tick'], y=df['neg_flux'], name="Drain", line=dict(color='red'), fill='tozeroy'))
+                fig2.update_layout(title="Efficiency vs Chaos", height=230, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig2, use_container_width=True)
+            
+            with col_g3:
+                fig3 = go.Figure()
+                if 'agent_entropy' in df.columns:
+                    fig3.add_trace(go.Scatter(x=df['tick'], y=df['agent_entropy'], name="Entropy", line=dict(color='#45b6fe')))
+                if 'scarcity' in df.columns:
+                    fig3.add_trace(go.Scatter(x=df['tick'], y=df['scarcity'], name="Scarcity", line=dict(color='gray', dash='dot')))
+                fig3.update_layout(title="Thermodynamics", height=230, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig3, use_container_width=True)
+        
+        # Show agent positions
+        if obs.get('agent_positions'):
+            st.markdown(f"#### 👥 Agents: {len(obs['agent_positions'])} preserved")
+            st.dataframe(pd.DataFrame(obs['agent_positions'][:20]), use_container_width=True)
+        
+        # Show structures
+        if obs.get('structures'):
+            st.markdown(f"#### 🏗️ Structures: {len(obs['structures'])} preserved")
+            st.dataframe(pd.DataFrame(obs['structures']), use_container_width=True)
+    
+    # === LIVE MODE: Normal display ===
+    elif st.session_state.stats_history:
         df = pd.DataFrame(st.session_state.stats_history)
         
         if st.session_state.get("show_charts", False):
@@ -1065,9 +1122,40 @@ with tab_macro:
         st.info("System Initializing...")
 
 with tab_hive:
-    st.markdown("## 🐝 Specialized Division of Labor (Level 4)")
+    # === VIEWING MODE: Display Loaded DNA ===
+    if st.session_state.get('viewing_loaded_dna', False):
+        loaded = st.session_state.loaded_dna
+        st.info(f"📊 **VIEWING MODE:** Showing preserved results from `{loaded.get('metadata', {}).get('timestamp', 'Unknown')}`")
+        
+        hive = loaded.get('hive_structures', {})
+        st.markdown(f"### 🐝 Hive Structures - Preserved State")
+        
+        # Role counts
+        role_counts = hive.get('role_counts', {})
+        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+        col_c1.metric("Foragers", role_counts.get("Forager", 0))
+        col_c2.metric("Processors", role_counts.get("Processor", 0))
+        col_c3.metric("Warriors", role_counts.get("Warrior", 0))
+        col_c4.metric("Queens", role_counts.get("Queen", 0))
+        
+        st.metric("Fused Units", hive.get('fused_count', 0))
+        
+        # Top leaders
+        if hive.get('top_leaders'):
+            st.markdown("#### 👑 Top Leaders")
+            st.dataframe(pd.DataFrame(hive['top_leaders']), use_container_width=True)
+        
+        # Role stability
+        if hive.get('role_stability_scores'):
+            st.markdown(f"#### 📊 Role Persistence: {len(hive['role_stability_scores'])} agents")
+            avg_stability = np.mean(hive['role_stability_scores'])
+            st.metric("Mean Role Persistence", f"{avg_stability*100:.1f}%")
     
-    if st.session_state.world.agents:
+    # === LIVE MODE: Normal display ===
+    elif st.session_state.world.agents:
+        st.markdown("## 🐝 Specialized Division of Labor (Level 4)")
+    
+    if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         agents_l4 = list(st.session_state.world.agents.values())
         
         # 4.0 Census Panel (Lightweight)
