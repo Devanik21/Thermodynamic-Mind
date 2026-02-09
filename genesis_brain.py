@@ -529,6 +529,9 @@ class GenesisAgent:
             trust_signal,
             gradient_signal
         ], dim=1).float()
+        
+        # 🔧 FIX: Sanitize inputs to prevent NaN propagation
+        input_tensor = torch.nan_to_num(input_tensor, nan=0.0, posinf=1.0, neginf=-1.0)
     
         # v5.0.4 Store previous state before update
         # We need to detach metadata to prevent graph leaks
@@ -791,6 +794,12 @@ class GenesisAgent:
         # The error "modified by an inplace operation" typically refers to the weights themselves
         # or the hidden state.
         
+        # FIX: Ensure we don't modify the graph in place before backward
+        
+        if torch.isnan(total_loss) or torch.isinf(total_loss):
+            self.optimizer.zero_grad()
+            return False
+            
         total_loss.backward()
         
         # --- 5.7 COGNITIVE COMPRESSION (Meta-Gradient) ---
@@ -817,6 +826,9 @@ class GenesisAgent:
              # 5.1 Meta-Learning: Adjust meta_lr based on gradient norm
              self.meta_lr = 0.005 * (1.0 + 0.1 * np.tanh(self.last_grad_norm))
 
+        # 🔧 CRITICAL FIX: Gradient Capping to prevent IQ Explosion (Infinite Weights)
+        torch.nn.utils.clip_grad_norm_(self.brain.parameters(), max_norm=1.0)
+        
         self.optimizer.step()
         
         # 9.3 Train Oracle Model (Level 9 Metric)

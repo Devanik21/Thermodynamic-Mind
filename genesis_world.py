@@ -189,10 +189,12 @@ class Battery(Structure):
     
     def deposit(self, agent, amount):
         """Store energy in battery."""
-        if self.stored_energy + amount > self.capacity:
-            actual = self.capacity - self.stored_energy
-        else:
-            actual = amount
+        if amount <= 0: return 0.0
+        
+        # Calculate space left
+        space = max(0.0, self.capacity - self.stored_energy)
+        actual = min(amount, space)
+            
         if agent.energy >= actual:
             agent.energy -= actual
             self.stored_energy += actual * 0.9  # 10% loss
@@ -1035,6 +1037,9 @@ class GenesisWorld:
         
             # Level 6.8: Battery Interactions (Tiny Fix)
             if isinstance(struct, Battery):
+                # 🔧 FIX: Auto-correct negative energy phantom bug
+                if struct.stored_energy < 0: struct.stored_energy = 0.0
+                
                 for agent in self.agents.values():
                     if agent.x == x and agent.y == y:
                         if agent.energy > 150: # Surplus
@@ -1139,7 +1144,8 @@ class GenesisWorld:
         self.system_entropy = np.mean(entropies) if entropies else 0.0
         
         # 1.10 Agent Entropy: Fallback for population energy diversity
-        energies = np.array([a.energy for a in self.agents.values()])
+        # 1.10 Agent Entropy: Fallback for population energy diversity
+        energies = np.array([max(0.0, a.energy) for a in self.agents.values()])
         e_sum = energies.sum()
         if e_sum > 0:
             e_norm = (energies + 1e-8) / (e_sum + 1e-7)
@@ -1443,13 +1449,13 @@ class GenesisWorld:
             oldest = min(self.tradition_tracker.keys())
             del self.tradition_tracker[oldest]
         
-        # Check autocorrelation at lag=10
+        # Check autocorrelation at lag=5 (Reduced from 10 for faster feedback)
         gen_keys = sorted(self.tradition_tracker.keys())
-        if len(gen_keys) < 10:
+        if len(gen_keys) < 5:
             return False
         
         behaviors_now = self.tradition_tracker.get(gen_keys[-1], [])
-        behaviors_lag = self.tradition_tracker.get(gen_keys[-10], [])
+        behaviors_lag = self.tradition_tracker.get(gen_keys[-5], [])
         
         if not behaviors_now or not behaviors_lag:
             return False
