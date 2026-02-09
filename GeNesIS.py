@@ -1593,34 +1593,7 @@ with tab_culture:
         col_c_a, col_c_b = st.columns([1, 1])
         
         with col_c_a:
-            st.markdown("### 🗺️ Stigmergy Map (3.3)")
-            meme_grid = culture.get('meme_grid')
-            if meme_grid and st.session_state.get("show_charts", False):
-                meme_array = np.array(meme_grid)
-                
-                # Reshape if it was saved flattened (1D)
-                if len(meme_array.shape) == 1 and len(meme_array) == 40*40*3:
-                    meme_array = meme_array.reshape(40, 40, 3)
-                
-                if len(meme_array.shape) == 3:
-                    # Choose channels based on availability
-                    if meme_array.shape[2] == 3:
-                        rgb_grid = (meme_array * 255).astype(np.uint8)
-                    elif meme_array.shape[2] >= 13: # e.g. 21D
-                        rgb_grid = (meme_array[:, :, [0, 5, 12]] * 255).astype(np.uint8)
-                    else:
-                        # Fallback for other dimensions (e.g. 5, 8)
-                        channels = min(meme_array.shape[2], 3)
-                        rgb_grid = np.zeros((meme_array.shape[0], meme_array.shape[1], 3), dtype=np.uint8)
-                        for c in range(channels):
-                            rgb_grid[:, :, c] = (meme_array[:, :, c] * 255).astype(np.uint8)
 
-                    fig_meme = px.imshow(rgb_grid, title="Preserved Meme Density (Stigmergic Field)")
-                    fig_meme.update_layout(height=450, margin=dict(l=0,r=0,t=30,b=0))
-                    st.plotly_chart(fig_meme, width='stretch')
-
-            else:
-                st.warning("Charts hidden or no meme data preserved.")
 
         with col_c_b:
             st.markdown("### 🏺 Cultural Speciation (3.10)")
@@ -1635,7 +1608,8 @@ with tab_culture:
                         all_vecs.append(v)
                         gen_labels.append(f"Gen {g}")
                 
-                if len(all_vecs) > 2:
+                if len(all_vecs) > 0:
+
 
                     X_c = np.array(all_vecs)
                     if len(X_c.shape) > 2:
