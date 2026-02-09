@@ -353,6 +353,8 @@ class GenesisAgent:
         )
         self.oracle_model_optimizer = optim.Adam(self.oracle_model.parameters(), lr=0.001)
         self.oracle_model_accuracy = 0.0
+        self.last_oracle_loss = 0.0
+
         
         # 9.4 Inverse Reinforcement Learning
         self.inferred_reward_weights = torch.zeros(5)
@@ -593,7 +595,7 @@ class GenesisAgent:
             # But let's just use raw value thresholds
             
             if struct_type_val < -0.5: s_type = "barrier" # Negative value
-            elif struct_type_val < 0.0: s_type = "trap"
+            elif struct_type_val < 0.1: s_type = "trap"
             elif struct_type_val < 0.5: s_type = "battery"
             elif struct_type_val < 1.0: s_type = "cultivator"
             else: s_type = "generic"
@@ -1607,7 +1609,9 @@ class GenesisAgent:
         self.oracle_model_optimizer.step()
         
         self.oracle_model_accuracy = max(0, 1.0 - loss.item())
+        self.last_oracle_loss = loss.item()
         return loss.item()
+
     
     def infer_oracle_goals(self):
         """9.4 Inverse Reinforcement Learning: Infer reward function."""
@@ -2219,7 +2223,6 @@ class GenesisAgent:
         if hasattr(self, 'role_history'):
             self.role_history.append(self.role)
             if len(self.role_history) > 100: self.role_history.pop(0)
-
 
 
 
