@@ -1267,11 +1267,10 @@ with tab_hive:
 
     
     # === LIVE MODE: Normal display ===
-    elif st.session_state.world.agents:
+    elif st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         st.markdown("## 🐝 Specialized Division of Labor (Level 4)")
-    
-    if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         agents_l4 = list(st.session_state.world.agents.values())
+
         
         # 4.0 Census Panel (Lightweight)
         col_c1, col_c2, col_c3, col_c4 = st.columns(4)
@@ -1417,17 +1416,7 @@ with tab_micro:
             st.warning("📉 Charts Hidden. Enable in sidebar.")
 
     # === LIVE MODE: Normal display ===
-    elif st.session_state.world.agents:
-        pass
-    
-    if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
-
-            
-    # === LIVE MODE: Normal display ===
-    elif st.session_state.world.agents:
-        pass
-    
-    if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
+    elif st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         col_vis, col_log = st.columns([2, 1])
         with col_vis:
             st.markdown("### 🔮 Quantum Spectrogram (Linguistic Field)")
@@ -1651,11 +1640,10 @@ with tab_culture:
             st.dataframe(pd.DataFrame(events), use_container_width=True, height=250)
     
     # === LIVE MODE: Normal display ===
-    elif st.session_state.world.agents:
+    elif st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         st.markdown("## 🏺 The Cultural Replicator (Level 3)")
-    
-    if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         col_meme, col_dyn = st.columns([1, 1])
+
     
         with col_meme:
             st.markdown("### 🗺️ Stigmergy Map (Meme Grid)")
@@ -2064,11 +2052,9 @@ with tab_omega:
 
     
     # === LIVE MODE: Normal display ===
-    elif st.session_state.world.agents:
-        pass
-    
-    if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
+    elif st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         col_civ, col_agent = st.columns([1, 2])
+
     
         with col_civ:
             st.markdown("### 🏛️ Civilization Status")
