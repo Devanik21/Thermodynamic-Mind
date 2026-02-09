@@ -912,7 +912,7 @@ with st.sidebar:
     st.caption("Nobel Prize Showcase Mode")
     
     # Download Section
-    if st.button("📥 DOWNLOAD COMPLETE DNA", help="Export ALL metrics, plots, charts from all 7 tabs", width=stretch, type="primary"):
+    if st.button("📥 DOWNLOAD COMPLETE DNA", help="Export ALL metrics, plots, charts from all 7 tabs", use_container_width=True, type="primary"):
         with st.spinner("Collecting full simulation DNA..."):
             try:
                 dna = collect_full_simulation_dna()
@@ -931,7 +931,7 @@ with st.sidebar:
             st.session_state.dna_zip,
             f"genesis_dna_{timestamp}.zip",
             "application/zip",
-            width=stretch
+            use_container_width=True
         )
     
     st.markdown("---")
@@ -940,7 +940,7 @@ with st.sidebar:
     uploaded_dna = st.file_uploader("📤 LOAD PREVIOUS DNA", type="zip", help="Restore results from saved ZIP")
     
     if uploaded_dna is not None:
-        if st.button("🔄 RESTORE & VIEW", width=stretch):
+        if st.button("🔄 RESTORE & VIEW", use_container_width=True):
             try:
                 with zipfile.ZipFile(io.BytesIO(uploaded_dna.read()), 'r') as zf:
                     loaded_dna = {}
@@ -956,7 +956,7 @@ with st.sidebar:
     
     if st.session_state.get('viewing_loaded_dna', False):
         st.info(f"📊 Viewing: {st.session_state.loaded_dna.get('metadata', {}).get('timestamp', 'Unknown')}")
-        if st.button("🔴 EXIT VIEW MODE", width=stretch):
+        if st.button("🔴 EXIT VIEW MODE", use_container_width=True):
             st.session_state.viewing_loaded_dna = False
             st.session_state.loaded_dna = None
             st.rerun()
@@ -997,7 +997,7 @@ if st.session_state.get('viewing_loaded_dna', False):
                 metrics_df = pd.DataFrame([
                     {"Metric": k, "Value": v} for k, v in omega.items()
                 ])
-                st.dataframe(metrics_df, width=stretch, height=600)
+                st.dataframe(metrics_df, use_container_width=True, height=600)
         
         with tab_meta_data:
             meta = loaded.get('metacognition', {})
@@ -1012,7 +1012,7 @@ if st.session_state.get('viewing_loaded_dna', False):
             grid = loaded.get('agent_grid', [])
             if grid:
                 st.markdown(f"### 👥 Agent Grid - Top {len(grid)} Agents (25 Columns)")
-                st.dataframe(pd.DataFrame(grid), width=stretch, height=600)
+                st.dataframe(pd.DataFrame(grid), use_container_width=True, height=600)
 
 
 with tab_macro:
@@ -1677,7 +1677,7 @@ with tab_culture:
                     st.write(f"- `Tick {e.get('Tick', '?')}`: **{e.get('Event', 'Unknown')}**")
 
             st.markdown(f"#### 📰 Event Stream (Last 50)")
-            st.dataframe(pd.DataFrame(events), width=stretch, height=250)
+            st.dataframe(pd.DataFrame(events), use_container_width=True, height=250)
     
     # === LIVE MODE: Normal display ===
     elif st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
