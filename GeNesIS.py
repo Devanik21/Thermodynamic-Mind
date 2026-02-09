@@ -1868,31 +1868,31 @@ with tab_omega:
         
         st.write(f"**Discoveries:** `{st.session_state.total_events_count}`")
 
-    with col_agent:
-        st.markdown("### 🔬 100+ Metric Grid (Top 50)")
-        
-        # --- GLOBAL TELEMETRY (20+ Metrics) ---
-        if st.session_state.world.agents:
-            all_agents = list(st.session_state.world.agents.values())
-            n_pop = len(all_agents)
-            ages = [a.age for a in all_agents]
-            energies = [a.energy for a in all_agents]
-            gens = [a.generation for a in all_agents]
+        with col_agent:
+            st.markdown("### 🔬 100+ Metric Grid (Top 50)")
             
-            # Quick Stats
-            # Calculate Scarcity Factor manually (it's a local variable in world.step)
-            current_scarcity = max(0.2, np.exp(-st.session_state.world.scarcity_lambda * st.session_state.world.time_step))
-            
-            # Level 1-10 Enhanced Global Stats
-            trad_p = getattr(st.session_state.world, 'tradition_persistence_verified', False)
-            cult_r = getattr(st.session_state.world, 'cultural_ratchet_verified', False)
-            prot_c = getattr(st.session_state.world, 'protocol_convergence', 0.0)
-            sym_g = getattr(st.session_state.world, 'symbol_grounding_r2', 0.0)
-            plan_c = getattr(st.session_state.world, 'planetary_structure_coverage', 0.0)
-            str_e = getattr(st.session_state.world, 'structure_energy_ratio', 0.0)
-            t2_v = getattr(st.session_state.world, 'type_ii_verified', False)
-            
-            stats_md = f"""
+            # --- GLOBAL TELEMETRY (20+ Metrics) ---
+            if st.session_state.world.agents:
+                all_agents = list(st.session_state.world.agents.values())
+                n_pop = len(all_agents)
+                ages = [a.age for a in all_agents]
+                energies = [a.energy for a in all_agents]
+                gens = [a.generation for a in all_agents]
+                
+                # Quick Stats
+                # Calculate Scarcity Factor manually (it's a local variable in world.step)
+                current_scarcity = max(0.2, np.exp(-st.session_state.world.scarcity_lambda * st.session_state.world.time_step))
+                
+                # Level 1-10 Enhanced Global Stats
+                trad_p = getattr(st.session_state.world, 'tradition_persistence_verified', False)
+                cult_r = getattr(st.session_state.world, 'cultural_ratchet_verified', False)
+                prot_c = getattr(st.session_state.world, 'protocol_convergence', 0.0)
+                sym_g = getattr(st.session_state.world, 'symbol_grounding_r2', 0.0)
+                plan_c = getattr(st.session_state.world, 'planetary_structure_coverage', 0.0)
+                str_e = getattr(st.session_state.world, 'structure_energy_ratio', 0.0)
+                t2_v = getattr(st.session_state.world, 'type_ii_verified', False)
+                
+                stats_md = f"""
 | 🌍 Global Metric | 📊 Value | 🌍 Global Metric | 📊 Value |
 | :--- | :--- | :--- | :--- |
 | **Current Population** | `{n_pop}` | **Average Age** | `{np.mean(ages):.1f}` |
@@ -1942,73 +1942,73 @@ with tab_omega:
 
 
 
-            st.markdown(stats_md)
-            
-            # Update max pop tracker
-            st.session_state.max_pop = max(n_pop, st.session_state.get('max_pop', 0))
+                st.markdown(stats_md)
+                
+                # Update max pop tracker
+                st.session_state.max_pop = max(n_pop, st.session_state.get('max_pop', 0))
 
-        # --- TOP 50 AGENTS GRID ---
-        st.caption("Showing Top 50 Agents by Age")
-        agent_data = []
-        # Sort by Age descending (Elders first)
-        top_agents = sorted(st.session_state.world.agents.values(), key=lambda x: x.age, reverse=True)[:50]
-        
-        for agent in top_agents:
-            iq_score = 0.0
-            love_score = 0.0
-            if agent.last_vector is not None:
-                # 1.10 IQ Normalization: Center 100 IQ at 1.0 Neural Std
-                # Uncapped: True AGI can exceed 202
-                raw_std = float(torch.std(agent.last_vector.detach()))
-                iq_score = raw_std * 100.0 
-                love_score = float(torch.mean(agent.last_vector.detach()))
+            # --- TOP 50 AGENTS GRID ---
+            st.caption("Showing Top 50 Agents by Age")
+            agent_data = []
+            # Sort by Age descending (Elders first)
+            top_agents = sorted(st.session_state.world.agents.values(), key=lambda x: x.age, reverse=True)[:50]
             
-            neuro_plasticity = (agent.thoughts_had / max(1, agent.age)) * 100.0
-            
-            # Extract additional real-time metrics
-            env_acc = getattr(agent, 'env_prediction_accuracy', 0.0)
-            self_acc = getattr(agent, 'self_model_accuracy', 0.0)
-            p_error = np.mean(agent.prediction_errors) if agent.prediction_errors else 0.0
-            sparsity = agent.brain.actor_mask.sparsity().item() if hasattr(agent.brain, 'actor_mask') else 0.0
-            tom_d = getattr(agent, 'tom_depth', 0)
-            art_a = getattr(agent, 'aesthetic_actions', 0)
-            aware = getattr(agent, 'simulation_awareness', 0.0)
-            niche = getattr(agent, 'niche_modifications', 0)
-            conf = getattr(agent, 'confidence', 0.5)
-            inf = getattr(agent, 'influence', 0.0)
-            
-            agent_data.append({
-                "ID": agent.id[:6],
-                "Gen": agent.generation,
-                "Age": agent.age,
-                "Energy": f"{agent.energy:.1f}",
-                "IQ": f"{max(iq_score, 0.001):.2f}",
-                "Love": f"{love_score:.2f}",
-                "Plas": f"{neuro_plasticity:.1f}%",
-                "Φ": f"{getattr(agent, 'phi_value', 0):.2f}",
-                "🧠": "✅" if getattr(agent, 'consciousness_verified', False) else "❌",
-                "Spec": getattr(agent, 'cognitive_specialty', '-')[:4] if getattr(agent, 'cognitive_specialty', None) else "-",
-                "🔗": len(getattr(agent, 'neural_bridge_partners', set())),
-                "🏗️": len(getattr(agent, 'structures_built', [])),
-                "🔭": len(getattr(agent, 'discovered_patterns', [])),
-                "🎮": getattr(agent, 'scratchpad_writes', 0),
-                "🔁": "Y" if getattr(agent, 'strange_loop_active', False) else "-",
-                "Ω": "✅" if getattr(agent, 'omega_verified', False) else "-",
-                "Err": f"{p_error:.3f}",
-                "Conf": f"{conf:.2f}",
-                "Self-M": f"{self_acc:.2f}",
-                "Spars": f"{sparsity*100:.1f}%",
-                "Tom": tom_d,
-                "Art": art_a,
-                "Aware": f"{aware:.2f}",
-                "Niche": niche,
-                "Inf": f"{inf:.2f}",
-                "Bkp": len(getattr(agent, 'backup_connections', set()))
-            })
-            
-        if agent_data:
-            df_agents = pd.DataFrame(agent_data)
-            st.dataframe(df_agents, width='stretch', height=500)
+            for agent in top_agents:
+                iq_score = 0.0
+                love_score = 0.0
+                if agent.last_vector is not None:
+                    # 1.10 IQ Normalization: Center 100 IQ at 1.0 Neural Std
+                    # Uncapped: True AGI can exceed 202
+                    raw_std = float(torch.std(agent.last_vector.detach()))
+                    iq_score = raw_std * 100.0 
+                    love_score = float(torch.mean(agent.last_vector.detach()))
+                
+                neuro_plasticity = (agent.thoughts_had / max(1, agent.age)) * 100.0
+                
+                # Extract additional real-time metrics
+                env_acc = getattr(agent, 'env_prediction_accuracy', 0.0)
+                self_acc = getattr(agent, 'self_model_accuracy', 0.0)
+                p_error = np.mean(agent.prediction_errors) if agent.prediction_errors else 0.0
+                sparsity = agent.brain.actor_mask.sparsity().item() if hasattr(agent.brain, 'actor_mask') else 0.0
+                tom_d = getattr(agent, 'tom_depth', 0)
+                art_a = getattr(agent, 'aesthetic_actions', 0)
+                aware = getattr(agent, 'simulation_awareness', 0.0)
+                niche = getattr(agent, 'niche_modifications', 0)
+                conf = getattr(agent, 'confidence', 0.5)
+                inf = getattr(agent, 'influence', 0.0)
+                
+                agent_data.append({
+                    "ID": agent.id[:6],
+                    "Gen": agent.generation,
+                    "Age": agent.age,
+                    "Energy": f"{agent.energy:.1f}",
+                    "IQ": f"{max(iq_score, 0.001):.2f}",
+                    "Love": f"{love_score:.2f}",
+                    "Plas": f"{neuro_plasticity:.1f}%",
+                    "Φ": f"{getattr(agent, 'phi_value', 0):.2f}",
+                    "🧠": "✅" if getattr(agent, 'consciousness_verified', False) else "❌",
+                    "Spec": getattr(agent, 'cognitive_specialty', '-')[:4] if getattr(agent, 'cognitive_specialty', None) else "-",
+                    "🔗": len(getattr(agent, 'neural_bridge_partners', set())),
+                    "🏗️": len(getattr(agent, 'structures_built', [])),
+                    "🔭": len(getattr(agent, 'discovered_patterns', [])),
+                    "🎮": getattr(agent, 'scratchpad_writes', 0),
+                    "🔁": "Y" if getattr(agent, 'strange_loop_active', False) else "-",
+                    "Ω": "✅" if getattr(agent, 'omega_verified', False) else "-",
+                    "Err": f"{p_error:.3f}",
+                    "Conf": f"{conf:.2f}",
+                    "Self-M": f"{self_acc:.2f}",
+                    "Spars": f"{sparsity*100:.1f}%",
+                    "Tom": tom_d,
+                    "Art": art_a,
+                    "Aware": f"{aware:.2f}",
+                    "Niche": niche,
+                    "Inf": f"{inf:.2f}",
+                    "Bkp": len(getattr(agent, 'backup_connections', set()))
+                })
+                
+            if agent_data:
+                df_agents = pd.DataFrame(agent_data)
+                st.dataframe(df_agents, width='stretch', height=500)
 
 
 
