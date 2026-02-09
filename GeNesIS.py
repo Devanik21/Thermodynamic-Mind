@@ -1315,14 +1315,17 @@ with tab_micro:
             thought_vecs = quantum.get('thought_vectors', [])
             if thought_vecs:
                 st.markdown("#### 💭 Thought Spectrum (Preserved)")
-                # Convert to numpy array for heatmap
+                # Convert to numpy array for heatmap - ensure 2D shape
                 thought_array = np.array(thought_vecs[:30])  # First 30 agents
+                # Squeeze out any singleton dimensions to get 2D array
+                if len(thought_array.shape) == 3:
+                    thought_array = thought_array.squeeze()
                 fig = px.imshow(thought_array, 
                                labels=dict(x="Feature Dim", y="Agent", color="Activation"),
                                title="Real-Time Thought Spectrum",
                                color_continuous_scale='RdBu_r')
                 fig.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             # Communication vectors
             comm_vecs = quantum.get('comm_vectors', [])
