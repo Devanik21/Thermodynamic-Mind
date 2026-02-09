@@ -2286,8 +2286,12 @@ with tab_omega:
                     "Inf": f"{inf:.2f}",
                     "Bkp": len(getattr(agent, 'backup_connections', set()))
                 })
-                
+
+            
+            if agent_data:
+                df_agents = pd.DataFrame(agent_data)
                 st.dataframe(df_agents, width='stretch', height=500)
+
 
             # ♾️ LIVE INFINITE STIGMERGY GARDEN
             st.markdown("---")
