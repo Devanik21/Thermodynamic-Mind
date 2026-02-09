@@ -640,21 +640,28 @@ def collect_full_simulation_dna():
     all_agents = list(world.agents.values()) if world.agents else []
     n_pop = len(all_agents)
     
-    # Helper: Safe tensor/numpy conversion
+    # Helper: Safe tensor/numpy conversion (handles ALL numpy types)
     def safe_list(val):
         if val is None: return None
         if torch.is_tensor(val): return val.detach().cpu().tolist()
         if isinstance(val, np.ndarray): return val.tolist()
+        # Handle numpy scalar types (float32, int64, etc.)
+        if isinstance(val, (np.integer, np.floating)):
+            return val.item()  # Convert to Python native type
         return val
     
-    # Helper: Round floats to save space
+    # Helper: Round floats to save space AND handle numpy types
     def round_dict(d, decimals=4):
         if isinstance(d, dict):
             return {k: round_dict(v, decimals) for k, v in d.items()}
         elif isinstance(d, list):
             return [round_dict(v, decimals) for v in d]
-        elif isinstance(d, float):
-            return round(d, decimals)
+        elif isinstance(d, (float, np.floating)):  # Handle both Python float and numpy float
+            return round(float(d), decimals)
+        elif isinstance(d, (int, np.integer)):  # Handle numpy integers
+            return int(d)
+        elif isinstance(d, (bool, np.bool_)):  # Handle numpy booleans
+            return bool(d)
         return d
     
     dna = {
