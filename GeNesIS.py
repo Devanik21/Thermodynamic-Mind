@@ -642,13 +642,13 @@ def collect_full_simulation_dna():
     
     # Helper: Safe tensor/numpy conversion (handles ALL numpy types)
     def safe_list(val):
-        """Ensures tensors, arrays, and lists are converted to a JSON-safe 1D list."""
+        """Ensures tensors, arrays, and lists are converted to a JSON-safe list (preserves structure)."""
         if val is None: return []
         if hasattr(val, 'detach'): val = val.detach().cpu()
         if hasattr(val, 'numpy'): val = val.numpy()
-        if hasattr(val, 'flatten'): return val.flatten().tolist()
         if hasattr(val, 'tolist'): return val.tolist()
         return list(val)
+
     
     # Helper: Round floats to save space AND handle ALL numpy/torch types recursively
     def round_dict(d, decimals=4):
@@ -706,11 +706,12 @@ def collect_full_simulation_dna():
         
         # ==================== TAB 2: QUANTUM SPECTROGRAM ====================
         "quantum_spectrogram": {
-            "comm_vectors": [safe_list(a.last_comm) for a in all_agents if hasattr(a, 'last_comm') and a.last_comm is not None],
-            "thought_vectors": [safe_list(a.last_vector) for a in all_agents[:50] if a.last_vector is not None],
-            "hidden_states": [safe_list(a.hidden_state) for a in all_agents[:20] if a.hidden_state is not None],
+            "comm_vectors": [safe_list(a.last_comm.flatten()) for a in all_agents if hasattr(a, 'last_comm') and a.last_comm is not None],
+            "thought_vectors": [safe_list(a.last_vector.flatten()) for a in all_agents[:50] if a.last_vector is not None],
+            "hidden_states": [safe_list(a.hidden_state.flatten()) for a in all_agents[:20] if a.hidden_state is not None],
             "signal_silhouette": st.session_state.get('last_silhouette_score', 0.0)
         },
+
 
 
         
@@ -1589,12 +1590,28 @@ with tab_culture:
             meme_grid = culture.get('meme_grid')
             if meme_grid and st.session_state.get("show_charts", False):
                 meme_array = np.array(meme_grid)
-                if len(meme_array.shape) == 3 and meme_array.shape[2] >= 3:
-                    # Sample 3 dims for RGB
-                    rgb_grid = (meme_array[:, :, [0, 5, 12]] * 255).astype(np.uint8)
+                
+                # Reshape if it was saved flattened (1D)
+                if len(meme_array.shape) == 1 and len(meme_array) == 40*40*3:
+                    meme_array = meme_array.reshape(40, 40, 3)
+                
+                if len(meme_array.shape) == 3:
+                    # Choose channels based on availability
+                    if meme_array.shape[2] == 3:
+                        rgb_grid = (meme_array * 255).astype(np.uint8)
+                    elif meme_array.shape[2] >= 13: # e.g. 21D
+                        rgb_grid = (meme_array[:, :, [0, 5, 12]] * 255).astype(np.uint8)
+                    else:
+                        # Fallback for other dimensions (e.g. 5, 8)
+                        channels = min(meme_array.shape[2], 3)
+                        rgb_grid = np.zeros((meme_array.shape[0], meme_array.shape[1], 3), dtype=np.uint8)
+                        for c in range(channels):
+                            rgb_grid[:, :, c] = (meme_array[:, :, c] * 255).astype(np.uint8)
+
                     fig_meme = px.imshow(rgb_grid, title="Preserved Meme Density (Stigmergic Field)")
                     fig_meme.update_layout(height=450, margin=dict(l=0,r=0,t=30,b=0))
                     st.plotly_chart(fig_meme, width='stretch')
+
             else:
                 st.warning("Charts hidden or no meme data preserved.")
 
