@@ -2789,7 +2789,8 @@ with tab_meta:
                 with c6_3:
                     # Fig 6.3: Battery Charge Distribution (REAL)
                     # If empty, provide distinct message
-                    if any(c6['battery_charge']):
+                    if struct_counts.get('battery', 0) > 0:
+
                          fig_6_3 = px.violin(
                             y=c6['battery_charge'], box=True, points='all',
                             title="6.3 Battery Charge Distribution (Real)",
@@ -2797,7 +2798,8 @@ with tab_meta:
                             color_discrete_sequence=['#FFA15A']
                         )
                     else:
-                        fig_6_3 = px.bar(x=["No Batteries"], y=[0], title="6.3 No Charged Batteries Found", template='plotly_dark')
+                        fig_6_3 = px.bar(x=["No Batteries"], y=[0], title="6.3 No Battery Structures Found", template='plotly_dark')
+
                         
                     fig_6_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                     st.plotly_chart(fig_6_3, width='stretch', key="fig_6_3")
