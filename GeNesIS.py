@@ -864,14 +864,7 @@ def collect_full_simulation_dna():
         },
         
         # ==================== TAB 7: METACOGNITION (PRESERVED) ====================
-        "metacognition": {
-            "level_5": st.session_state.get('l5_cache', {}),
-            "level_6": st.session_state.get('l6_cache', {}),
-            "level_7": st.session_state.get('l7_cache', {}),
-            "level_8": st.session_state.get('l8_cache', {}),
-            "level_9": st.session_state.get('l9_cache', {}),
-            "level_10": st.session_state.get('l10_cache', {})
-        },
+
 
         
         # ==================== AGENT GRID (Top 50) ====================
@@ -3585,6 +3578,7 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
 
