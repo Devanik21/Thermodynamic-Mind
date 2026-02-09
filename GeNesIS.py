@@ -3216,7 +3216,7 @@ with tab_meta:
             am8_6.metric("Self-Recog", f"{c8.get('self_models_count', 0) / (len(all_agents)+1):.2%}")
 
             # Additional 12 Metrics (Row 2) - REAL
-            am8_7, am8_8, am8_9, am10_10, am10_11, am10_12 = st.columns(6)
+            am8_7, am8_8, am8_9, am8_10, am8_11, am8_12 = st.columns(6)
             am8_7.metric("Sim Depth", f"{c8.get('sim_depth', 0)}")
             am8_8.metric("Counterfact.", f"{c8.get('counterfact', '0 branches')}")
             am8_9.metric("Emo Stabil.", f"{c8.get('emo_stabil', '0.00')}")
