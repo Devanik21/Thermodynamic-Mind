@@ -1399,14 +1399,18 @@ with tab_micro:
                     st.markdown("#### 📡 Communication Signal Clusters")
                     # Reconstruct simple PCA for visualization
                     X = np.array(comm_vecs)
+                    if len(X.shape) > 2:
+                        X = X.reshape(X.shape[0], -1)
+                    
                     if len(X) > 2:
                         pca = PCA(n_components=2)
                         X_2d = pca.fit_transform(X)
                         fig_comm = px.scatter(x=X_2d[:,0], y=X_2d[:,1], title="Linguistic Field (PCA)", opacity=0.7)
                         fig_comm.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                        st.plotly_chart(fig_comm, width='stretch')
+                        st.plotly_chart(fig_comm, width='stretch', key="view_tab2_pca")
                     else:
                         st.info("Insufficient vectors for PCA.")
+
 
             # Hidden States Bar Chart
             hidden = quantum.get('hidden_states', [])
@@ -1452,7 +1456,10 @@ with tab_micro:
                     
                     # PCA for 2D Projection
                     pca = PCA(n_components=2)
+                    if len(X_comm.shape) > 2:
+                        X_comm = X_comm.reshape(X_comm.shape[0], -1)
                     X_pca = pca.fit_transform(X_comm)
+
                     
                     df_pca = pd.DataFrame(data=X_pca, columns=['PC1', 'PC2'])
                     df_pca['Cluster'] = kmeans.labels_.astype(str)
@@ -1604,8 +1611,11 @@ with tab_culture:
                 
                 if len(all_vecs) > 5:
                     X_c = np.array(all_vecs)
+                    if len(X_c.shape) > 2:
+                        X_c = X_c.reshape(X_c.shape[0], -1)
                     pca_c = PCA(n_components=2)
                     X_c_2d = pca_c.fit_transform(X_c)
+
                     
                     df_c = pd.DataFrame(X_c_2d, columns=['PC1', 'PC2'])
                     df_c['Generation'] = gen_labels
