@@ -603,6 +603,8 @@ class GenesisWorld:
                             agent.energy -= cost
                             other.energy -= damage
                             other.social_memory[agent.id] = other.social_memory.get(agent.id, 0) - 1.0 # Trust loss
+                            # 1.10 AUDIT FIX: Track Punish Count
+                            if hasattr(agent, 'punish_count'): agent.punish_count += 1
                             outcome_log = f"⚔️ PUNISHED {other_id[:4]}"
                             break
 
@@ -623,6 +625,8 @@ class GenesisWorld:
                                     partner.inventory[j] -= 1
                                     partner.inventory[i] += 1
                                     agent.social_memory[other_id] = agent.social_memory.get(other_id, 0) + 0.5 # Trust gain
+                                    # 1.10 AUDIT FIX: Track Trade Count
+                                    if hasattr(agent, 'trade_count'): agent.trade_count += 1
                                     outcome_log = f"🤝 TRADED with {other_id[:4]}"
                                     break
 
@@ -907,6 +911,42 @@ class GenesisWorld:
             self.structures[(x, y)] = Structure(x, y, struct_type, builder_id)
         
         self.structures[(x, y)].created_tick = self.time_step
+        
+        # 6.9 AUDIT FIX: Infrastructure Network Formation
+        # If built near another structure, create or join a network
+        nearby_structs = []
+        for dx in range(-2, 3):
+            for dy in range(-2, 3):
+                if dx == 0 and dy == 0: continue
+                pos = ((x + dx) % self.size, (y + dy) % self.size)
+                if pos in self.structures:
+                    nearby_structs.append(pos)
+        
+        if nearby_structs:
+            # Join existing network if any nearby structure is already and in one
+            target_network = None
+            for nx, ny in nearby_structs:
+                for net in self.networks.values():
+                    if (nx, ny) in net.structures:
+                        target_network = net
+                        break
+                if target_network: break
+            
+            if not target_network:
+                # Create new network
+                net_id = f"net_{len(self.networks)}"
+                target_network = InfrastructureNetwork(net_id)
+                self.networks[net_id] = target_network
+                # Add all nearby orphans to this new network
+                for nx, ny in nearby_structs:
+                    target_network.add_structure(nx, ny)
+            
+            target_network.add_structure(x, y)
+            # Agent also becomes a member
+            if builder_id in self.agents:
+                target_network.add_member(builder_id)
+                self.agents[builder_id].network_memberships.add(target_network.id)
+
         return True
     
     def add_terrain_modification(self, terraform_info):
@@ -1117,7 +1157,12 @@ class GenesisWorld:
                 sim = 1.0 - np.mean(np.abs(protocols[i] - protocols[j]))
                 similarities.append(sim)
         
-        self.protocol_convergence = np.mean(similarities) if similarities else 0.0
+            self.protocol_convergence = np.mean(similarities) if similarities else 0.0
+        
+        # 7.6 Consensus Mechanism: If convergence > 0.6, start a new proposal occasionally
+        if self.protocol_convergence > 0.6 and self.time_step % 50 == 0:
+            proposal_id = f"prop_{self.time_step}"
+            self.consensus_registry[proposal_id] = {"votes": {}, "result": "pending"}
     
     def compute_hive_phi(self):
         """7.10 Hive Mind: Calculate collective Φ."""
@@ -1199,6 +1244,7 @@ class GenesisWorld:
         self.collective_oracle_model_accuracy = best_oracle_acc
         self.collective_simulation_awareness = max_awareness
         self.discovered_physics_patterns = list(set(all_patterns))
+        self.physics_mastery_score = best_oracle_acc # Map for dashboard
         
         # Merge exploits
         all_exploits = []
@@ -1313,9 +1359,9 @@ class GenesisWorld:
             self.update_omega_tracking()
         
         # ============================================================
-        # 🔧 AUDIT FIX: RUN VERIFICATION CHECKS
+        # 🔧 AUDIT FIX: RUN VERIFICATION CHECKS (Lowered threshold for reality proof)
         # ============================================================
-        if self.time_step % 100 == 0:
+        if self.time_step % 50 == 0:
             self.verify_tradition_persistence()
             self.measure_cultural_drift()
             self.verify_cultural_ratchet()

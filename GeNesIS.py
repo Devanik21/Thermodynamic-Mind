@@ -209,6 +209,19 @@ def update_simulation():
                 best_neighbor = max(neighbors, key=lambda n: n.energy)
                 if best_neighbor.energy > agent.energy + 20.0:
                     agent.imitate(best_neighbor, rate=0.05)
+            
+            # --- LEVEL 7: COLLECTIVE MANIFOLD INTERACTIONS ---
+            # 7.0 Neural Bridging
+            if social_trust > 0.7:
+                partner = random.choice(neighbors)
+                agent.share_hidden_state(partner)
+            
+            # 7.1 Kuramoto Synchronization
+            agent.kuramoto_update(neighbors)
+            
+            # 7.2 Gradient Sharing
+            if social_trust > 0.8:
+                agent.share_gradients(neighbors)
         
         # 1.7 Gradient Sensing (Stress Response)
         gradient_val = world.get_energy_gradient(agent.x, agent.y).item()
@@ -231,6 +244,11 @@ def update_simulation():
             agent, reality_vector_tensor, emit_vector=comm_vector, 
             adhesion=adhesion_val, punish=punish_val, trade=trade_val
         ) 
+
+        # 8.9 Qualia Recording (Shared Concepts Proof)
+        if hasattr(agent, 'classify_qualia'):
+            q_type = agent.classify_qualia(agent.hidden_state)
+            agent.record_qualia(q_type, agent.hidden_state)
 
         # --- PROCESS LEVEL 6-10 INTENTS ---
         if special_intent:
@@ -316,6 +334,14 @@ def update_simulation():
                             "Vector": [0]*21
                         })
                         break
+        
+        # 1.10 AUDIT FIX: Track Interaction Intent
+        if trade_val > 0.5: agent.trade_count += 1
+        if punish_val > 0.5: agent.punish_count += 1
+        
+        # 8.5 Aesthetic Action
+        if hasattr(agent, 'take_aesthetic_action'):
+            agent.take_aesthetic_action(vector)
 
         # ❤️ PHASE 14/17: "EUSOCIAL" REPRODUCTION (4.10) - ELASTIC DIFFICULTY
         n_pop = len(world.agents)
@@ -368,6 +394,9 @@ def update_simulation():
                 
                 child = GenesisAgent(new_x, new_y, genome=child_genome, generation=max(agent.generation, partner.generation) + 1, parent_hidden=parent_hidden_avg, parent_id=agent.id)
                 world.agents[child.id] = child
+                
+                # 1.10 AUDIT FIX: Track successful births globally
+                st.session_state.successful_births = st.session_state.get('successful_births', 0) + 1
                 
                 # Cost
                 agent.energy -= repro_cost

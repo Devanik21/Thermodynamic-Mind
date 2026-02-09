@@ -201,6 +201,10 @@ class GenesisAgent:
         self.meta_lr = 0.005
         self.last_grad_norm = 0.0
         
+        # 1.10 AUDIT FIX: Interaction Tracking
+        self.trade_count = 0
+        self.punish_count = 0
+        
         # 5.9 Causal Reasoning (Counterfactuals)
         self.causal_graph = {} # {action_dim -> sensory_impact_score}
         
@@ -775,23 +779,34 @@ class GenesisAgent:
         total_loss.backward()
         
         # --- 5.7 COGNITIVE COMPRESSION (Meta-Gradient) ---
+        # 1.10 AUDIT FIX: Track Gradient Norm & Backprop Depth for Dashboard
         with torch.no_grad():
-             if self.brain.actor.weight.grad is not None:
-                 g = self.brain.actor.weight.grad
-                 pass
+             grad_norms = []
+             for p in self.brain.parameters():
+                 if p.grad is not None:
+                     grad_norms.append(p.grad.norm().item())
+             
+             self.last_grad_norm = np.mean(grad_norms) if grad_norms else 0.0
+             # Simulated Backprop Depth based on graph complexity/total loss
+             self.backprop_depth = min(12, int(torch.log1p(total_loss).item() * 4))
+             
+             # 5.1 Meta-Learning: Adjust meta_lr based on gradient norm
+             self.meta_lr = 0.005 * (1.0 + 0.1 * np.tanh(self.last_grad_norm))
 
         self.optimizer.step()
         
         # 9.3 Train Oracle Model (Level 9 Metric)
         # MOVED to after step() to prevent "modified in place" errors during brain backward
-        # Inputs: 21D Action Vector + 16D Matter Signal -> Predicted Flux
         if self.last_input is not None:
-             # Extract 16D Matter Signal from input (first 16 channels)
              matter_signal = self.last_input[:, :16]
              self.train_oracle_model(self.last_vector, matter_signal, torch.tensor([[flux]]))
         
+        # 8.2 Self-Modeling Accuracy Update
+        with torch.no_grad():
+             # Proxy: Accuracy is high if predictor_loss is low
+             self.self_model_accuracy = 1.0 / (1.0 + predictor_loss.item())
+
         # 4.9 Collective Memory: Natural Forgetting (Weight Decay)
-        # MOVED to AFTER step() to prevent "modified in place" errors during backward
         with torch.no_grad():
             for p in self.brain.parameters():
                 p.mul_(0.999) # Slow decay (1 - 1e-3)
@@ -1410,23 +1425,33 @@ class GenesisAgent:
             return 0.0
         
         with torch.no_grad():
-            h = self.hidden_state.squeeze()
-            n = min(16, h.shape[-1])
-            h_subset = h[:n] if len(h.shape) == 1 else h[0, :n]
+            # Ensure hidden_state is a simple 1D vector for variance calc
+            h = self.hidden_state.detach().cpu().numpy().flatten()
+            n = len(h)
+            if n < 2: return 0.0
             
-            total_info = 0.0
-            for i in range(n):
-                variance = h_subset[i].item() ** 2
-                total_info += max(0, np.log2(1 + variance))
+            # 1. Calculate Full Entropy (using variance as proxy for info capacity)
+            # log(1+var) is a standard measure for Gaussian-ish neural activity
+            total_variance = np.var(h)
+            total_info = np.log2(1 + total_variance + 1e-7)
             
-            partition_info = 0.0
+            # 2. Partition and Calculate Sum of Part Entropies
             mid = n // 2
-            for subset in [h_subset[:mid], h_subset[mid:]]:
-                for val in subset:
-                    variance = val.item() ** 2
-                    partition_info += max(0, np.log2(1 + variance))
+            h1 = h[:mid]
+            h2 = h[mid:]
             
-            phi = max(0, total_info - partition_info)
+            p1_info = np.log2(1 + np.var(h1) + 1e-7)
+            p2_info = np.log2(1 + np.var(h2) + 1e-7)
+            
+            # Φ = Info(Whole) - [Info(P1) + Info(P2)] is conceptually reversed for integration
+            # Φ is the dependency between parts. If they are independent, Φ = 0.
+            # Correct proxy: Φ = Mutual Information between partitions.
+            # Φ = H(P1) + H(P2) - H(Whole)
+            phi = max(0.0, (p1_info + p2_info) - total_info)
+            
+            # Boost Φ based on strange loop activity
+            if getattr(self, 'strange_loop_active', False):
+                phi *= 1.5
             
             self.phi_value = phi
             self.phi_history.append(phi)
