@@ -863,6 +863,17 @@ def collect_full_simulation_dna():
             "symbol_ground": getattr(world, 'symbol_grounding_r2', 0)
         },
         
+        # ==================== TAB 7: METACOGNITION (PRESERVED) ====================
+        "metacognition": {
+            "level_5": st.session_state.get('l5_cache', {}),
+            "level_6": st.session_state.get('l6_cache', {}),
+            "level_7": st.session_state.get('l7_cache', {}),
+            "level_8": st.session_state.get('l8_cache', {}),
+            "level_9": st.session_state.get('l9_cache', {}),
+            "level_10": st.session_state.get('l10_cache', {})
+        }
+
+        
         # ==================== AGENT GRID (Top 50) ====================
         "agent_grid": [
             {
