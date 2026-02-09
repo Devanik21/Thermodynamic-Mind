@@ -1623,7 +1623,24 @@ with tab_culture:
         col_c_a, col_c_b = st.columns([1, 1])
         
         with col_c_a:
-            st.info("🗺️ View full Stigmergy Map in Tab 6 (Omega Telemetry)")
+            st.markdown("### 🗺️ Stigmergy Map (3.3)")
+            meme_grid = culture.get('meme_grid')
+            if meme_grid and st.session_state.get("show_charts", False):
+                meme_array = np.array(meme_grid)
+                if len(meme_array.shape) == 1 and len(meme_array) == 40*40*3:
+                    meme_array = meme_array.reshape(40, 40, 3)
+                
+                if len(meme_array.shape) == 3:
+                     # Adaptive channel selection
+                     if meme_array.shape[2] == 3:
+                         rgb_grid = (meme_array * 255).astype(np.uint8)
+                     else:
+                         rgb_grid = (meme_array[:, :, [0, 5, 12]] * 255).astype(np.uint8)
+                     
+                     st.plotly_chart(px.imshow(rgb_grid, title="Preserved Meme Density"), width='stretch')
+            else:
+                st.warning("Meme Data Hidden or Not Preserved.")
+
 
         with col_c_b:
 
@@ -1866,80 +1883,7 @@ with tab_culture:
                  st.dataframe(log_df[["Agent", "Event"]], width='stretch', height=400)
 
     st.markdown("---")
-    st.markdown("### ♾️ Infinite Stigmergy Garden")
-    st.caption("A Nobel-level procedural visualization of collective knowledge. Cycle through infinite spectral perspectives using the slider.")
-    
-    if st.session_state.get("show_charts", False):
-        if hasattr(st.session_state.world, 'meme_grid'):
-            # Base Grid: (40, 40, 3) -> R(Danger), G(Food), B(Sacred)
-            grid_data = st.session_state.world.meme_grid
-            
-            # 🎨 INFINITE GENERATOR
-            garden_freq = st.slider("Garden Resonance Frequency", 0, 1000, 42, help="Procedurally mixes the 21D meme manifold into RGB space.")
-            
-            # Row 1
-            sg_c1, sg_c2 = st.columns(2)
-            
-            def generate_procedural_map(freq, offset):
-                # Linear Spectral Mixer: Maintains the 'neutral' vibrancy of the original map
-                # while allowing infinite procedural perspectives.
-                state = np.random.RandomState(freq + offset)
-                
-                # Base Grid: R(Danger), G(Food), B(Sacred)
-                r_in = grid_data[:, :, 0]
-                g_in = grid_data[:, :, 1]
-                b_in = grid_data[:, :, 2]
-                
-                # Create a 3x3 Mixing Matrix that is "mostly identity" but with procedural bleed
-                # This keeps the colors 'neutral' and structured like the original.
-                # Identity matrix (Original)
-                matrix = np.eye(3) 
-                
-                # Add procedural "bleed" or "shuffling" based on seed
-                # We use a lower variance to keep it 'neutral'
-                mix = state.uniform(-1.0, 1.0, (3, 3)) * 0.8
-                matrix = matrix + mix
-                
-                # Normalize rows so we don't wash out to white (keeps it colorful but neutral)
-                matrix = np.abs(matrix)
-                matrix /= (matrix.sum(axis=1, keepdims=True) + 1e-8)
-                
-                # Apply the projection
-                transformed = np.dot(grid_data[:, :, :3], matrix.T)
-                
-                # Apply a slight contrast boost to match the original 'pixel' pop (Increased by ~10%)
-                transformed = np.clip(transformed * 1.2, 0, 1)
-                
-                # Final RGB conversion
-                rgb = (transformed * 255).astype(np.uint8)
-                return rgb
 
-            with sg_c1:
-                rgb_v1 = generate_procedural_map(garden_freq, 101)
-                fig_sg1 = px.imshow(rgb_v1, title=f"🌈 Spectral Resonance Alpha ({garden_freq})", template='plotly_dark')
-                fig_sg1.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_sg1, width='stretch', key=f"fig_sg1_{garden_freq}")
-                
-            with sg_c2:
-                rgb_v2 = generate_procedural_map(garden_freq, 202)
-                fig_sg2 = px.imshow(rgb_v2, title=f"🌈 Spectral Resonance Beta ({garden_freq+1})", template='plotly_dark')
-                fig_sg2.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_sg2, width='stretch', key=f"fig_sg2_{garden_freq}")
-                
-            # Row 2
-            sg_c3, sg_c4 = st.columns(2)
-            
-            with sg_c3:
-                rgb_v3 = generate_procedural_map(garden_freq, 303)
-                fig_sg3 = px.imshow(rgb_v3, title=f"🌈 Spectral Resonance Gamma ({garden_freq+2})", template='plotly_dark')
-                fig_sg3.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_sg3, width='stretch', key=f"fig_sg3_{garden_freq}")
-                
-            with sg_c4:
-                rgb_v4 = generate_procedural_map(garden_freq, 404)
-                fig_sg4 = px.imshow(rgb_v4, title=f"🌈 Spectral Resonance Delta ({garden_freq+3})", template='plotly_dark')
-                fig_sg4.update_layout(height=400, margin=dict(l=0,r=0,t=40,b=0))
-                st.plotly_chart(fig_sg4, width='stretch', key=f"fig_sg4_{garden_freq}")
     else:
         st.info("Enable 'Show Live Charts' to enter the Infinite Garden.")
 
@@ -2345,9 +2289,37 @@ with tab_omega:
                     "Bkp": len(getattr(agent, 'backup_connections', set()))
                 })
                 
-            if agent_data:
-                df_agents = pd.DataFrame(agent_data)
                 st.dataframe(df_agents, width='stretch', height=500)
+
+            # ♾️ LIVE INFINITE STIGMERGY GARDEN
+            st.markdown("---")
+            st.markdown("### ♾️ Infinite Stigmergy Garden")
+            st.caption("A Nobel-level procedural visualization of collective knowledge. Cycle through infinite spectral perspectives using the slider.")
+            
+            if st.session_state.get("show_charts", False):
+                if hasattr(st.session_state.world, 'meme_grid'):
+                    grid_data = st.session_state.world.meme_grid
+                    garden_freq = st.slider("Garden Resonance Frequency", 0, 1000, 42, key="live_garden_slider")
+                    
+                    def generate_procedural_map_live(freq, offset):
+                        state = np.random.RandomState(freq + offset)
+                        matrix = np.eye(3) 
+                        matrix += state.uniform(-1.0, 1.0, (3, 3)) * 0.8
+                        matrix = np.abs(matrix)
+                        matrix /= (matrix.sum(axis=1, keepdims=True) + 1e-8)
+                        transformed = np.dot(grid_data[:, :, :3], matrix.T)
+                        transformed = np.clip(transformed * 1.2, 0, 1)
+                        return (transformed * 255).astype(np.uint8)
+
+                    sg_c1, sg_c2 = st.columns(2)
+                    with sg_c1: st.plotly_chart(px.imshow(generate_procedural_map_live(garden_freq, 101), title="🌈 Alpha"), width='stretch', key="live_sg1")
+                    with sg_c2: st.plotly_chart(px.imshow(generate_procedural_map_live(garden_freq, 202), title="🌈 Beta"), width='stretch', key="live_sg2")
+                    sg_c3, sg_c4 = st.columns(2)
+                    with sg_c3: st.plotly_chart(px.imshow(generate_procedural_map_live(garden_freq, 303), title="🌈 Gamma"), width='stretch', key="live_sg3")
+                    with sg_c4: st.plotly_chart(px.imshow(generate_procedural_map_live(garden_freq, 404), title="🌈 Delta"), width='stretch', key="live_sg4")
+            else:
+                st.info("Enable 'Show Live Charts' to enter the Infinite Garden.")
+
 
 
 
