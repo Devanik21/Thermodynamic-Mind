@@ -561,12 +561,15 @@ class GenesisWorld:
              displacement_flag = emit_vector[15].item()
              if displacement_flag > 0.5:
                  # Map 0-1 to -5 to +5 offset
-                 dx = int((emit_vector[13].item() - 0.5) * 10)
-                 dy = int((emit_vector[14].item() - 0.5) * 10)
-                 target_x = (agent.x + dx) % self.size
-                 target_y = (agent.y + dy) % self.size
-                 # Higher cost for projection
-                 agent.energy -= 0.5
+                 raw_dx = (emit_vector[13].item() - 0.5) * 10
+                 raw_dy = (emit_vector[14].item() - 0.5) * 10
+                 if np.isfinite(raw_dx) and np.isfinite(raw_dy):
+                     dx = int(raw_dx)
+                     dy = int(raw_dy)
+                     target_x = (agent.x + dx) % self.size
+                     target_y = (agent.y + dy) % self.size
+                     # Higher cost for projection
+                     agent.energy -= 0.5
              
              self.pheromone_grid[target_x, target_y] += emit_vector.detach().numpy()
              np.clip(self.pheromone_grid[target_x, target_y], 0, 1.0, out=self.pheromone_grid[target_x, target_y])

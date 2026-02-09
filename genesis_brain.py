@@ -643,7 +643,16 @@ class GenesisAgent:
             
             # Write to scratchpad if inspired (Channel 15 > 0.7)
             if vector[0, 15].item() > 0.7:
-                self.write_scratchpad(int(self.x)%32, int(self.y)%32, 1)
+                try:
+                    # Guard coordinates against NaN/Inf
+                    safe_x = float(self.x)
+                    safe_y = float(self.y)
+                    if np.isfinite(safe_x) and np.isfinite(safe_y):
+                        expr_x = int(safe_x) % 32
+                        expr_y = int(safe_y) % 32
+                        self.write_scratchpad(expr_x, expr_y, 1)
+                except (ValueError, TypeError):
+                    pass
 
         # 9.9 Simulation Awareness (Rare check)
         if self.age % 50 == 0:
@@ -660,8 +669,12 @@ class GenesisAgent:
 
         # 7.9 Update Protocol Dialect (Simple Clustering)
         # Using a type-agnostic sum to avoid TypeError between torch and numpy
-        p_sum = self.protocol_version.sum()
-        self.dialect_id = int((p_sum.item() if hasattr(p_sum, 'item') else p_sum) * 10) % 8
+        p_sum_raw = self.protocol_version.sum()
+        p_sum = p_sum_raw.item() if hasattr(p_sum_raw, 'item') else p_sum_raw
+        if np.isfinite(p_sum):
+            self.dialect_id = int(p_sum * 10) % 8
+        else:
+            self.dialect_id = 0
 
         # 7.7 Distributed Memory (Rare social event)
         if social_trust > 0.8 and random.random() < 0.05:
@@ -789,11 +802,14 @@ class GenesisAgent:
                          grad_norms.append(val)
              
              self.last_grad_norm = np.mean(grad_norms) if grad_norms else 0.0
-             # 1.10 AUDIT FIX: Safe conversion of loss to backprop depth
-             loss_val = total_loss.item()
-             if np.isfinite(loss_val) and loss_val > 0:
-                 self.backprop_depth = min(12, int(np.log1p(loss_val) * 4))
-             else:
+             # 1.10 AUDIT FIX: Safe conversion of loss to backprop depth (Guard against NaN)
+             try:
+                 loss_val = total_loss.item()
+                 if np.isfinite(loss_val) and loss_val > 0:
+                     self.backprop_depth = min(12, int(np.log1p(loss_val) * 4))
+                 else:
+                     self.backprop_depth = 0
+             except (ValueError, TypeError, RuntimeError):
                  self.backprop_depth = 0
              
              # 5.1 Meta-Learning: Adjust meta_lr based on gradient norm
@@ -1457,7 +1473,8 @@ class GenesisAgent:
             # Φ is the dependency between parts. If they are independent, Φ = 0.
             # Correct proxy: Φ = Mutual Information between partitions.
             # Φ = H(P1) + H(P2) - H(Whole)
-            phi = max(0.0, (p1_info + p2_info) - total_info)
+            raw_phi = (p1_info + p2_info) - total_info
+            phi = max(0.0, float(raw_phi)) if np.isfinite(raw_phi) else 0.0
             
             # Boost Φ based on strange loop activity
             if getattr(self, 'strange_loop_active', False):
