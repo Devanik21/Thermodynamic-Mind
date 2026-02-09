@@ -1140,8 +1140,12 @@ class GenesisWorld:
         
         # 1.10 Agent Entropy: Fallback for population energy diversity
         energies = np.array([a.energy for a in self.agents.values()])
-        e_norm = (energies + 1e-8) / (energies.sum() + 1e-7)
-        self.agent_entropy = -np.sum(e_norm * np.log2(e_norm)) if len(energies) > 0 else 0.0
+        e_sum = energies.sum()
+        if e_sum > 0:
+            e_norm = (energies + 1e-8) / (e_sum + 1e-7)
+            self.agent_entropy = -np.sum(e_norm * np.log2(e_norm + 1e-10))
+        else:
+            self.agent_entropy = 0.0
     
     def process_consensus(self, proposal_id):
         """7.6 Consensus Mechanisms: Byzantine fault-tolerant voting."""
@@ -1385,8 +1389,11 @@ class GenesisWorld:
         # ============================================================
         # 🔧 AUDIT FIX: RUN VERIFICATION CHECKS (Staggered 25-tick cycle)
         # ============================================================
-        if self.time_step % 25 == 6:
+        # 🔧 AUDIT FIX: High-Frequency Tradition Tracking (Every 5 ticks)
+        if self.time_step % 5 == 0:
             self.verify_tradition_persistence()
+        
+        # Staggered 25-tick cycle for other checks
         if self.time_step % 25 == 7:
             self.measure_cultural_drift()
         if self.time_step % 25 == 8:
@@ -1417,6 +1424,10 @@ class GenesisWorld:
         current_behaviors = []
         max_gen = max(a.generation for a in self.agents.values())
         
+        # Guard: Only record once per generation to save compute
+        if max_gen in self.tradition_tracker:
+            return self.tradition_persistence_verified
+            
         for agent in self.agents.values():
             if hasattr(agent, 'tradition_history') and agent.tradition_history:
                 current_behaviors.append(agent.tradition_history[-1])
@@ -1450,7 +1461,10 @@ class GenesisWorld:
             if len(avg_now) != len(avg_lag):
                 return False
             
-            correlation = np.corrcoef(avg_now, avg_lag)[0, 1]
+            if np.std(avg_now) > 1e-9 and np.std(avg_lag) > 1e-9:
+                correlation = np.corrcoef(avg_now, avg_lag)[0, 1]
+            else:
+                correlation = 0.0
             self.tradition_persistence_verified = correlation > 0.7
             return self.tradition_persistence_verified
         except:
@@ -1596,9 +1610,10 @@ class GenesisWorld:
             correlations = []
             min_dim = min(X.shape[1], Y.shape[1])
             for i in range(min_dim):
-                corr = np.corrcoef(X[:, i], Y[:, i])[0, 1]
-                if not np.isnan(corr):
-                    correlations.append(corr ** 2)
+                if np.std(X[:, i]) > 1e-9 and np.std(Y[:, i]) > 1e-9:
+                    corr = np.corrcoef(X[:, i], Y[:, i])[0, 1]
+                    if not np.isnan(corr):
+                        correlations.append(corr ** 2)
             
             self.symbol_grounding_r2 = np.mean(correlations) if correlations else 0.0
             self.symbol_grounding_verified = self.symbol_grounding_r2 > 0.7
