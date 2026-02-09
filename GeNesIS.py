@@ -863,7 +863,7 @@ def collect_full_simulation_dna():
             "symbol_ground": getattr(world, 'symbol_grounding_r2', 0)
         },
         
-,
+        
 
         
         # ==================== AGENT GRID (Top 50) ====================
