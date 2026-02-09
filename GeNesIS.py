@@ -1306,8 +1306,8 @@ with tab_omega:
 | **🧬 Pheno Plastic** | `{np.mean([(a.thoughts_had / max(1, a.age)) for a in all_agents]):.3f}` | **🧪 Experiment C** | `{sum([len(a.physics_experiments) for a in all_agents])}` |
 | **🔭 State Explored** | `{sum([len(a.discovered_patterns) for a in all_agents])}` | **📈 Oracle Loss** | `{np.mean([getattr(a, 'last_oracle_loss', 0.0) for a in all_agents]):.4f}` |
 | **📡 Shared Proto** | `{np.mean([a.protocol_version.mean() for a in all_agents]):.3f}` | **🧬 Mutate Lines** | `{getattr(st.session_state.world, 'code_mutations', 0)}` |
-| **🧪 Innovation R** | `{st.session_state.total_events_count / max(1, st.session_state.world.time_step):.3f}` | **🦠 Viral Fit** | `{np.mean([m['fitness'] for a in all_agents for m in a.meme_pool]) if any([a.meme_pool for a in all_agents]) else 0.0:.2f}` |
-| **📉 Mean Confid** | `{np.mean([a.confidence for a in all_agents]):.3f}` | **📡 Meme Divers** | `{len(set([m['type'] for a in all_agents for m in a.meme_pool])) if any([a.meme_pool for a in all_agents]) else 0}` |
+| **🧪 Innovation R** | `{st.session_state.total_events_count / max(1, st.session_state.world.time_step):.3f}` | **🦠 Viral Fit** | `{np.mean([m.get('fitness', 0.0) for a in all_agents for m in a.meme_pool]) if any([a.meme_pool for a in all_agents]) else 0.0:.2f}` |
+| **📉 Mean Confid** | `{np.mean([a.confidence for a in all_agents]):.3f}` | **📡 Meme Divers** | `{len(set([m.get('id', 'unk') for a in all_agents for m in a.meme_pool])) if any([a.meme_pool for a in all_agents]) else 0}` |
 | **🤝 Trade Volume** | `{sum([getattr(a, 'trade_count', 0) for a in all_agents])}` | **⚖️ Punish Count** | `{sum([getattr(a, 'punish_count', 0) for a in all_agents])}` |
 | **🍼 Mating Succ** | `{st.session_state.get('successful_births', 0)}` | **🧠 Average IQ** | `{np.mean([float(torch.std(a.last_vector.detach()))*100 for a in all_agents if a.last_vector is not None]):.1f}` |
 | **🛰️ Spatial Spar** | `{len(st.session_state.world.grid) / (st.session_state.world.size**2):.4f}` | **🔋 Homeo Error** | `{np.mean([abs(a.energy - 120) for a in all_agents]):.1f}` |
