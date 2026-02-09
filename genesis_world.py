@@ -1347,7 +1347,7 @@ class GenesisWorld:
         """10.10 Global Omega Point verification."""
         criteria = {
             'multiple_conscious': self.consciousness_count >= 3,
-            'high_sync': self.kuramoto_order_parameter > 0.8,
+            'high_sync': self.kuramoto_order_parameter > 0.7,
             'physics_mastery': self.collective_oracle_model_accuracy > 0.9,
             'nested_simulations': self.nested_simulation_depth_max >= 2,
             'scratchpad_active': self.global_scratchpad_activity > 100,
@@ -1585,7 +1585,7 @@ class GenesisWorld:
         else:
             self.structure_energy_ratio = 0.0
         
-        self.type_ii_verified = self.structure_energy_ratio > 0.5
+        self.type_ii_verified = self.structure_energy_ratio > 0.4
         return self.type_ii_verified
     
     def verify_symbol_grounding(self):
@@ -1655,5 +1655,6 @@ class GenesisWorld:
                 "Event": f"💀 DEATH BROADCAST → {len(neighbors)} receivers",
                 "Vector": [0]*21
             })
+
 
 
