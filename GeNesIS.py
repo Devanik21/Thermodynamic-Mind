@@ -641,19 +641,14 @@ def collect_full_simulation_dna():
     n_pop = len(all_agents)
     
     # Helper: Safe tensor/numpy conversion (handles ALL numpy types)
-    def safe_flatten(val):
-        """Ensures tensors and arrays are flattened into a JSON-safe 1D list."""
+    def safe_list(val):
+        """Ensures tensors, arrays, and lists are converted to a JSON-safe 1D list."""
         if val is None: return []
         if hasattr(val, 'detach'): val = val.detach().cpu()
         if hasattr(val, 'numpy'): val = val.numpy()
         if hasattr(val, 'flatten'): return val.flatten().tolist()
+        if hasattr(val, 'tolist'): return val.tolist()
         return list(val)
-
-        if isinstance(val, np.ndarray): return val.tolist()
-        # Handle numpy scalar types (float32, int64, etc.)
-        if isinstance(val, (np.integer, np.floating)):
-            return val.item()  # Convert to Python native type
-        return val
     
     # Helper: Round floats to save space AND handle ALL numpy/torch types recursively
     def round_dict(d, decimals=4):
@@ -711,11 +706,12 @@ def collect_full_simulation_dna():
         
         # ==================== TAB 2: QUANTUM SPECTROGRAM ====================
         "quantum_spectrogram": {
-            "comm_vectors": [safe_flatten(a.last_comm) for a in all_agents if hasattr(a, 'last_comm') and a.last_comm is not None],
-            "thought_vectors": [safe_flatten(a.last_vector) for a in all_agents[:50] if a.last_vector is not None],
-            "hidden_states": [safe_flatten(a.hidden_state) for a in all_agents[:20] if a.hidden_state is not None],
+            "comm_vectors": [safe_list(a.last_comm) for a in all_agents if hasattr(a, 'last_comm') and a.last_comm is not None],
+            "thought_vectors": [safe_list(a.last_vector) for a in all_agents[:50] if a.last_vector is not None],
+            "hidden_states": [safe_list(a.hidden_state) for a in all_agents[:20] if a.hidden_state is not None],
             "signal_silhouette": st.session_state.get('last_silhouette_score', 0.0)
         },
+
 
         
         # ==================== TAB 3: HIVE STRUCTURES ====================
@@ -730,10 +726,11 @@ def collect_full_simulation_dna():
         "culture": {
             "culture_history": {str(k): v for k, v in st.session_state.culture_history.items()},
             "tradition_history": st.session_state.get('tradition_history', []),
-            "meme_grid": safe_flatten(world.meme_grid) if hasattr(world, 'meme_grid') else None,
+            "meme_grid": safe_list(world.meme_grid) if hasattr(world, 'meme_grid') else None,
             "global_registry": st.session_state.global_registry,
             "event_log": st.session_state.event_log[:50]
         },
+
 
         
         # ==================== TAB 5: NOBEL COMMITTEE ====================
