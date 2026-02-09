@@ -1346,89 +1346,89 @@ with tab_micro:
         col_vis, col_log = st.columns([2, 1])
         with col_vis:
             st.markdown("### 🔮 Quantum Spectrogram (Linguistic Field)")
-        
-        # Level 2.1: Signal Differentiation Analysis
-        if len(st.session_state.world.agents) > 10:
-            comm_vectors = []
-            comm_labels = []
-            for a in st.session_state.world.agents.values():
-                if hasattr(a, 'last_comm') and a.last_comm is not None:
-                     vec = a.last_comm.detach().cpu().numpy().flatten()
-                     if vec.sum() > 0.1:
-                         comm_vectors.append(vec)
-                         comm_labels.append(f"{a.id[:4]}")
             
-            if len(comm_vectors) > 5:
-                from sklearn.metrics import silhouette_score
-                # K-Means Clustering on Communication Vectors
-                X_comm = np.array(comm_vectors)
-                n_clusters = min(len(X_comm), 4) 
-                kmeans = KMeans(n_clusters=n_clusters, random_state=42).fit(X_comm)
-                sil = silhouette_score(X_comm, kmeans.labels_)
+            # Level 2.1: Signal Differentiation Analysis
+            if len(st.session_state.world.agents) > 10:
+                comm_vectors = []
+                comm_labels = []
+                for a in st.session_state.world.agents.values():
+                    if hasattr(a, 'last_comm') and a.last_comm is not None:
+                         vec = a.last_comm.detach().cpu().numpy().flatten()
+                         if vec.sum() > 0.1:
+                             comm_vectors.append(vec)
+                             comm_labels.append(f"{a.id[:4]}")
                 
-                # PCA for 2D Projection
-                pca = PCA(n_components=2)
-                X_pca = pca.fit_transform(X_comm)
-                
-                df_pca = pd.DataFrame(data=X_pca, columns=['PC1', 'PC2'])
-                df_pca['Cluster'] = kmeans.labels_.astype(str)
-                df_pca['Agent'] = comm_labels
-                
-                st.metric("Signal Silhouette Score (2.1)", f"{sil:.3f}")
-                
-                if st.session_state.get("show_charts", False):
-                    fig_cluster = px.scatter(
-                        df_pca, x='PC1', y='PC2', color='Cluster', 
-                        hover_data=['Agent'],
-                        title=f"Semantic Signal Clusters (k={n_clusters})",
-                        color_discrete_sequence=px.colors.qualitative.Bold
-                    )
-                    fig_cluster.update_layout(height=350, plot_bgcolor='rgba(0,0,0,0)')
-                    st.plotly_chart(fig_cluster, width='stretch')
+                if len(comm_vectors) > 5:
+                    from sklearn.metrics import silhouette_score
+                    # K-Means Clustering on Communication Vectors
+                    X_comm = np.array(comm_vectors)
+                    n_clusters = min(len(X_comm), 4) 
+                    kmeans = KMeans(n_clusters=n_clusters, random_state=42).fit(X_comm)
+                    sil = silhouette_score(X_comm, kmeans.labels_)
+                    
+                    # PCA for 2D Projection
+                    pca = PCA(n_components=2)
+                    X_pca = pca.fit_transform(X_comm)
+                    
+                    df_pca = pd.DataFrame(data=X_pca, columns=['PC1', 'PC2'])
+                    df_pca['Cluster'] = kmeans.labels_.astype(str)
+                    df_pca['Agent'] = comm_labels
+                    
+                    st.metric("Signal Silhouette Score (2.1)", f"{sil:.3f}")
+                    
+                    if st.session_state.get("show_charts", False):
+                        fig_cluster = px.scatter(
+                            df_pca, x='PC1', y='PC2', color='Cluster', 
+                            hover_data=['Agent'],
+                            title=f"Semantic Signal Clusters (k={n_clusters})",
+                            color_discrete_sequence=px.colors.qualitative.Bold
+                        )
+                        fig_cluster.update_layout(height=350, plot_bgcolor='rgba(0,0,0,0)')
+                        st.plotly_chart(fig_cluster, width='stretch')
+                    else:
+                        st.caption("Plots hidden.")
                 else:
-                    st.caption("Plots hidden.")
+                    st.caption("Not enough active signals to cluster.")
+                    
+            # 2.2 Receiver Interpretation: Action vs Internal State
+            st.markdown("### 🧬 Receiver Interpretation (2.2)")
+            if st.session_state.world.agents:
+                 # Sample data for correlation
+                 states, actions = [], []
+                 for a in st.session_state.world.agents.values():
+                     if a.last_vector is not None:
+                         states.append(a.energy)
+                         actions.append(float(torch.mean(a.last_vector).item()))
+                 if states:
+                     if st.session_state.get("show_charts", False):
+                         fig_mod = px.scatter(x=states, y=actions, labels={'x': "Internal Energy", 'y': "Mean Action Vector"}, title="Energy vs Action Modulation")
+                         fig_mod.update_layout(height=300)
+                         st.plotly_chart(fig_mod, width='stretch')
+                    
+            st.markdown("### 💭🧠 The Mind Cloud")
+            if st.session_state.world.agents:
+                sample_agents = random.sample(list(st.session_state.world.agents.values()), min(len(st.session_state.world.agents), 15))
+                vectors = []
+                labels = []
+                for a in sample_agents:
+                    if a.last_vector is not None:
+                        vectors.append(a.last_vector.tolist()[0])
+                        labels.append(f"{a.id[:4]}")
+                
+                if vectors:
+                    if st.session_state.get("show_charts", False):
+                        vec_arr = np.array(vectors)
+                        fig_spec = px.imshow(
+                            vec_arr, 
+                            color_continuous_scale='Plasma', 
+                            aspect='auto',
+                            labels=dict(x="Dimension (0-20)", y="Agent Sample", color="Activation"),
+                            title=f"Real-Time Thought Spectrum (n={len(vectors)})"
+                        )
+                        fig_spec.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+                        st.plotly_chart(fig_spec, width='stretch')
             else:
-                st.caption("Not enough active signals to cluster.")
-                
-        # 2.2 Receiver Interpretation: Action vs Internal State
-        st.markdown("### 🧬 Receiver Interpretation (2.2)")
-        if st.session_state.world.agents:
-             # Sample data for correlation
-             states, actions = [], []
-             for a in st.session_state.world.agents.values():
-                 if a.last_vector is not None:
-                     states.append(a.energy)
-                     actions.append(float(torch.mean(a.last_vector).item()))
-             if states:
-                 if st.session_state.get("show_charts", False):
-                     fig_mod = px.scatter(x=states, y=actions, labels={'x': "Internal Energy", 'y': "Mean Action Vector"}, title="Energy vs Action Modulation")
-                     fig_mod.update_layout(height=300)
-                     st.plotly_chart(fig_mod, width='stretch')
-                
-        st.markdown("### �🧠 The Mind Cloud")
-        if st.session_state.world.agents:
-            sample_agents = random.sample(list(st.session_state.world.agents.values()), min(len(st.session_state.world.agents), 15))
-            vectors = []
-            labels = []
-            for a in sample_agents:
-                if a.last_vector is not None:
-                    vectors.append(a.last_vector.tolist()[0])
-                    labels.append(f"{a.id[:4]}")
-            
-            if vectors:
-                if st.session_state.get("show_charts", False):
-                    vec_arr = np.array(vectors)
-                    fig_spec = px.imshow(
-                        vec_arr, 
-                        color_continuous_scale='Plasma', 
-                        aspect='auto',
-                        labels=dict(x="Dimension (0-20)", y="Agent Sample", color="Activation"),
-                        title=f"Real-Time Thought Spectrum (n={len(vectors)})"
-                    )
-                    fig_spec.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-                    st.plotly_chart(fig_spec, width='stretch')
-        else:
-            st.warning("Extinction Event. No Minds Detected.")
+                st.warning("Extinction Event. No Minds Detected.")
 
     # --- NEW: NEURAL BLUEPRINT SECTION (Moved to Micro) ---
     st.markdown("---")
@@ -1534,169 +1534,169 @@ with tab_culture:
     if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         col_meme, col_dyn = st.columns([1, 1])
     
-    with col_meme:
-        st.markdown("### 🗺️ Stigmergy Map (Meme Grid)")
-        # Normalize Meme Grid for visual
-        if st.session_state.get("show_charts", False):
-            # Show Channel 0 (Danger) in Red, 1 (Resource) in Green
-            # We composite them
-            grid_data = st.session_state.world.meme_grid
-            rgb_grid = (grid_data[:, :, :3] * 255).astype(np.uint8)
-            fig_meme = px.imshow(rgb_grid, title="Global Knowledge (Meme Grid)")
-            fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
-            st.plotly_chart(fig_meme, width='stretch')
-        else:
-            st.info("Meme Grid Hidden.")
-
-    with col_dyn:
-        st.markdown("### 📜 Tradition Persistence (3.4)")
-        # Calculate consistency across generations
-        if st.session_state.culture_history:
-            gens = sorted(list(st.session_state.culture_history.keys()))
-            if len(gens) > 1:
-                # Compare Gen T with Gen T-1
-                consistencies = []
-                for i in range(1, len(gens)):
-                    g_curr = gens[i]
-                    g_prev = gens[i-1]
-                    if st.session_state.culture_history[g_curr] and st.session_state.culture_history[g_prev]:
-                        # Get latest average vector
-                        curr_vec = np.array(st.session_state.culture_history[g_curr][-1])
-                        prev_vec = np.array(st.session_state.culture_history[g_prev][-1])
-                        
-                        # Cosine similarity
-                        sim = np.dot(curr_vec, prev_vec) / (np.linalg.norm(curr_vec)*np.linalg.norm(prev_vec) + 1e-8)
-                        consistencies.append(sim)
-                
-                if consistencies:
-                    avg_tradition = np.mean(consistencies)
-                    st.metric("Inter-Generational Fidelity", f"{avg_tradition:.3f}")
-                    if avg_tradition > 0.7:
-                        st.success("✅ Milestone 3.4 Reached: Stable Traditions")
-                    else:
-                        st.warning("Culture is drifting randomly.")
+        with col_meme:
+            st.markdown("### 🗺️ Stigmergy Map (Meme Grid)")
+            # Normalize Meme Grid for visual
+            if st.session_state.get("show_charts", False):
+                # Show Channel 0 (Danger) in Red, 1 (Resource) in Green
+                # We composite them
+                grid_data = st.session_state.world.meme_grid
+                rgb_grid = (grid_data[:, :, :3] * 255).astype(np.uint8)
+                fig_meme = px.imshow(rgb_grid, title="Global Knowledge (Meme Grid)")
+                fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig_meme, width='stretch')
             else:
-                st.info("Waiting for multi-generational data...")
-        else:
-            st.info("No cultural history yet.")
-        # Grid is (40, 40, 3). Channels: R(Danger), G(Food), B(Sacred)
-        if hasattr(st.session_state.world, 'meme_grid'):
-            meme_vis = st.session_state.world.meme_grid.copy()
-            
-
-            
-    with col_dyn:
-        st.markdown("### 📜 Cultural Dynamics")
-        
-        # 3.4 Tradition Formation (Stability of Action Vectors)
-        # We need history of mean action vectors.
-        # Let's compute current mean action vector
-        if st.session_state.world.agents:
-            current_actions = []
-            for a in st.session_state.world.agents.values():
-                if a.last_vector is not None:
-                     current_actions.append(a.last_vector.detach().numpy().flatten())
-            
-            if current_actions:
-                mean_action = np.mean(current_actions, axis=0)
-                # Store simple scalar proxy (norm) for now to track stability
-                action_norm = np.linalg.norm(mean_action)
+                st.info("Meme Grid Hidden.")
+    
+        with col_dyn:
+            st.markdown("### 📜 Tradition Persistence (3.4)")
+            # Calculate consistency across generations
+            if st.session_state.culture_history:
+                gens = sorted(list(st.session_state.culture_history.keys()))
+                if len(gens) > 1:
+                    # Compare Gen T with Gen T-1
+                    consistencies = []
+                    for i in range(1, len(gens)):
+                        g_curr = gens[i]
+                        g_prev = gens[i-1]
+                        if st.session_state.culture_history[g_curr] and st.session_state.culture_history[g_prev]:
+                            # Get latest average vector
+                            curr_vec = np.array(st.session_state.culture_history[g_curr][-1])
+                            prev_vec = np.array(st.session_state.culture_history[g_prev][-1])
+                            
+                            # Cosine similarity
+                            sim = np.dot(curr_vec, prev_vec) / (np.linalg.norm(curr_vec)*np.linalg.norm(prev_vec) + 1e-8)
+                            consistencies.append(sim)
+                    
+                    if consistencies:
+                        avg_tradition = np.mean(consistencies)
+                        st.metric("Inter-Generational Fidelity", f"{avg_tradition:.3f}")
+                        if avg_tradition > 0.7:
+                            st.success("✅ Milestone 3.4 Reached: Stable Traditions")
+                        else:
+                            st.warning("Culture is drifting randomly.")
+                else:
+                    st.info("Waiting for multi-generational data...")
+            else:
+                st.info("No cultural history yet.")
+            # Grid is (40, 40, 3). Channels: R(Danger), G(Food), B(Sacred)
+            if hasattr(st.session_state.world, 'meme_grid'):
+                meme_vis = st.session_state.world.meme_grid.copy()
                 
-                # Update stats history if needed or just use a local list
-                if "tradition_history" not in st.session_state:
-                    st.session_state.tradition_history = []
+    
                 
-                st.session_state.tradition_history.append(action_norm)
-                if len(st.session_state.tradition_history) > 100:
-                    st.session_state.tradition_history.pop(0)
+        col_spec_wide, col_log = st.columns([2, 1])
+        with col_spec_wide:
+            st.markdown("### 📜 Cultural Dynamics")
+            
+            # 3.4 Tradition Formation (Stability of Action Vectors)
+            # We need history of mean action vectors.
+            # Let's compute current mean action vector
+            if st.session_state.world.agents:
+                current_actions = []
+                for a in st.session_state.world.agents.values():
+                    if a.last_vector is not None:
+                         current_actions.append(a.last_vector.detach().numpy().flatten())
                 
-                # Plot
-                if st.session_state.get("show_charts", False):
-                    fig_trad = px.line(
-                        y=st.session_state.tradition_history, 
-                        title="Tradition Index (Action Stability)",
-                        labels={'y': "Mean Action Norm", 'x': "Time"}
-                    )
-                    fig_trad.update_layout(height=200)
-                    st.plotly_chart(fig_trad, width='stretch')
-
-        # 3.5 Cultural Drift (KL Divergence)
-        st.markdown("### 🧬 Cultural Drift (KL 3.5)")
-        # Split geographically: West vs East
-        if len(st.session_state.world.agents) > 10:
-             agents_all = list(st.session_state.world.agents.values())
-             pop_A = [a for a in agents_all if a.x < 20]
-             pop_B = [a for a in agents_all if a.x >= 20]
-             
-             if len(pop_A) > 5 and len(pop_B) > 5:
-                 def get_action_dist(pop):
-                     # Feature distribution of Action Vectors
-                     vecs = [a.last_vector.detach().cpu().numpy().flatten() for a in pop if a.last_vector is not None]
-                     if not vecs: return np.zeros(21)
-                     mean_v = np.mean(vecs, axis=0)
-                     # Softmax for probability distribution
-                     e_x = np.exp(mean_v - np.max(mean_v))
-                     return e_x / e_x.sum()
+                if current_actions:
+                    mean_action = np.mean(current_actions, axis=0)
+                    # Store simple scalar proxy (norm) for now to track stability
+                    action_norm = np.linalg.norm(mean_action)
+                    
+                    # Update stats history if needed or just use a local list
+                    if "tradition_history" not in st.session_state:
+                        st.session_state.tradition_history = []
+                    
+                    st.session_state.tradition_history.append(action_norm)
+                    if len(st.session_state.tradition_history) > 100:
+                        st.session_state.tradition_history.pop(0)
+                    
+                    # Plot
+                    if st.session_state.get("show_charts", False):
+                        fig_trad = px.line(
+                            y=st.session_state.tradition_history, 
+                            title="Tradition Index (Action Stability)",
+                            labels={'y': "Mean Action Norm", 'x': "Time"}
+                        )
+                        fig_trad.update_layout(height=200)
+                        st.plotly_chart(fig_trad, width='stretch')
+    
+            # 3.5 Cultural Drift (KL Divergence)
+            st.markdown("### 🧬 Cultural Drift (KL 3.5)")
+            # Split geographically: West vs East
+            if len(st.session_state.world.agents) > 10:
+                 agents_all = list(st.session_state.world.agents.values())
+                 pop_A = [a for a in agents_all if a.x < 20]
+                 pop_B = [a for a in agents_all if a.x >= 20]
                  
-                 P = get_action_dist(pop_A)
-                 Q = get_action_dist(pop_B)
-                 # KL Divergence: Sum(P * log(P/Q))
-                 kl = np.sum(P * np.log((P + 1e-9) / (Q + 1e-9)))
-                 st.metric("East-West Divergence (KL)", f"{kl:.4f}")
-                 if kl > 2.0: st.success("✅ Milestone 3.5 Reached!")
-
-        # 3.10 Cultural Speciation
-        st.markdown("### 🗣️ Cultural Speciation (3.10)")
-        if len(st.session_state.world.agents) > 10:
-            # Measure protocol compatibility between East/West
-            pop_A = [a for a in st.session_state.world.agents.values() if a.x < 20]
-            pop_B = [a for a in st.session_state.world.agents.values() if a.x >= 20]
-            if pop_A and pop_B:
-                proto_A = np.mean([getattr(a, 'protocol_version', 0) for a in pop_A])
-                proto_B = np.mean([getattr(a, 'protocol_version', 0) for a in pop_B])
-                cross_compat = 1.0 - abs(proto_A - proto_B)
-                st.metric("Cross-Group Protocol", f"{cross_compat:.2f}")
-                if cross_compat < 0.3: st.success("✅ Speciation Diverged!")
-
-        # 3.6 Innovation Diffusion (S-Curve)
-        st.markdown("### 📈 Innovation Diffusion (S-Curve 3.6)")
-        inv_count = len(st.session_state.global_registry)
-        st.metric("Total Patents", inv_count)
-        
-        if st.session_state.global_registry:
-            df_inv = pd.DataFrame(st.session_state.global_registry)
-            if len(df_inv) > 10:
-                df_inv = df_inv.sort_values('tick')
-                ticks = df_inv['tick'].values.astype(float)
-                y = np.arange(1, len(ticks) + 1).astype(float)
-                
-                # Logistic Fit Check: Log(y / (L-y)) = kx + c
-                L = len(ticks) * 1.5
-                valid_mask = y < L
-                if valid_mask.sum() > 5:
-                    y_logit = np.log((y[valid_mask] + 1e-9) / (L - y[valid_mask] + 1e-9))
-                    try:
-                        slope, intercept = np.polyfit(ticks[valid_mask], y_logit, 1)
-                        y_pred = slope * ticks[valid_mask] + intercept
-                        ss_res = np.sum((y_logit - y_pred)**2)
-                        ss_tot = np.sum((y_logit - np.mean(y_logit))**2)
-                        r2 = 1 - (ss_res / (ss_tot + 1e-9))
-                        st.metric("Logistic Fit R²", f"{r2:.3f}")
-                        if r2 > 0.9: st.success("✅ Milestone 3.6 Reached!")
-                    except:
-                        st.caption("Curve fit unstable.")
-
-            # Show recent inventions
-            recents = st.session_state.global_registry[-5:]
-            for inv in recents:
-                st.caption(f"Tick {inv['tick']}: **{inv['name']}** (Yield {inv['value']:.1f})")
-
+                 if len(pop_A) > 5 and len(pop_B) > 5:
+                     def get_action_dist(pop):
+                         # Feature distribution of Action Vectors
+                         vecs = [a.last_vector.detach().cpu().numpy().flatten() for a in pop if a.last_vector is not None]
+                         if not vecs: return np.zeros(21)
+                         mean_v = np.mean(vecs, axis=0)
+                         # Softmax for probability distribution
+                         e_x = np.exp(mean_v - np.max(mean_v))
+                         return e_x / e_x.sum()
+                     
+                     P = get_action_dist(pop_A)
+                     Q = get_action_dist(pop_B)
+                     # KL Divergence: Sum(P * log(P/Q))
+                     kl = np.sum(P * np.log((P + 1e-9) / (Q + 1e-9)))
+                     st.metric("East-West Divergence (KL)", f"{kl:.4f}")
+                     if kl > 2.0: st.success("✅ Milestone 3.5 Reached!")
+    
+            # 3.10 Cultural Speciation
+            st.markdown("### 🗣️ Cultural Speciation (3.10)")
+            if len(st.session_state.world.agents) > 10:
+                # Measure protocol compatibility between East/West
+                pop_A = [a for a in st.session_state.world.agents.values() if a.x < 20]
+                pop_B = [a for a in st.session_state.world.agents.values() if a.x >= 20]
+                if pop_A and pop_B:
+                    proto_A = np.mean([getattr(a, 'protocol_version', 0) for a in pop_A])
+                    proto_B = np.mean([getattr(a, 'protocol_version', 0) for a in pop_B])
+                    cross_compat = 1.0 - abs(proto_A - proto_B)
+                    st.metric("Cross-Group Protocol", f"{cross_compat:.2f}")
+                    if cross_compat < 0.3: st.success("✅ Speciation Diverged!")
+    
+            # 3.6 Innovation Diffusion (S-Curve)
+            st.markdown("### 📈 Innovation Diffusion (S-Curve 3.6)")
+            inv_count = len(st.session_state.global_registry)
+            st.metric("Total Patents", inv_count)
             
-    with col_log:
-        st.markdown("### ⚡ Event Stream")
-        if st.session_state.event_log:
-             log_df = pd.DataFrame(st.session_state.event_log)
-             st.dataframe(log_df[["Agent", "Event"]], width='stretch', height=400)
+            if st.session_state.global_registry:
+                df_inv = pd.DataFrame(st.session_state.global_registry)
+                if len(df_inv) > 10:
+                    df_inv = df_inv.sort_values('tick')
+                    ticks = df_inv['tick'].values.astype(float)
+                    y = np.arange(1, len(ticks) + 1).astype(float)
+                    
+                    # Logistic Fit Check: Log(y / (L-y)) = kx + c
+                    L = len(ticks) * 1.5
+                    valid_mask = y < L
+                    if valid_mask.sum() > 5:
+                        y_logit = np.log((y[valid_mask] + 1e-9) / (L - y[valid_mask] + 1e-9))
+                        try:
+                            slope, intercept = np.polyfit(ticks[valid_mask], y_logit, 1)
+                            y_pred = slope * ticks[valid_mask] + intercept
+                            ss_res = np.sum((y_logit - y_pred)**2)
+                            ss_tot = np.sum((y_logit - np.mean(y_logit))**2)
+                            r2 = 1 - (ss_res / (ss_tot + 1e-9))
+                            st.metric("Logistic Fit R²", f"{r2:.3f}")
+                            if r2 > 0.9: st.success("✅ Milestone 3.6 Reached!")
+                        except:
+                            st.caption("Curve fit unstable.")
+    
+                # Show recent inventions
+                recents = st.session_state.global_registry[-5:]
+                for inv in recents:
+                    st.caption(f"Tick {inv['tick']}: **{inv['name']}** (Yield {inv['value']:.1f})")
+    
+        with col_log:
+            st.markdown("### ⚡ Event Stream")
+            if st.session_state.event_log:
+                 log_df = pd.DataFrame(st.session_state.event_log)
+                 st.dataframe(log_df[["Agent", "Event"]], width='stretch', height=400)
 
     st.markdown("---")
     st.markdown("### ♾️ Infinite Stigmergy Garden")
@@ -1835,8 +1835,8 @@ with tab_omega:
     if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         col_civ, col_agent = st.columns([1, 2])
     
-    with col_civ:
-        st.markdown("### 🏛️ Civilization Status")
+        with col_civ:
+            st.markdown("### 🏛️ Civilization Status")
         max_energy = 0
         max_age = 0
         if st.session_state.world.agents:
