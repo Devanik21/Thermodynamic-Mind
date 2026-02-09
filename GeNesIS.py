@@ -1262,6 +1262,15 @@ with tab_omega:
             # Calculate Scarcity Factor manually (it's a local variable in world.step)
             current_scarcity = max(0.2, np.exp(-st.session_state.world.scarcity_lambda * st.session_state.world.time_step))
             
+            # Level 1-10 Enhanced Global Stats
+            trad_p = getattr(st.session_state.world, 'tradition_persistence_verified', False)
+            cult_r = getattr(st.session_state.world, 'cultural_ratchet_verified', False)
+            prot_c = getattr(st.session_state.world, 'protocol_convergence', 0.0)
+            sym_g = getattr(st.session_state.world, 'symbol_grounding_r2', 0.0)
+            plan_c = getattr(st.session_state.world, 'planetary_structure_coverage', 0.0)
+            str_e = getattr(st.session_state.world, 'structure_energy_ratio', 0.0)
+            t2_v = getattr(st.session_state.world, 'type_ii_verified', False)
+            
             stats_md = f"""
 | 🌍 Global Metric | 📊 Value | 🌍 Global Metric | 📊 Value |
 | :--- | :--- | :--- | :--- |
@@ -1279,7 +1288,39 @@ with tab_omega:
 | **⚛️ Oracle R²** | `{getattr(st.session_state.world, 'collective_oracle_model_accuracy', 0):.3f}` | **📡 Sim Awareness** | `{getattr(st.session_state.world, 'collective_simulation_awareness', 0):.2f}` |
 | **🎮 GoL WRites** | `{getattr(st.session_state.world, 'global_scratchpad_activity', 0)}` | **♾️ Nesting Depth** | `{getattr(st.session_state.world, 'nested_simulation_depth_max', 0)}` |
 | **🐝 Hive Φ** | `{getattr(st.session_state.world, 'hive_phi', 0):.2f}` | **🏆 OMEGA ACHIEVED** | `{'✅ YES' if getattr(st.session_state.world, 'omega_achieved', False) else '❌ NO'}` |
-            """
+| **📜 Tradition Persist** | `{'✅' if trad_p else '❌'}` | **🧬 Cultural Ratchet** | `{'✅' if cult_r else '❌'}` |
+| **📡 Protocol Align** | `{prot_c:.3f}` | **🧪 Symbol R²** | `{sym_g:.3f}` |
+| **🏗️ Planetary Cov** | `{plan_c*100:.2f}%` | **🔋 Struct Energy** | `{str_e*100:.1f}%` |
+| **🏛️ Type II Status** | `{'✅' if t2_v else '❌'}` | **🌍 Cultural Drift** | `{getattr(st.session_state.world, 'cultural_divergence', 0.0):.3f}` |
+| **🥇 Nobel Hall** | `{len(st.session_state.global_registry)}` | **☄️ Weather Amp** | `{getattr(st.session_state.world, 'weather_amplitude', 1.0):.2f}` |
+| **🧬 Adaptive Rate** | `{getattr(st.session_state.world, 'base_spawn_rate', 0.5):.2f}` | **🧰 Niche Mods** | `{sum([a.niche_modifications for a in all_agents])}` |
+| **🔗 Neural Bridges** | `{sum([len(a.neural_bridge_partners) for a in all_agents])}` | **📈 Mean Meta-LR** | `{np.mean([a.meta_lr for a in all_agents]):.4f}` |
+| **💭 Shared Concepts** | `{len(set().union(*[set(a.qualia_patterns.keys()) for a in all_agents]))}` | **🗃️ Dist. Memory** | `{sum([len(a.distributed_memory_fragments) for a in all_agents])}` |
+| **⚖️ Consensus Count** | `{len(getattr(st.session_state.world, 'consensus_registry', {}))}` | **🧬 Genome Rank** | `{len(st.session_state.gene_pool)}` |
+| **📉 Gradient Norm** | `{np.mean([a.last_grad_norm for a in all_agents]):.4f}` | **🔋 Battery Store** | `{sum([s.stored_energy for s in st.session_state.world.structures.values() if hasattr(s, 'stored_energy')]):.0f}` |
+| **🏺 Cultural Speci** | `{len(set([a.dialect_id for a in all_agents]))}` | **🐝 Kuramoto Var** | `{np.std([a.kuramoto_phase for a in all_agents]):.3f}` |
+| **💭 Concept Diverg** | `{np.std([len(a.qualia_patterns) for a in all_agents]):.2f}` | **🔗 Redundancy** | `{np.mean([len(a.backup_connections) for a in all_agents]):.2f}` |
+| **📡 Fault Toler** | `{sum([len(a.backup_connections) for a in all_agents])}` | **🧠 Cognitive Load** | `{np.mean([a.compute_used for a in all_agents]):.2f}` |
+| **♾️ Surplus Val** | `{sum([a.computational_budget - a.compute_used for a in all_agents]):.0f}` | **🔁 Loop Multipl** | `{np.mean([a.self_reference_count for a in all_agents]):.2f}` |
+| **🎨 Aesthetic Vol** | `{sum([a.aesthetic_actions for a in all_agents])}` | **📡 Social Reach** | `{np.mean([len(a.social_memory) for a in all_agents]):.1f}` |
+| **🧬 Pheno Plastic** | `{np.mean([(a.thoughts_had / max(1, a.age)) for a in all_agents]):.3f}` | **🧪 Experiment C** | `{sum([len(a.physics_experiments) for a in all_agents])}` |
+| **🔭 State Explored** | `{sum([len(a.discovered_patterns) for a in all_agents])}` | **📈 Oracle Loss** | `{np.mean([getattr(a, 'last_oracle_loss', 0.0) for a in all_agents]):.4f}` |
+| **📡 Shared Proto** | `{np.mean([a.protocol_version.mean() for a in all_agents]):.3f}` | **🧬 Mutate Lines** | `{getattr(st.session_state.world, 'code_mutations', 0)}` |
+| **🧪 Innovation R** | `{st.session_state.total_events_count / max(1, st.session_state.world.time_step):.3f}` | **🦠 Viral Fit** | `{np.mean([m['fitness'] for a in all_agents for m in a.meme_pool]) if any([a.meme_pool for a in all_agents]) else 0.0:.2f}` |
+| **📉 Mean Confid** | `{np.mean([a.confidence for a in all_agents]):.3f}` | **📡 Meme Divers** | `{len(set([m['type'] for a in all_agents for m in a.meme_pool])) if any([a.meme_pool for a in all_agents]) else 0}` |
+| **🤝 Trade Volume** | `{sum([getattr(a, 'trade_count', 0) for a in all_agents])}` | **⚖️ Punish Count** | `{sum([getattr(a, 'punish_count', 0) for a in all_agents])}` |
+| **🍼 Mating Succ** | `{st.session_state.get('successful_births', 0)}` | **🧠 Average IQ** | `{np.mean([float(torch.std(a.last_vector.detach()))*100 for a in all_agents if a.last_vector is not None]):.1f}` |
+| **🛰️ Spatial Spar** | `{len(st.session_state.world.grid) / (st.session_state.world.size**2):.4f}` | **🔋 Homeo Error** | `{np.mean([abs(a.energy - 120) for a in all_agents]):.1f}` |
+| **🔗 Bridge Dens** | `{sum([len(a.neural_bridge_partners) for a in all_agents]) / max(1, n_pop):.2f}` | **🧠 Substrate Ind** | `{np.mean([a.brain.actor_mask.sparsity().item() for a in all_agents if hasattr(a.brain, 'actor_mask')]):.3f}` |
+| **📈 Mean Phase** | `{np.mean([a.internal_phase for a in all_agents]):.3f}` | **📊 Metabolic Eff** | `{np.mean([a.energy / max(1, a.age) for a in all_agents]):.2f}` |
+| **🔗 Connect Index** | `{len(st.session_state.world.bonds) / 202:.4f}` | **♾️ Max Recursion** | `{max([a.simulation_depth for a in all_agents]):.0f}` |
+| **📡 Backprop Dp** | `{max([a.backprop_depth for a in all_agents]):.0f}` | **🔭 Physics Score** | `{getattr(st.session_state.world, 'physics_mastery_score', 0.0):.3f}` |
+| **🧠 Avg Self-Acc** | `{np.mean([a.self_model_accuracy for a in all_agents]):.3f}` | **🧪 Oracle Nodes** | `{len(st.session_state.world.causal_graph_collective)}` |
+| **📡 Proto Converg** | `{getattr(st.session_state.world, 'protocol_convergence', 0.0):.3f}` | **🧪 Symbol Ground** | `{getattr(st.session_state.world, 'symbol_grounding_r2', 0.0):.3f}` |
+"""
+
+
+
             st.markdown(stats_md)
             
             # Update max pop tracker
@@ -1303,13 +1344,26 @@ with tab_omega:
             
             neuro_plasticity = (agent.thoughts_had / max(1, agent.age)) * 100.0
             
+            # Extract additional real-time metrics
+            env_acc = getattr(agent, 'env_prediction_accuracy', 0.0)
+            self_acc = getattr(agent, 'self_model_accuracy', 0.0)
+            p_error = np.mean(agent.prediction_errors) if agent.prediction_errors else 0.0
+            sparsity = agent.brain.actor_mask.sparsity().item() if hasattr(agent.brain, 'actor_mask') else 0.0
+            tom_d = getattr(agent, 'tom_depth', 0)
+            art_a = getattr(agent, 'aesthetic_actions', 0)
+            aware = getattr(agent, 'simulation_awareness', 0.0)
+            niche = getattr(agent, 'niche_modifications', 0)
+            conf = getattr(agent, 'confidence', 0.5)
+            inf = getattr(agent, 'influence', 0.0)
+            
             agent_data.append({
                 "ID": agent.id[:6],
                 "Gen": agent.generation,
                 "Age": agent.age,
                 "Energy": f"{agent.energy:.1f}",
                 "IQ": f"{max(iq_score, 0.001):.2f}",
-                # Level 6-10 Columns
+                "Love": f"{love_score:.2f}",
+                "Plas": f"{neuro_plasticity:.1f}%",
                 "Φ": f"{getattr(agent, 'phi_value', 0):.2f}",
                 "🧠": "✅" if getattr(agent, 'consciousness_verified', False) else "❌",
                 "Spec": getattr(agent, 'cognitive_specialty', '-')[:4] if getattr(agent, 'cognitive_specialty', None) else "-",
@@ -1318,12 +1372,23 @@ with tab_omega:
                 "🔭": len(getattr(agent, 'discovered_patterns', [])),
                 "🎮": getattr(agent, 'scratchpad_writes', 0),
                 "🔁": "Y" if getattr(agent, 'strange_loop_active', False) else "-",
-                "Ω": "✅" if getattr(agent, 'omega_verified', False) else "-"
+                "Ω": "✅" if getattr(agent, 'omega_verified', False) else "-",
+                "Err": f"{p_error:.3f}",
+                "Conf": f"{conf:.2f}",
+                "Self-M": f"{self_acc:.2f}",
+                "Spars": f"{sparsity*100:.1f}%",
+                "Tom": tom_d,
+                "Art": art_a,
+                "Aware": f"{aware:.2f}",
+                "Niche": niche,
+                "Inf": f"{inf:.2f}",
+                "Bkp": len(getattr(agent, 'backup_connections', set()))
             })
             
         if agent_data:
             df_agents = pd.DataFrame(agent_data)
-            st.dataframe(df_agents, width='stretch', height=400)
+            st.dataframe(df_agents, width='stretch', height=500)
+
 
 
 with tab_nobel:

@@ -781,6 +781,10 @@ class GenesisWorld:
         if self.time_step % 100 == 0:
             mx, my = random.randint(0, self.size-1), random.randint(0, self.size-1)
             self.grid[(mx, my)] = MegaResource(mx, my)
+        
+        # 🔧 AUDIT FIX: Run Level 6-10 Logic
+        self.level_6_10_step()
+
 
     def _update_entropy_metrics(self):
         """1.10 Complete Entropy Defiance: Track system-wide entropy changes."""
@@ -1135,17 +1139,21 @@ class GenesisWorld:
         loop_count = 0
         
         for agent in list(self.agents.values()):
-            if hasattr(agent, 'compute_phi'):
-                phi = agent.compute_phi()
-                phi_values.append(phi)
+            if hasattr(agent, 'verify_consciousness'):
+                agent.verify_consciousness() # This also calls compute_phi()
+            
+            if hasattr(agent, 'phi_value'):
+                phi_values.append(agent.phi_value)
             
             if hasattr(agent, 'consciousness_verified') and agent.consciousness_verified:
                 conscious_count += 1
             
-            if hasattr(agent, 'strange_loop_active') and agent.strange_loop_active:
-                loop_count += 1
+            if hasattr(agent, 'strange_loop_check'):
+                if agent.strange_loop_check():
+                    loop_count += 1
         
         self.population_phi = np.mean(phi_values) if phi_values else 0.0
+
         self.consciousness_count = conscious_count
         self.strange_loop_count = loop_count
     
