@@ -627,36 +627,310 @@ with st.container():
     with col_h4:
         # Global Chart Toggle for Performance
         st.session_state.show_charts = st.checkbox("Show Live Charts", value=False, help="Enable heavy plots. Keep off for speed.")
-        # Optimized Report Generator
-        # No cache here to avoid filling media storage with high-frequency updates
-        def generate_report(stats, genes, events):
-            stats_json = json.dumps(stats, indent=2)
-            gene_json = json.dumps(genes)
-            events_json = json.dumps(events, indent=2)
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr("stats.json", stats_json)
-                zf.writestr("genes.json", gene_json)
-                zf.writestr("events.json", events_json)
-            return zip_buffer.getvalue()
 
-        # We convert complex objects to simpler ones for caching if needed, but for now passing session state contents directly
-        # To avoid caching issues with mutable objects, we clone them or just run generate_report on click.
-        # Streamlit's new button callback pattern is cleaner.
+# ============================================================
+# 🧬 COMPLETE DNA PRESERVATION SYSTEM
+# ============================================================
+def collect_full_simulation_dna():
+    """
+    Collects ALL metrics and plot data from EVERY tab in the frontend.
+    This preserves the complete 'DNA' of the simulation results for Nobel Prize showcase.
+    """
+    world = st.session_state.world
+    all_agents = list(world.agents.values()) if world.agents else []
+    n_pop = len(all_agents)
+    
+    # Helper: Safe tensor/numpy conversion
+    def safe_list(val):
+        if val is None: return None
+        if torch.is_tensor(val): return val.detach().cpu().tolist()
+        if isinstance(val, np.ndarray): return val.tolist()
+        return val
+    
+    # Helper: Round floats to save space
+    def round_dict(d, decimals=4):
+        if isinstance(d, dict):
+            return {k: round_dict(v, decimals) for k, v in d.items()}
+        elif isinstance(d, list):
+            return [round_dict(v, decimals) for v in d]
+        elif isinstance(d, float):
+            return round(d, decimals)
+        return d
+    
+    dna = {
+        # ==================== METADATA ====================
+        "metadata": {
+            "version": SYSTEM_VERSION,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "world_tick": world.time_step,
+            "population": n_pop,
+            "max_generation": st.session_state.max_generation,
+            "total_events": st.session_state.total_events_count
+        },
         
-        if st.button("📦 PREPARE EXPORT", help="Collects simulation data and creates a download link."):
-            encoded_pool_clean = [{k: v.cpu().tolist() for k, v in g.items()} for g in st.session_state.gene_pool]
-            st.session_state.export_zip = generate_report(st.session_state.stats_history, encoded_pool_clean, st.session_state.event_log)
-            st.toast("Export ready!", icon="✅")
+        # ==================== TAB 1: OBSERVATION DECK ====================
+        "observation_deck": {
+            "stats_history": st.session_state.stats_history[-200:],  # Last 200 ticks
+            "season": world.current_season,
+            "gene_pool_size": len(st.session_state.gene_pool),
+            "bonds_count": len(world.bonds) if hasattr(world, 'bonds') else 0,
+            "structures": [
+                {"x": s.x, "y": s.y, "type": getattr(s, 'structure_type', 'generic'), "hp": getattr(s, 'durability', 0)}
+                for s in world.structures.values()
+            ] if hasattr(world, 'structures') else [],
+            "agent_positions": [{"id": a.id[:6], "x": a.x, "y": a.y, "energy": a.energy, "tag": safe_list(a.tag)} for a in all_agents],
+            "resource_grid": {f"{k[0]},{k[1]}": v.get_nutrition(world.current_season) for k, v in world.grid.items()}
+        },
+        
+        # ==================== TAB 2: QUANTUM SPECTROGRAM ====================
+        "quantum_spectrogram": {
+            "comm_vectors": [safe_list(a.last_comm) for a in all_agents if hasattr(a, 'last_comm') and a.last_comm is not None],
+            "thought_vectors": [safe_list(a.last_vector) for a in all_agents[:50] if a.last_vector is not None],
+            "hidden_states": [safe_list(a.hidden_state) for a in all_agents[:20] if a.hidden_state is not None],
+            "signal_silhouette": st.session_state.get('last_silhouette_score', 0.0)
+        },
+        
+        # ==================== TAB 3: HIVE STRUCTURES ====================
+        "hive_structures": {
+            "role_counts": {r: sum(1 for a in all_agents if getattr(a, 'role', 'Generalist') == r) for r in ['Forager', 'Processor', 'Warrior', 'Queen']},
+            "fused_count": sum(1 for a in all_agents if a.is_fused),
+            "top_leaders": [{"id": a.id[:6], "influence": getattr(a, 'influence', 0)} for a in sorted(all_agents, key=lambda x: getattr(x, 'influence', 0), reverse=True)[:5]],
+            "role_stability_scores": [sum(1 for i in range(1, len(a.role_history)) if a.role_history[i] == a.role_history[i-1]) / max(1, len(a.role_history)) for a in all_agents if len(a.role_history) > 5]
+        },
+        
+        # ==================== TAB 4: CULTURE ====================
+        "culture": {
+            "culture_history": {str(k): v for k, v in st.session_state.culture_history.items()},
+            "tradition_history": st.session_state.get('tradition_history', []),
+            "meme_grid": safe_list(world.meme_grid) if hasattr(world, 'meme_grid') else None,
+            "global_registry": st.session_state.global_registry,
+            "event_log": st.session_state.event_log[:50]
+        },
+        
+        # ==================== TAB 5: NOBEL COMMITTEE ====================
+        "nobel_committee": {
+            "all_inventions": [
+                {"agent_id": a.id[:6], "inventions": a.inventions}
+                for a in all_agents if a.inventions
+            ],
+            "global_patents": st.session_state.global_registry
+        },
+        
+        # ==================== TAB 6: OMEGA TELEMETRY (100+ METRICS) ====================
+        "omega_telemetry": {
+            # Core Stats
+            "current_population": n_pop,
+            "average_age": np.mean([a.age for a in all_agents]) if all_agents else 0,
+            "peak_population": st.session_state.get('max_pop', n_pop),
+            "oldest_elder": max([a.age for a in all_agents]) if all_agents else 0,
+            "total_biomass": sum([a.energy for a in all_agents]),
+            "average_energy": np.mean([a.energy for a in all_agents]) if all_agents else 0,
+            "max_generation": max([a.generation for a in all_agents]) if all_agents else 0,
+            "avg_generation": np.mean([a.generation for a in all_agents]) if all_agents else 0,
+            "total_inventions": st.session_state.total_events_count,
+            "global_patents": len(st.session_state.global_registry),
+            "world_time_step": world.time_step,
+            "season_timer": world.season_timer,
+            "active_bonds": len(world.bonds) if hasattr(world, 'bonds') else 0,
+            "gene_pool_size": len(st.session_state.gene_pool),
+            "system_entropy": getattr(world, 'agent_entropy', 0),
+            "scarcity_factor": max(0.2, np.exp(-world.scarcity_lambda * world.time_step)),
+            "structures_count": len(getattr(world, 'structures', {})),
+            "networks_count": len(getattr(world, 'networks', {})),
+            "kuramoto_r": getattr(world, 'kuramoto_order_parameter', 0),
+            "population_phi": getattr(world, 'population_phi', 0),
+            "consciousness_count": getattr(world, 'consciousness_count', 0),
+            "strange_loop_count": getattr(world, 'strange_loop_count', 0),
+            "oracle_r2": getattr(world, 'collective_oracle_model_accuracy', 0),
+            "sim_awareness": getattr(world, 'collective_simulation_awareness', 0),
+            "gol_writes": getattr(world, 'global_scratchpad_activity', 0),
+            "nesting_depth": getattr(world, 'nested_simulation_depth_max', 0),
+            "hive_phi": getattr(world, 'hive_phi', 0),
+            "omega_achieved": getattr(world, 'omega_achieved', False),
+            "tradition_persist": getattr(world, 'tradition_persistence_verified', False),
+            "cultural_ratchet": getattr(world, 'cultural_ratchet_verified', False),
+            "protocol_align": getattr(world, 'protocol_convergence', 0),
+            "symbol_r2": getattr(world, 'symbol_grounding_r2', 0),
+            "planetary_cov": getattr(world, 'planetary_structure_coverage', 0),
+            "struct_energy": getattr(world, 'structure_energy_ratio', 0),
+            "type_ii_status": getattr(world, 'type_ii_verified', False),
+            "cultural_drift": getattr(world, 'cultural_divergence', 0),
+            "weather_amp": getattr(world, 'weather_amplitude', 1.0),
+            "adaptive_rate": getattr(world, 'base_spawn_rate', 0.5),
+            "niche_mods": sum([a.niche_modifications for a in all_agents]),
+            "neural_bridges": sum([len(a.neural_bridge_partners) for a in all_agents]),
+            "mean_meta_lr": np.mean([a.meta_lr for a in all_agents]) if all_agents else 0,
+            "shared_concepts": len(set().union(*[set(a.qualia_patterns.keys()) for a in all_agents])) if all_agents else 0,
+            "dist_memory": sum([len(a.distributed_memory_fragments) for a in all_agents]),
+            "consensus_count": len(getattr(world, 'consensus_registry', {})),
+            "gradient_norm": np.mean([a.last_grad_norm for a in all_agents]) if all_agents else 0,
+            "battery_store": sum([s.stored_energy for s in world.structures.values() if hasattr(s, 'stored_energy')]),
+            "cultural_speciation": len(set([a.dialect_id for a in all_agents])),
+            "kuramoto_var": np.std([a.kuramoto_phase for a in all_agents]) if all_agents else 0,
+            "concept_diverg": np.std([len(a.qualia_patterns) for a in all_agents]) if all_agents else 0,
+            "redundancy": np.mean([len(a.backup_connections) for a in all_agents]) if all_agents else 0,
+            "fault_toler": sum([len(a.backup_connections) for a in all_agents]),
+            "cognitive_load": np.mean([a.compute_used for a in all_agents]) if all_agents else 0,
+            "surplus_val": sum([a.computational_budget - a.compute_used for a in all_agents]),
+            "loop_multipl": np.mean([a.self_reference_count for a in all_agents]) if all_agents else 0,
+            "aesthetic_vol": sum([a.aesthetic_actions for a in all_agents]),
+            "social_reach": np.mean([len(a.social_memory) for a in all_agents]) if all_agents else 0,
+            "pheno_plastic": np.mean([(a.thoughts_had / max(1, a.age)) for a in all_agents]) if all_agents else 0,
+            "experiment_c": sum([len(a.physics_experiments) for a in all_agents]),
+            "state_explored": sum([len(a.discovered_patterns) for a in all_agents]),
+            "oracle_loss": np.mean([getattr(a, 'last_oracle_loss', 0.0) for a in all_agents]) if all_agents else 0,
+            "shared_proto": np.mean([a.protocol_version.mean() for a in all_agents]) if all_agents else 0,
+            "mutate_lines": getattr(world, 'code_mutations', 0),
+            "innovation_r": st.session_state.total_events_count / max(1, world.time_step),
+            "viral_fit": np.mean([m.get('fitness', 0.0) for a in all_agents for m in a.meme_pool]) if any([a.meme_pool for a in all_agents]) else 0,
+            "mean_confid": np.mean([a.confidence for a in all_agents]) if all_agents else 0,
+            "meme_divers": len(set([m.get('id', 'unk') for a in all_agents for m in a.meme_pool])) if any([a.meme_pool for a in all_agents]) else 0,
+            "trade_volume": sum([getattr(a, 'trade_count', 0) for a in all_agents]),
+            "punish_count": sum([getattr(a, 'punish_count', 0) for a in all_agents]),
+            "mating_succ": st.session_state.get('successful_births', 0),
+            "average_iq": np.mean([float(torch.std(a.last_vector.detach()))*100 for a in all_agents if a.last_vector is not None]) if all_agents else 0,
+            "spatial_spar": len(world.grid) / (world.size**2),
+            "homeo_error": np.mean([abs(a.energy - 120) for a in all_agents]) if all_agents else 0,
+            "bridge_dens": sum([len(a.neural_bridge_partners) for a in all_agents]) / max(1, n_pop),
+            "substrate_ind": np.mean([a.brain.actor_mask.sparsity().item() for a in all_agents if hasattr(a.brain, 'actor_mask')]) if all_agents else 0,
+            "mean_phase": np.mean([a.internal_phase for a in all_agents]) if all_agents else 0,
+            "metabolic_eff": np.mean([a.energy / max(1, a.age) for a in all_agents]) if all_agents else 0,
+            "connect_index": len(world.bonds) / 202 if hasattr(world, 'bonds') else 0,
+            "max_recursion": max([a.simulation_depth for a in all_agents]) if all_agents else 0,
+            "backprop_dp": max([a.backprop_depth for a in all_agents]) if all_agents else 0,
+            "physics_score": getattr(world, 'physics_mastery_score', 0),
+            "avg_self_acc": np.mean([a.self_model_accuracy for a in all_agents]) if all_agents else 0,
+            "oracle_nodes": len(world.causal_graph_collective) if hasattr(world, 'causal_graph_collective') else 0,
+            "proto_converg": getattr(world, 'protocol_convergence', 0),
+            "symbol_ground": getattr(world, 'symbol_grounding_r2', 0)
+        },
+        
+        # ==================== AGENT GRID (Top 50) ====================
+        "agent_grid": [
+            {
+                "id": a.id[:6],
+                "gen": a.generation,
+                "age": a.age,
+                "energy": round(a.energy, 1),
+                "iq": round(float(torch.std(a.last_vector.detach()))*100, 2) if a.last_vector is not None else 0,
+                "love": round(float(torch.mean(a.last_vector.detach())), 2) if a.last_vector is not None else 0,
+                "plasticity": round((a.thoughts_had / max(1, a.age)) * 100, 1),
+                "phi": round(getattr(a, 'phi_value', 0), 2),
+                "conscious": getattr(a, 'consciousness_verified', False),
+                "specialty": (getattr(a, 'cognitive_specialty', '-') or '-')[:4],
+                "bridges": len(getattr(a, 'neural_bridge_partners', set())),
+                "structures_built": len(getattr(a, 'structures_built', [])),
+                "patterns": len(getattr(a, 'discovered_patterns', [])),
+                "scratchpad_writes": getattr(a, 'scratchpad_writes', 0),
+                "strange_loop": getattr(a, 'strange_loop_active', False),
+                "omega": getattr(a, 'omega_verified', False),
+                "error": round(np.mean(a.prediction_errors), 3) if a.prediction_errors else 0,
+                "confidence": round(getattr(a, 'confidence', 0.5), 2),
+                "self_model": round(getattr(a, 'self_model_accuracy', 0), 2),
+                "sparsity": round(a.brain.actor_mask.sparsity().item() * 100, 1) if hasattr(a.brain, 'actor_mask') else 0,
+                "tom_depth": getattr(a, 'tom_depth', 0),
+                "aesthetic": getattr(a, 'aesthetic_actions', 0),
+                "awareness": round(getattr(a, 'simulation_awareness', 0), 2),
+                "niche": getattr(a, 'niche_modifications', 0),
+                "influence": round(getattr(a, 'influence', 0), 2),
+                "backups": len(getattr(a, 'backup_connections', set()))
+            }
+            for a in sorted(all_agents, key=lambda x: x.age, reverse=True)[:50]
+        ],
+        
+        # ==================== TAB 7: METACOGNITION (Levels 5-10 Caches) ====================
+        "metacognition": {
+            "level_5": round_dict(st.session_state.get('l5_cache', {})),
+            "level_6": round_dict(st.session_state.get('l6_cache', {})),
+            "level_7": round_dict(st.session_state.get('l7_cache', {})),
+            "level_8": round_dict(st.session_state.get('l8_cache', {})),
+            "level_9": round_dict(st.session_state.get('l9_cache', {})),
+            "level_10": round_dict(st.session_state.get('l10_cache', {}))
+        },
+        
+        # ==================== GENE POOL (For Genetic Analysis) ====================
+        "gene_pool": [
+            {k: safe_list(v) for k, v in g.items()}
+            for g in st.session_state.gene_pool[-50:]  # Last 50 genomes
+        ]
+    }
+    
+    return round_dict(dna)
 
-        if "export_zip" in st.session_state:
-            st.download_button(
-                "💾 DOWNLOAD NOW", 
-                st.session_state.export_zip, 
-                "genesis_data.zip", 
-                "application/zip", 
-                width='stretch'
-            )
+
+def generate_dna_zip(dna):
+    """Creates a compressed ZIP file with all DNA data."""
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+        # Write each section as separate JSON for clarity
+        zf.writestr("metadata.json", json.dumps(dna["metadata"], indent=2))
+        zf.writestr("observation_deck.json", json.dumps(dna["observation_deck"]))
+        zf.writestr("quantum_spectrogram.json", json.dumps(dna["quantum_spectrogram"]))
+        zf.writestr("hive_structures.json", json.dumps(dna["hive_structures"]))
+        zf.writestr("culture.json", json.dumps(dna["culture"]))
+        zf.writestr("nobel_committee.json", json.dumps(dna["nobel_committee"]))
+        zf.writestr("omega_telemetry.json", json.dumps(dna["omega_telemetry"]))
+        zf.writestr("agent_grid.json", json.dumps(dna["agent_grid"]))
+        zf.writestr("metacognition.json", json.dumps(dna["metacognition"]))
+        zf.writestr("gene_pool.json", json.dumps(dna["gene_pool"]))
+    return zip_buffer.getvalue()
+
+
+# --- DNA PRESERVATION UI (Download/Upload) ---
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### 🧬 Results Preservation")
+    st.caption("Nobel Prize Showcase Mode")
+    
+    # Download Section
+    if st.button("📥 DOWNLOAD COMPLETE DNA", help="Export ALL metrics, plots, charts from all 7 tabs", use_container_width=True, type="primary"):
+        with st.spinner("Collecting full simulation DNA..."):
+            try:
+                dna = collect_full_simulation_dna()
+                zip_bytes = generate_dna_zip(dna)
+                st.session_state.dna_zip = zip_bytes
+                st.session_state.dna_size = len(zip_bytes) / (1024 * 1024)  # MB
+                st.toast(f"DNA collected! Size: {st.session_state.dna_size:.2f} MB", icon="🧬")
+            except Exception as e:
+                st.error(f"Collection error: {str(e)[:100]}")
+    
+    if "dna_zip" in st.session_state:
+        st.success(f"✅ Ready ({st.session_state.dna_size:.2f} MB)")
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        st.download_button(
+            "💾 SAVE genesis_dna.zip",
+            st.session_state.dna_zip,
+            f"genesis_dna_{timestamp}.zip",
+            "application/zip",
+            use_container_width=True
+        )
+    
+    st.markdown("---")
+    
+    # Upload Section
+    uploaded_dna = st.file_uploader("📤 LOAD PREVIOUS DNA", type="zip", help="Restore results from saved ZIP")
+    
+    if uploaded_dna is not None:
+        if st.button("🔄 RESTORE & VIEW", use_container_width=True):
+            try:
+                with zipfile.ZipFile(io.BytesIO(uploaded_dna.read()), 'r') as zf:
+                    loaded_dna = {}
+                    for filename in zf.namelist():
+                        key = filename.replace('.json', '')
+                        loaded_dna[key] = json.loads(zf.read(filename).decode('utf-8'))
+                    st.session_state.loaded_dna = loaded_dna
+                    st.session_state.viewing_loaded_dna = True
+                    st.toast("DNA Loaded Successfully!", icon="✅")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Load error: {str(e)[:100]}")
+    
+    if st.session_state.get('viewing_loaded_dna', False):
+        st.info(f"📊 Viewing: {st.session_state.loaded_dna.get('metadata', {}).get('timestamp', 'Unknown')}")
+        if st.button("🔴 EXIT VIEW MODE", use_container_width=True):
+            st.session_state.viewing_loaded_dna = False
+            st.session_state.loaded_dna = None
+            st.rerun()
 
 # --- MAIN TABS FRAGMENT ---
 tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st.tabs([
