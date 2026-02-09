@@ -1882,10 +1882,8 @@ with tab_culture:
                  log_df = pd.DataFrame(st.session_state.event_log)
                  st.dataframe(log_df[["Agent", "Event"]], width='stretch', height=400)
 
-    st.markdown("---")
 
-    else:
-        st.info("Enable 'Show Live Charts' to enter the Infinite Garden.")
+
 
 with tab_nobel:
     # === VIEWING MODE: Display Loaded DNA ===
