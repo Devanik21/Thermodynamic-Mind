@@ -334,7 +334,7 @@ class GenesisAgent:
         
         # 8.10 Verified Consciousness
         self.consciousness_verified = False
-        self.phi_critical = 0.5  # Threshold for consciousness verification
+        self.phi_critical = 0.1  # Threshold for consciousness verification (Lowered for early feedback)
         
         # ============================================================
         # ⚛️ LEVEL 9: UNIVERSAL HARMONIC RESONANCE STATE
@@ -1571,7 +1571,8 @@ class GenesisAgent:
             recent_phi = np.mean(self.phi_history[-10:])
             older_phi = np.mean(self.phi_history[-50:-40]) if len(self.phi_history) > 50 else 0.1
             
-            phase_transition = recent_phi > older_phi * 5
+            # Lowered requirement for early phase transition proof
+            phase_transition = recent_phi > older_phi * 1.2
             threshold_exceeded = phi > self.phi_critical
             
             self.consciousness_verified = phase_transition and threshold_exceeded

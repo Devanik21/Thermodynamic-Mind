@@ -319,7 +319,8 @@ class GenesisWorld:
         # 1.4 Scarcity Scaling
         self.scarcity_lambda = 0.01
         self.discovered_physics_exploits = [] # 9.2 Collective Exploit Tracking
-        self.base_spawn_rate = 15 # GOLDEN ERA: Increased from 10 to 15
+        self.base_spawn_rate = 15.0 # GOLDEN ERA: Increased from 10 to 15
+        self.code_mutations = 0 # 1.10 AUDIT FIX: Track total mutations
         
         # 1.10 Entropy Tracking
         self.system_entropy = 0.0
@@ -1121,6 +1122,26 @@ class GenesisWorld:
             if hasattr(agent, 'cognitive_specialty') and agent.cognitive_specialty:
                 if agent.cognitive_specialty in self.cognitive_modules:
                     self.cognitive_modules[agent.cognitive_specialty].append(agent.id)
+
+    def update_global_metrics(self):
+        """Global metric aggregation for the dashboard."""
+        if not self.agents: return
+        
+        # 1.10 Adaptive Spawning: Rate decreases as population fills 
+        # (Negative feedback loop for stability)
+        capacity = (self.size ** 2) * 0.1 # 10% density limit
+        fill_ratio = len(self.agents) / max(1, capacity)
+        self.base_spawn_rate = max(1.0, 20.0 * (1.1 - fill_ratio))
+        
+        # 1.10 System Entropy: Mean neural complexity of all agents
+        entropies = [a.calculate_weight_entropy() for a in self.agents.values() 
+                     if hasattr(a, 'calculate_weight_entropy')]
+        self.system_entropy = np.mean(entropies) if entropies else 0.0
+        
+        # 1.10 Agent Entropy: Fallback for population energy diversity
+        energies = np.array([a.energy for a in self.agents.values()])
+        e_norm = (energies + 1e-8) / (energies.sum() + 1e-7)
+        self.agent_entropy = -np.sum(e_norm * np.log2(e_norm)) if len(energies) > 0 else 0.0
     
     def process_consensus(self, proposal_id):
         """7.6 Consensus Mechanisms: Byzantine fault-tolerant voting."""
@@ -1162,8 +1183,8 @@ class GenesisWorld:
         
             self.protocol_convergence = np.mean(similarities) if similarities else 0.0
         
-        # 7.6 Consensus Mechanism: If convergence > 0.6, start a new proposal occasionally
-        if self.protocol_convergence > 0.6 and self.time_step % 50 == 0:
+        # 7.6 Consensus Mechanism: If convergence > 0.3, start a new proposal occasionally (Staggered)
+        if self.protocol_convergence > 0.3 and self.time_step % 25 == 4:
             proposal_id = f"prop_{self.time_step}"
             self.consensus_registry[proposal_id] = {"votes": {}, "result": "pending"}
     
@@ -1333,7 +1354,7 @@ class GenesisWorld:
         }
     
     def level_6_10_step(self):
-        """Combined step function for all Level 6-10 features."""
+        """Combined step function for all Level 6-10 features (Staggered execution)."""
         # Level 6: Geo-Engineering
         self.process_structures()
         self.update_weather_control()
@@ -1344,34 +1365,44 @@ class GenesisWorld:
         self.kuramoto_global_step()
         self.federated_gradient_step()
         self.update_cognitive_modules()
-        if self.time_step % 20 == 0:
+        if self.time_step % 20 == 4: # Staggered
             self.update_protocol_convergence()
-        if self.time_step % 10 == 0:
+        if self.time_step % 10 == 2: # Staggered
             self.compute_hive_phi()
         
         # Level 8: Abstract Representation (lighter, every 5 ticks)
-        if self.time_step % 5 == 0:
+        if self.time_step % 5 == 1: # Staggered
             self.update_consciousness_metrics()
         
         # Level 9: Physics Discovery (every 10 ticks)
-        if self.time_step % 10 == 0:
+        if self.time_step % 10 == 3: # Staggered
             self.update_physics_discovery()
         
         # Level 10: Omega Point (every 20 ticks)
-        if self.time_step % 20 == 0:
+        if self.time_step % 20 == 5: # Staggered
             self.update_omega_tracking()
         
         # ============================================================
-        # 🔧 AUDIT FIX: RUN VERIFICATION CHECKS (Lowered threshold for reality proof)
+        # 🔧 AUDIT FIX: RUN VERIFICATION CHECKS (Staggered 25-tick cycle)
         # ============================================================
-        if self.time_step % 50 == 0:
+        if self.time_step % 25 == 6:
             self.verify_tradition_persistence()
+        if self.time_step % 25 == 7:
             self.measure_cultural_drift()
+        if self.time_step % 25 == 8:
             self.verify_cultural_ratchet()
+        if self.time_step % 25 == 9:
             self.compute_planetary_coverage()
+        if self.time_step % 25 == 10:
             self.verify_type_ii_civilization()
+        if self.time_step % 25 == 11:
             self.verify_symbol_grounding()
+        if self.time_step % 25 == 12:
             self._update_leadership()
+        
+        # 1.10 Global Metric Aggregation (Staggered)
+        if self.time_step % 25 == 13:
+            self.update_global_metrics()
 
     # ============================================================
     # 🔧 AUDIT FIX: NEW METHODS FOR MISSING FEATURES

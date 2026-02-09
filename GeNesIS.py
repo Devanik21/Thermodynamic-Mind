@@ -165,8 +165,8 @@ def update_simulation():
                 else:
                     a.is_fertile = True
 
-    # 4.4 Emergent Hierarchy: Calculate Influence
-    if world.time_step % 20 == 0 and agents:
+    # 4.4 Emergent Hierarchy: Calculate Influence (Staggered 25-tick cycle)
+    if world.time_step % 25 == 1 and agents:
         for a in agents:
             # Simple metric: Energy * age * inventions
             a.influence = (a.energy / 100.0) * (a.age / 50.0) * (len(a.inventions) + 1)
@@ -397,6 +397,7 @@ def update_simulation():
                 
                 # 1.10 AUDIT FIX: Track successful births globally
                 st.session_state.successful_births = st.session_state.get('successful_births', 0) + 1
+                world.code_mutations += 1
                 
                 # Cost
                 agent.energy -= repro_cost
@@ -571,8 +572,8 @@ def update_simulation():
         st.session_state.stats_history.pop(0)
         
     # --- PHASE 14: LEVEL 3.4 TRADITION FORMATION ---
-    # Periodically sample population behavior by generation
-    if world.time_step % 100 == 0 and agents:
+    # Periodically sample population behavior by generation (Staggered offset)
+    if world.time_step % 100 == 2 and agents:
         gen_map = {}
         for a in agents:
             if a.last_vector is not None:
