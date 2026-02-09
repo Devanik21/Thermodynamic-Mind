@@ -959,6 +959,55 @@ tab_macro, tab_micro, tab_hive, tab_culture, tab_nobel, tab_omega, tab_meta = st
     "🔭 OBSERVATION DECK", "🧬 QUANTUM SPECTROGRAM", "🐝 HIVE STRUCTURES", "🏺 Culture", "🏆 Nobel Committee", "Ω OMEGA TELEMETRY", "🧠 METACOGNITION"
 ])
 
+# === UNIVERSAL VIEWING MODE BANNER (ALL TABS) ===
+if st.session_state.get('viewing_loaded_dna', False):
+    loaded = st.session_state.loaded_dna
+    metadata = loaded.get('metadata', {})
+    
+    st.success(f"📊 **VIEWING MODE ACTIVE** | Preserved Results from: `{metadata.get('timestamp', 'Unknown')}` | Tick: {metadata.get('world_tick', 'N/A')} | Population: {metadata.get('population', 'N/A')}")
+    
+    # Show all preserved data in expandable sections
+    with st.expander("📦 VIEW ALL PRESERVED DATA", expanded=False):
+        tab_data, tab_omega_data, tab_meta_data, tab_grid = st.tabs(["📊 Tabs 1-5", "Ω Omega Telemetry", "🧠 Metacognition", "👥 Agent Grid"])
+        
+        with tab_data:
+            if loaded.get('observation_deck'):
+                st.json(loaded['observation_deck'], expanded=False)
+            if loaded.get('quantum_spectrogram'):
+                st.json(loaded['quantum_spectrogram'], expanded=False)
+            if loaded.get('hive_structures'):
+                st.json(loaded['hive_structures'], expanded=False)
+            if loaded.get('culture'):
+                st.json(loaded['culture'], expanded=False)
+            if loaded.get('nobel_committee'):
+                st.json(loaded['nobel_committee'], expanded=False)
+        
+        with tab_omega_data:
+            omega = loaded.get('omega_telemetry', {})
+            if omega:
+                st.markdown("### Ω Omega Telemetry - 86+ Metrics")
+                # Display as formatted table
+                metrics_df = pd.DataFrame([
+                    {"Metric": k, "Value": v} for k, v in omega.items()
+                ])
+                st.dataframe(metrics_df, use_container_width=True, height=600)
+        
+        with tab_meta_data:
+            meta = loaded.get('metacognition', {})
+            if meta:
+                st.markdown("### 🧠 Metacognition - Levels 5-10 (96 Metrics)")
+                for level in ['level_5', 'level_6', 'level_7', 'level_8', 'level_9', 'level_10']:
+                    if meta.get(level):
+                        with st.expander(f"📊 {level.replace('_', ' ').upper()}", expanded=False):
+                            st.json(meta[level])
+        
+        with tab_grid:
+            grid = loaded.get('agent_grid', [])
+            if grid:
+                st.markdown(f"### 👥 Agent Grid - Top {len(grid)} Agents (25 Columns)")
+                st.dataframe(pd.DataFrame(grid), use_container_width=True, height=600)
+
+
 with tab_macro:
     # === VIEWING MODE: Display Loaded DNA ===
     if st.session_state.get('viewing_loaded_dna', False):
