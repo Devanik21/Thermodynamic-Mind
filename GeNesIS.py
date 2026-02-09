@@ -1450,15 +1450,17 @@ with tab_micro:
                     from sklearn.metrics import silhouette_score
                     # K-Means Clustering on Communication Vectors
                     X_comm = np.array(comm_vectors)
+                    if len(X_comm.shape) > 2:
+                        X_comm = X_comm.reshape(X_comm.shape[0], -1)
+                        
                     n_clusters = min(len(X_comm), 4) 
                     kmeans = KMeans(n_clusters=n_clusters, random_state=42).fit(X_comm)
                     sil = silhouette_score(X_comm, kmeans.labels_)
                     
                     # PCA for 2D Projection
                     pca = PCA(n_components=2)
-                    if len(X_comm.shape) > 2:
-                        X_comm = X_comm.reshape(X_comm.shape[0], -1)
                     X_pca = pca.fit_transform(X_comm)
+
 
                     
                     df_pca = pd.DataFrame(data=X_pca, columns=['PC1', 'PC2'])
