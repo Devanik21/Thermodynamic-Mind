@@ -638,6 +638,24 @@ with st.container():
             """
             import plotly.io as pio
             
+            # Helper function to convert numpy types to native Python types
+            def numpy_to_python(obj):
+                """Recursively convert numpy types to Python native types for JSON serialization"""
+                if isinstance(obj, np.integer):
+                    return int(obj)
+                elif isinstance(obj, np.floating):
+                    return float(obj)
+                elif isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                elif isinstance(obj, dict):
+                    return {k: numpy_to_python(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [numpy_to_python(item) for item in obj]
+                elif isinstance(obj, tuple):
+                    return tuple(numpy_to_python(item) for item in obj)
+                else:
+                    return obj
+            
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                 world = st.session_state.world
@@ -813,18 +831,18 @@ with st.container():
                 # ============================================================
                 # WRITE METRICS TO ZIP
                 # ============================================================
-                zf.writestr("metrics/observation_deck.json", json.dumps(observation_metrics, indent=2))
-                zf.writestr("metrics/quantum_spectrogram.json", json.dumps(quantum_metrics, indent=2))
-                zf.writestr("metrics/hive_structures.json", json.dumps(hive_metrics, indent=2))
-                zf.writestr("metrics/culture.json", json.dumps(culture_metrics, indent=2))
-                zf.writestr("metrics/nobel_committee.json", json.dumps(nobel_metrics, indent=2))
-                zf.writestr("metrics/omega_telemetry.json", json.dumps(omega_metrics, indent=2))
-                zf.writestr("metrics/metacognition_levels_5_10.json", json.dumps(metacog_metrics, indent=2))
+                zf.writestr("metrics/observation_deck.json", json.dumps(numpy_to_python(observation_metrics), indent=2))
+                zf.writestr("metrics/quantum_spectrogram.json", json.dumps(numpy_to_python(quantum_metrics), indent=2))
+                zf.writestr("metrics/hive_structures.json", json.dumps(numpy_to_python(hive_metrics), indent=2))
+                zf.writestr("metrics/culture.json", json.dumps(numpy_to_python(culture_metrics), indent=2))
+                zf.writestr("metrics/nobel_committee.json", json.dumps(numpy_to_python(nobel_metrics), indent=2))
+                zf.writestr("metrics/omega_telemetry.json", json.dumps(numpy_to_python(omega_metrics), indent=2))
+                zf.writestr("metrics/metacognition_levels_5_10.json", json.dumps(numpy_to_python(metacog_metrics), indent=2))
                 
                 # Legacy basic files for backward compatibility
-                zf.writestr("metrics/stats_history.json", json.dumps(stats, indent=2))
+                zf.writestr("metrics/stats_history.json", json.dumps(numpy_to_python(stats), indent=2))
                 zf.writestr("metrics/genes.json", json.dumps(genes, indent=2))
-                zf.writestr("metrics/events.json", json.dumps(events, indent=2))
+                zf.writestr("metrics/events.json", json.dumps(numpy_to_python(events), indent=2))
                 
                 # ============================================================
                 # GENERATE README.md
