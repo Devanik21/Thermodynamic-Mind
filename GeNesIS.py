@@ -1635,7 +1635,8 @@ with tab_culture:
                         all_vecs.append(v)
                         gen_labels.append(f"Gen {g}")
                 
-                if len(all_vecs) > 5:
+                if len(all_vecs) > 2:
+
                     X_c = np.array(all_vecs)
                     if len(X_c.shape) > 2:
                         X_c = X_c.reshape(X_c.shape[0], -1)
@@ -2097,6 +2098,68 @@ with tab_omega:
                 st.markdown(f"#### 👥 Agent Grid - Top {len(agent_grid)} Agents (Preserved Metrics)")
                 st.dataframe(pd.DataFrame(agent_grid), width='stretch', height=400)
 
+            # ♾️ INFINITE STIGMERGY GARDEN (PRESERVED)
+            st.markdown("---")
+            st.markdown("### ♾️ Infinite Stigmergy Garden (Preserved)")
+            
+            # Retrieve preserved meme grid from culture tab data
+            meme_grid_data = loaded.get('culture', {}).get('meme_grid', [])
+            
+            if meme_grid_data:
+                # Convert list back to numpy array
+                grid_array = np.array(meme_grid_data)
+                
+                # Handle flattened arrays (old save format)
+                if len(grid_array.shape) == 1 and len(grid_array) == 40*40*3:
+                     grid_array = grid_array.reshape(40, 40, 3)
+                
+                # Proceed only if we have valid 3D data
+                if len(grid_array.shape) == 3:
+                     garden_freq = st.slider("Garden Resonance Frequency (Preserved)", 0, 1000, 42)
+                     
+                     # Re-implement procedural map logic locally for viewing mode compatibility
+                     def generate_procedural_map_view(freq, offset):
+                        state = np.random.RandomState(freq + offset)
+                        matrix = np.eye(3) 
+                        mix = state.uniform(-1.0, 1.0, (3, 3)) * 0.8
+                        matrix = matrix + mix
+                        matrix = np.abs(matrix)
+                        matrix /= (matrix.sum(axis=1, keepdims=True) + 1e-8)
+                        
+                        # Use first 3 channels if more exist, or just use what we have
+                        channels = min(grid_array.shape[2], 3)
+                        input_grid = grid_array[:, :, :channels]
+                        
+                        # Pad if less than 3 channels (edge case)
+                        if channels < 3:
+                            padded = np.zeros((40, 40, 3))
+                            padded[:, :, :channels] = input_grid
+                            input_grid = padded
+                            
+                        transformed = np.dot(input_grid, matrix.T)
+                        transformed = np.clip(transformed * 1.2, 0, 1)
+                        rgb = (transformed * 255).astype(np.uint8)
+                        return rgb
+
+                     sg_c1, sg_c2 = st.columns(2)
+                     with sg_c1:
+                        rgb_v1 = generate_procedural_map_view(garden_freq, 101)
+                        st.plotly_chart(px.imshow(rgb_v1, title=f"🌈 Alpha ({garden_freq})"), width='stretch', key="view_sg1")
+                     with sg_c2:
+                        rgb_v2 = generate_procedural_map_view(garden_freq, 202)
+                        st.plotly_chart(px.imshow(rgb_v2, title=f"🌈 Beta ({garden_freq+1})"), width='stretch', key="view_sg2")
+                     
+                     sg_c3, sg_c4 = st.columns(2)
+                     with sg_c3:
+                        rgb_v3 = generate_procedural_map_view(garden_freq, 303)
+                        st.plotly_chart(px.imshow(rgb_v3, title=f"🌈 Gamma ({garden_freq+2})"), width='stretch', key="view_sg3")
+                     with sg_c4:
+                        rgb_v4 = generate_procedural_map_view(garden_freq, 404)
+                        st.plotly_chart(px.imshow(rgb_v4, title=f"🌈 Delta ({garden_freq+3})"), width='stretch', key="view_sg4")
+
+            else:
+                st.warning("No Stigmergy Grid data found in this DNA.")
+
     
     # === LIVE MODE: Normal display ===
     elif st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
@@ -2332,9 +2395,24 @@ with tab_meta:
                     
                     # Add a symbolic "Cognitive Scan" chart if data available
                     if st.session_state.get("show_charts", False):
-                        vals = [v for k, v in level_data.items() if isinstance(v, (int, float))]
-                        if len(vals) > 5:
-                            st.line_chart(vals[:24], height=120)
+                        
+                        # Extract list-based metrics for plotting (e.g. error history, learning rates)
+                        # These are saved as lists in the JSON
+                        plot_candidates = {}
+                        for k, v in level_data.items():
+                            if isinstance(v, list) and len(v) > 2 and isinstance(v[0], (int, float)):
+                                plot_candidates[k] = v
+                        
+                        if plot_candidates:
+                             # Create a combined chart or small multiples
+                             cols_p = st.columns(3)
+                             idx = 0
+                             for name, data in plot_candidates.items():
+                                 with cols_p[idx % 3]:
+                                     st.caption(f"📈 {name.replace('_', ' ').title()}")
+                                     st.line_chart(data, height=120)
+                                     idx += 1
+
         
         st.success("✨ ALL 110-FEATURE METRICS ACCESSIBLE VIA DNA ZIP ✨")
 
