@@ -784,11 +784,17 @@ class GenesisAgent:
              grad_norms = []
              for p in self.brain.parameters():
                  if p.grad is not None:
-                     grad_norms.append(p.grad.norm().item())
+                     val = p.grad.norm().item()
+                     if np.isfinite(val):
+                         grad_norms.append(val)
              
              self.last_grad_norm = np.mean(grad_norms) if grad_norms else 0.0
-             # Simulated Backprop Depth based on graph complexity/total loss
-             self.backprop_depth = min(12, int(torch.log1p(total_loss).item() * 4))
+             # 1.10 AUDIT FIX: Safe conversion of loss to backprop depth
+             loss_val = total_loss.item()
+             if np.isfinite(loss_val) and loss_val > 0:
+                 self.backprop_depth = min(12, int(np.log1p(loss_val) * 4))
+             else:
+                 self.backprop_depth = 0
              
              # 5.1 Meta-Learning: Adjust meta_lr based on gradient norm
              self.meta_lr = 0.005 * (1.0 + 0.1 * np.tanh(self.last_grad_norm))
@@ -804,7 +810,11 @@ class GenesisAgent:
         # 8.2 Self-Modeling Accuracy Update
         with torch.no_grad():
              # Proxy: Accuracy is high if predictor_loss is low
-             self.self_model_accuracy = 1.0 / (1.0 + predictor_loss.item())
+             p_loss_val = predictor_loss.item()
+             if np.isfinite(p_loss_val):
+                 self.self_model_accuracy = 1.0 / (1.0 + max(0, p_loss_val))
+             else:
+                 self.self_model_accuracy = 0.0
 
         # 4.9 Collective Memory: Natural Forgetting (Weight Decay)
         with torch.no_grad():
