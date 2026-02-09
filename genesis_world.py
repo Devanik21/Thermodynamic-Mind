@@ -1458,23 +1458,16 @@ class GenesisWorld:
             avg_now = np.mean(behaviors_now, axis=0)
             avg_lag = np.mean(behaviors_lag, axis=0)
             
-            # Guard against NaNs in averages
-            if not np.all(np.isfinite(avg_now)) or not np.all(np.isfinite(avg_lag)):
-                return False
-                
             if len(avg_now) != len(avg_lag):
                 return False
             
             if np.std(avg_now) > 1e-9 and np.std(avg_lag) > 1e-9:
                 correlation = np.corrcoef(avg_now, avg_lag)[0, 1]
-                # Final NaN guard for correlation
-                if not np.isfinite(correlation):
-                    correlation = 0.0
             else:
                 correlation = 0.0
             self.tradition_persistence_verified = correlation > 0.7
             return self.tradition_persistence_verified
-        except Exception:
+        except:
             return False
     
     def measure_cultural_drift(self):
