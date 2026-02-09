@@ -341,7 +341,7 @@ def update_simulation():
         
         # 8.5 Aesthetic Action
         if hasattr(agent, 'take_aesthetic_action'):
-            agent.take_aesthetic_action(vector)
+            agent.take_aesthetic_action(reality_vector_tensor)
 
         # ❤️ PHASE 14/17: "EUSOCIAL" REPRODUCTION (4.10) - ELASTIC DIFFICULTY
         n_pop = len(world.agents)
