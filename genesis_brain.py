@@ -123,7 +123,8 @@ class GenesisBrain(nn.Module):
         concepts = torch.relu(self.abstraction_encoder(last_hidden))
         reconstructed_hidden = self.abstraction_decoder(concepts)
         # Residual connection to preserve gradients but encourage concept usage
-        mixed_hidden = last_hidden + reconstructed_hidden * 0.1
+        # SURGERY: Increased from 0.1 to 0.3 to force "body-mind" alignment
+        mixed_hidden = last_hidden + reconstructed_hidden * 0.3
         
         # 5.2 Apply Pruning Mask
         effective_weights = self.actor.weight * self.actor_mask()
@@ -775,7 +776,8 @@ class GenesisAgent:
             actor_loss = -(advantage * recalc_vector.sum()) + 0.01 * recalc_vector.pow(2).sum()
             
             # 5.3 Consolidated Loss: A2C + Active Inference Predictor + Sparsity
-            total_loss = actor_loss + critic_loss + predictor_loss + sparsity_loss
+            # SURGERY: Doubled predictor_loss weight to 2.0 to fix Grounding Disconnection
+            total_loss = actor_loss + critic_loss + (predictor_loss * 2.0) + sparsity_loss
         else:
             total_loss = predictor_loss + sparsity_loss
         
