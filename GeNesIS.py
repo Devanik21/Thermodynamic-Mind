@@ -1344,8 +1344,8 @@ with tab_micro:
     
     if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
         col_vis, col_log = st.columns([2, 1])
-    with col_vis:
-        st.markdown("### � Quantum Spectrogram (Linguistic Field)")
+        with col_vis:
+            st.markdown("### 🔮 Quantum Spectrogram (Linguistic Field)")
         
         # Level 2.1: Signal Differentiation Analysis
         if len(st.session_state.world.agents) > 10:
