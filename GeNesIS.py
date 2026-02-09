@@ -1639,17 +1639,20 @@ with tab_culture:
                         all_vecs.append(v)
                         gen_labels.append(f"Gen {g}")
                 
-                if len(all_vecs) > 0:
-
-
+                if len(all_vecs) >= 2:
                     X_c = np.array(all_vecs)
                     if len(X_c.shape) > 2:
                         X_c = X_c.reshape(X_c.shape[0], -1)
-                    pca_c = PCA(n_components=2)
-                    X_c_2d = pca_c.fit_transform(X_c)
-
                     
-                    df_c = pd.DataFrame(X_c_2d, columns=['PC1', 'PC2'])
+                    # Defensively handle low sample/feature counts
+                    n_comp = min(2, X_c.shape[0], X_c.shape[1])
+                    if n_comp >= 1:
+                        pca_c = PCA(n_components=n_comp)
+                        X_c_2d = pca_c.fit_transform(X_c)
+                        
+                        df_c = pd.DataFrame(X_c_2d, columns=['PC1', 'PC2'] if n_comp == 2 else ['PC1'])
+                        if n_comp == 1: df_c['PC2'] = 0 # Dummy axis for scatter
+
                     df_c['Generation'] = gen_labels
                     
                     fig_c = px.scatter(df_c, x='PC1', y='PC2', color='Generation', title="Holographic Speciation Map (3.10)", opacity=0.6)
