@@ -1296,7 +1296,51 @@ with tab_hive:
         st.info("Waiting for population...")
 
 with tab_micro:
-    col_vis, col_log = st.columns([2, 1])
+    # === VIEWING MODE: Display Loaded DNA ===
+    if st.session_state.get('viewing_loaded_dna', False):
+        loaded = st.session_state.loaded_dna
+        st.info(f"📊 **VIEWING MODE:** Showing preserved results from `{loaded.get('metadata', {}).get('timestamp', 'Unknown')}`")
+        
+        quantum = loaded.get('quantum_spectrogram', {})
+        st.markdown(f"### 🧬 Quantum Spectrogram - Preserved Neural State")
+        
+        # Signal Silhouette Score
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Signal Silhouette Score (2.1)", f"{quantum.get('signal_silhouette', 0):.3f}")
+        col2.metric("Communication Vectors", len(quantum.get('comm_vectors', [])))
+        col3.metric("Thought Vectors", len(quantum.get('thought_vectors', [])))
+        
+        # Show thought vectors as heatmap if charts enabled
+        if st.session_state.get("show_charts", False):
+            thought_vecs = quantum.get('thought_vectors', [])
+            if thought_vecs:
+                st.markdown("#### 💭 Thought Spectrum (Preserved)")
+                # Convert to numpy array for heatmap
+                thought_array = np.array(thought_vecs[:30])  # First 30 agents
+                fig = px.imshow(thought_array, 
+                               labels=dict(x="Feature Dim", y="Agent", color="Activation"),
+                               title="Real-Time Thought Spectrum",
+                               color_continuous_scale='RdBu_r')
+                fig.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Communication vectors
+            comm_vecs = quantum.get('comm_vectors', [])
+            if comm_vecs:
+                st.markdown("#### 📡 Communication Signal Clusters")
+                st.info(f"Preserved {len(comm_vecs)} communication vectors")
+        
+        # Hidden states
+        hidden = quantum.get('hidden_states', [])
+        if hidden:
+            st.markdown(f"#### 🧠 GRU Hidden States: {len(hidden)} preserved")
+            
+    # === LIVE MODE: Normal display ===
+    elif st.session_state.world.agents:
+        pass
+    
+    if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
+        col_vis, col_log = st.columns([2, 1])
     with col_vis:
         st.markdown("### � Quantum Spectrogram (Linguistic Field)")
         
@@ -1429,8 +1473,63 @@ with tab_micro:
         st.warning("No Neural Networks detected.")
 
 with tab_culture:
-    st.markdown("## 🏺 The Cultural Replicator (Level 3)")
-    col_meme, col_dyn = st.columns([1, 1])
+    # === VIEWING MODE: Display Loaded DNA ===
+    if st.session_state.get('viewing_loaded_dna', False):
+        loaded = st.session_state.loaded_dna
+        st.info(f"📊 **VIEWING MODE:** Showing preserved results from `{loaded.get('metadata', {}).get('timestamp', 'Unknown')}`")
+        
+        culture = loaded.get('culture', {})
+        st.markdown(f"### 🏺 Cultural Data - Preserved State")
+        
+        # Key metrics
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Global Patents", len(culture.get('global_registry', [])))
+        col2.metric("Tradition Data Points", len(culture.get('tradition_history', [])))
+        col3.metric("Event Log Entries", len(culture.get('event_log', [])))
+        
+        # Meme Grid visualization
+        meme_grid = culture.get('meme_grid')
+        if meme_grid and st.session_state.get("show_charts", False):
+            st.markdown("#### 🗺️ Stigmergy Map (Preserved Meme Grid)")
+            meme_array = np.array(meme_grid)
+            if len(meme_array.shape) == 3 and meme_array.shape[2] >= 3:
+                rgb_grid = (meme_array[:, :, :3] * 255).astype(np.uint8)
+                fig_meme = px.imshow(rgb_grid, title="Global Knowledge (Meme Grid)")
+                fig_meme.update_layout(height=400, margin=dict(l=0,r=0,t=30,b=0))
+                st.plotly_chart(fig_meme, use_container_width=True)
+        
+        # Culture history
+        culture_hist = culture.get('culture_history', {})
+        if culture_hist:
+            st.markdown(f"#### 📈 Culture History: {len(culture_hist)} generations")
+            
+        # Tradition history chart
+        trad_hist = culture.get('tradition_history', [])
+        if trad_hist and st.session_state.get("show_charts", False):
+            st.markdown("#### 📜 Tradition Index Over Time")
+            fig_trad = go.Figure()
+            fig_trad.add_trace(go.Scatter(y=trad_hist, mode='lines+markers', name="Tradition Index"))
+            fig_trad.update_layout(title="Tradition Stability", height=250, margin=dict(l=0,r=0,t=30,b=0))
+            st.plotly_chart(fig_trad, use_container_width=True)
+        
+        # Patents/Registry
+        registry = culture.get('global_registry', [])
+        if registry:
+            st.markdown(f"#### 🏆 Patent Registry: {len(registry)} inventions")
+            st.dataframe(pd.DataFrame(registry), use_container_width=True, height=300)
+        
+        # Event log
+        events = culture.get('event_log', [])
+        if events:
+            st.markdown(f"#### 📰 Event Stream (Last 50)")
+            st.dataframe(pd.DataFrame(events), use_container_width=True, height=250)
+    
+    # === LIVE MODE: Normal display ===
+    elif st.session_state.world.agents:
+        st.markdown("## 🏺 The Cultural Replicator (Level 3)")
+    
+    if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
+        col_meme, col_dyn = st.columns([1, 1])
     
     with col_meme:
         st.markdown("### 🗺️ Stigmergy Map (Meme Grid)")
@@ -1675,7 +1774,63 @@ with tab_culture:
         st.info("Enable 'Show Live Charts' to enter the Infinite Garden.")
 
 with tab_omega:
-    col_civ, col_agent = st.columns([1, 2])
+    # === VIEWING MODE: Display Loaded DNA ===
+    if st.session_state.get('viewing_loaded_dna', False):
+        loaded = st.session_state.loaded_dna
+        st.info(f"📊 **VIEWING MODE:** Showing preserved results from `{loaded.get('metadata', {}).get('timestamp', 'Unknown')}`")
+        
+        omega = loaded.get('omega_telemetry', {})
+        st.markdown(f"### Ω OMEGA TELEMETRY - Preserved Metrics ({len(omega)} total)")
+        
+        # Key civilization metrics at top
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Population", omega.get('current_population', 0))
+        col2.metric("Max Generation", omega.get('max_generation', 0))
+        col3.metric("Total Biomass", f"{omega.get('total_biomass', 0):.0f}")
+        col4.metric("World Tick", omega.get('world_time_step', 0))
+        
+        # Omega achievement status
+        st.markdown("#### 🏆 Achievement Status")
+        ach_col1, ach_col2, ach_col3 = st.columns(3)
+        ach_col1.metric("Ω Omega Achieved", "✅ YES" if omega.get('omega_achieved') else "❌ NO")
+        ach_col2.metric("Tradition Persist", "✅ YES" if omega.get('tradition_persist') else "❌ NO")
+        ach_col3.metric("Cultural Ratchet", "✅ YES" if omega.get('cultural_ratchet') else "❌ NO")
+        
+        # All metrics in searchable table
+        st.markdown("#### 📊 Complete Metrics Grid (86+ Metrics)")
+        metrics_list = []
+        for key, value in omega.items():
+            # Format value nicely
+            if isinstance(value, bool):
+                display_val = "✅ YES" if value else "❌ NO"
+            elif isinstance(value, (int, float)):
+                if isinstance(value, float):
+                    display_val = f"{value:.4f}"
+                else:
+                    display_val = str(value)
+            else:
+                display_val = str(value)
+            
+            metrics_list.append({
+                "Metric": key.replace('_', ' ').title(),
+                "Value": display_val
+            })
+        
+        metrics_df = pd.DataFrame(metrics_list)
+        st.dataframe(metrics_df, use_container_width=True, height=600)
+        
+        # Agent Grid
+        agent_grid = loaded.get('agent_grid', [])
+        if agent_grid:
+            st.markdown(f"#### 👥 Agent Grid - Top {len(agent_grid)} Agents (25 Columns)")
+            st.dataframe(pd.DataFrame(agent_grid), use_container_width=True, height=400)
+    
+    # === LIVE MODE: Normal display ===
+    elif st.session_state.world.agents:
+        pass
+    
+    if st.session_state.world.agents and not st.session_state.get('viewing_loaded_dna', False):
+        col_civ, col_agent = st.columns([1, 2])
     
     with col_civ:
         st.markdown("### 🏛️ Civilization Status")
@@ -1897,7 +2052,60 @@ with tab_nobel:
 
 
 with tab_meta:
-    st.markdown("# 🧠 Metacognition & Verification Center")
+    # === VIEWING MODE: Display Loaded DNA ===
+    if st.session_state.get('viewing_loaded_dna', False):
+        loaded = st.session_state.loaded_dna
+        st.info(f"📊 **VIEWING MODE:** Showing preserved results from `{loaded.get('metadata', {}).get('timestamp', 'Unknown')}`")
+        
+        meta = loaded.get('metacognition', {})
+        st.markdown(f"### 🧠 METACOGNITION - Preserved State (Levels 5-10)")
+        
+        # Show all 6 levels
+        for level_num in [5, 6, 7, 8, 9, 10]:
+            level_key = f'level_{level_num}'
+            level_data = meta.get(level_key, {})
+            
+            if level_data:
+                level_names = {
+                    5: "Meta-Learning & Architecture",
+                    6: "Geo-Engineering",
+                    7: "Collective Manifold",
+                    8: "Abstract Representation",
+                    9: "Physics Discovery",
+                    10: "The Omega Point"
+                }
+                
+                with st.expander(f"🧠 LEVEL {level_num}: {level_names[level_num]} ({len(level_data)} metrics)", expanded=(level_num == 5)):
+                    # Display all metrics for this level
+                    metrics_cols = st.columns(4)
+                    metric_items = list(level_data.items())
+                    
+                    for idx, (key, value) in enumerate(metric_items[:16]):  # First 16 metrics
+                        with metrics_cols[idx % 4]:
+                            # Format value
+                            if isinstance(value, (int, float)):
+                                if isinstance(value, float):
+                                    display_val = f"{value:.4f}"
+                                else:
+                                    display_val = str(value)
+                            elif isinstance(value, bool):
+                                display_val = "✅" if value else "❌"
+                            elif isinstance(value, list):
+                                display_val = f"[{len(value)} items]"
+                            else:
+                                display_val = str(value)[:20]
+                            
+                            st.metric(key.replace('_', ' ').title()[:20], display_val)
+                    
+                    # Show full data as JSON
+                    if st.checkbox(f"Show Full Level {level_num} Data", key=f"show_l{level_num}"):
+                        st.json(level_data)
+        
+        st.success("✨ ALL METACOGNITION DATA PRESERVED ✨")
+    
+    # === LIVE MODE: Normal display ===
+    elif st.session_state.world.agents:
+        st.markdown("# 🧠 Metacognition & Verification Center")
     
     # --- 🏆 PROJECT OMEGA 110-FEATURE MATRIX ---
     # Enhanced Matrix covering ALL 110 features
