@@ -871,7 +871,7 @@ def collect_full_simulation_dna():
             "level_8": st.session_state.get('l8_cache', {}),
             "level_9": st.session_state.get('l9_cache', {}),
             "level_10": st.session_state.get('l10_cache', {})
-        }
+        },
 
         
         # ==================== AGENT GRID (Top 50) ====================
