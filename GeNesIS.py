@@ -3406,28 +3406,28 @@ with tab_meta:
             
             # 📊 TEXT PARAMETERS (REAL)
             m9_1, m9_2, m9_3, m9_4 = st.columns(4)
-            m9_1.metric("9.1 Patterns Found", f"{c9['found_patterns']}", help="Discovered Physical Laws (Real)")
-            m9_2.metric("9.2 Oracle Error", f"{c9['avg_residual']:.4f}", help="Avg Prediction Residual (Real)")
-            m9_3.metric("9.3 Exploits", f"{c9['exploits']}", help="Potential Physics Violations (Energy Outliers)")
-            m9_4.metric("9.4 Causal Depth", f"{c9['max_depth']}", help="Max Causal Chain Length (Real)")
+            m9_1.metric("9.1 Patterns Found", f"{c9.get('found_patterns', 0)}", help="Discovered Physical Laws (Real)")
+            m9_2.metric("9.2 Oracle Error", f"{c9.get('avg_residual', 0):.4f}", help="Avg Prediction Residual (Real)")
+            m9_3.metric("9.3 Exploits", f"{c9.get('exploits', 0)}", help="Potential Physics Violations (Energy Outliers)")
+            m9_4.metric("9.4 Causal Depth", f"{c9.get('max_depth', 0)}", help="Max Causal Chain Length (Real)")
 
             # Additional 12 Metrics (Row 1) - REAL
             am9_1, am9_2, am9_3, am9_4, am9_5, am9_6 = st.columns(6)
-            am9_1.metric("Law Consist.", f"{c9['law_consistency']:.2f}")
-            am9_2.metric("Pred Horizon", f"{c9['pred_horizon']}")
-            am9_3.metric("Entropy Delta", f"{c9['entropy_delta']}") # Updated
-            am9_4.metric("Symm Break", f"{c9['symm_break']}") # Updated
-            am9_5.metric("Gauge Inv.", f"{c9['gauge_inv']}") # Updated
-            am9_6.metric("Renorm Group", f"{c9['renorm_group']}") # Updated
+            am9_1.metric("Law Consist.", f"{c9.get('law_consistency', 0):.2f}")
+            am9_2.metric("Pred Horizon", f"{c9.get('pred_horizon', 0)}")
+            am9_3.metric("Entropy Delta", f"{c9.get('entropy_delta', '0')}") 
+            am9_4.metric("Symm Break", f"{c9.get('symm_break', '0')}") 
+            am9_5.metric("Gauge Inv.", f"{c9.get('gauge_inv', '0')}") 
+            am9_6.metric("Renorm Group", f"{c9.get('renorm_group', '0')}")
 
             # Additional 12 Metrics (Row 2) - REAL
             am9_7, am9_8, am9_9, am9_10, am9_11, am9_12 = st.columns(6)
-            am9_7.metric("Planck Scale", f"{c9['planck_scale']}") # Updated
-            am9_8.metric("Vac. Decay", f"{c9['vac_decay']}") # Updated
-            am9_9.metric("Dark Energy", f"{c9['dark_energy']}") # Updated
-            am9_10.metric("Tachyon Flux", f"{c9['tachyon_flux']}") # Updated
-            am9_11.metric("Boltzmann", f"{c9['boltzmann']}") # Updated
-            am9_12.metric("Simulacra", f"{c9['simulacra']}") # Updated
+            am9_7.metric("Planck Scale", f"{c9.get('planck_scale', '0')}") 
+            am9_8.metric("Vac. Decay", f"{c9.get('vac_decay', '0')}") 
+            am9_9.metric("Dark Energy", f"{c9.get('dark_energy', '0')}") 
+            am9_10.metric("Tachyon Flux", f"{c9.get('tachyon_flux', '0')}") 
+            am9_11.metric("Boltzmann", f"{c9.get('boltzmann', '0')}") 
+            am9_12.metric("Simulacra", f"{c9.get('simulacra', '0')}") 
 
             # 📈 PLOTS (REAL)
             if st.session_state.get('show_charts', False):
@@ -3435,7 +3435,7 @@ with tab_meta:
                 
                 with c9_1:
                     # Fig 9.1: Oracle Error Residuals (REAL)
-                    if c9['residuals']:
+                    if c9.get('residuals'):
                         fig_9_1 = px.histogram(
                             x=c9['residuals'], nbins=30,
                             title="9.1 Oracle Error Residuals (Real)",
@@ -3449,14 +3449,14 @@ with tab_meta:
 
                 with c9_2:
                     # Fig 9.2: Pattern Discovery Timeline (Real List)
-                    if c9['discovery_log']:
+                    if c9.get('discovery_log'):
                          df_9_2 = pd.DataFrame(c9['discovery_log'])
-                         # Assuming log has 'Time', 'Pattern'
                          fig_9_2 = px.scatter(
                             df_9_2, x='Time', y='Pattern',
                             title="9.2 Pattern Discovery Timeline (Real)",
                             template='plotly_dark'
                         )
+                         fig_9_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                          st.plotly_chart(fig_9_2, width='stretch', key="fig_9_2")
                     else:
                          st.info("No patterns discovered yet.")
@@ -3465,7 +3465,7 @@ with tab_meta:
                 
                 with c9_3:
                     # Fig 9.3: Reality Hacking Glitch Map (Real High Error Locations)
-                    if c9['glitch_x']:
+                    if c9.get('glitch_x'):
                         fig_9_3 = px.density_contour(
                             x=c9['glitch_x'], y=c9['glitch_y'],
                             title="9.3 Reality Hacking Glitch Map (High Error Zones)",
@@ -3478,8 +3478,8 @@ with tab_meta:
                         st.success("No Reality Glitches (High Error) Detected.")
 
                 with c9_4:
-                            # Fig 9.4: Causal Calculus (REAL)
-                    if c9['causal_sample']:
+                             # Fig 9.4: Causal Calculus (REAL)
+                    if c9.get('causal_sample'):
                              data_9_4 = []
                              for act, res in c9['causal_sample'].items():
                                  data_9_4.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
