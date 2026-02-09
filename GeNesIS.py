@@ -649,6 +649,34 @@ def collect_full_simulation_dna():
         if hasattr(val, 'tolist'): return val.tolist()
         return list(val)
 
+    # Helper: Safe silhouette calculation for DNA preservation
+    def calculate_silhouette_safe(agents):
+        """Calculates silhouette score on-demand for DNA preservation."""
+        try:
+            from sklearn.cluster import KMeans
+            from sklearn.metrics import silhouette_score
+            
+            vecs = []
+            for a in agents:
+                if hasattr(a, 'last_comm') and a.last_comm is not None:
+                    v = a.last_comm.detach().cpu().numpy().flatten()
+                    if v.sum() > 0.01:
+                        vecs.append(v)
+            
+            if len(vecs) > 5:
+                X = np.array(vecs)
+                if len(X.shape) > 2: X = X.reshape(X.shape[0], -1)
+                
+                n_clusters = min(len(X), 4)
+                kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10).fit(X)
+                if len(set(kmeans.labels_)) > 1:
+                    return float(silhouette_score(X, kmeans.labels_))
+        except Exception as e:
+            pass
+        return 0.0
+
+
+
     
     # Helper: Round floats to save space AND handle ALL numpy/torch types recursively
     def round_dict(d, decimals=4):
@@ -709,8 +737,9 @@ def collect_full_simulation_dna():
             "comm_vectors": [safe_list(a.last_comm.flatten()) for a in all_agents if hasattr(a, 'last_comm') and a.last_comm is not None],
             "thought_vectors": [safe_list(a.last_vector.flatten()) for a in all_agents[:50] if a.last_vector is not None],
             "hidden_states": [safe_list(a.hidden_state.flatten()) for a in all_agents[:20] if a.hidden_state is not None],
-            "signal_silhouette": st.session_state.get('last_silhouette_score', 0.0)
+            "signal_silhouette": st.session_state.get('last_silhouette_score', 0.0) if st.session_state.get('last_silhouette_score', 0.0) > 0 else calculate_silhouette_safe(all_agents)
         },
+
 
 
 
@@ -879,6 +908,7 @@ def collect_full_simulation_dna():
         
         # ==================== GENE POOL (For Genetic Analysis) ====================
         "gene_pool": [
+
             {k: safe_list(v) for k, v in g.items()}
             for g in st.session_state.gene_pool[-50:]  # Last 50 genomes
         ]
@@ -1593,9 +1623,10 @@ with tab_culture:
         col_c_a, col_c_b = st.columns([1, 1])
         
         with col_c_a:
-
+            st.info("🗺️ View full Stigmergy Map in Tab 6 (Omega Telemetry)")
 
         with col_c_b:
+
             st.markdown("### 🏺 Cultural Speciation (3.10)")
             culture_hist = culture.get('culture_history', {})
             if culture_hist and st.session_state.get("show_charts", False):
