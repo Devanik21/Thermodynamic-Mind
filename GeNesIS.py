@@ -650,18 +650,33 @@ def collect_full_simulation_dna():
             return val.item()  # Convert to Python native type
         return val
     
-    # Helper: Round floats to save space AND handle numpy types
+    # Helper: Round floats to save space AND handle ALL numpy/torch types recursively
     def round_dict(d, decimals=4):
+        # Handle None first
+        if d is None:
+            return None
+        # Handle torch tensors
+        if torch.is_tensor(d):
+            return round_dict(d.detach().cpu().tolist(), decimals)
+        # Handle numpy arrays
+        if isinstance(d, np.ndarray):
+            return round_dict(d.tolist(), decimals)
+        # Handle dictionaries recursively
         if isinstance(d, dict):
             return {k: round_dict(v, decimals) for k, v in d.items()}
+        # Handle lists recursively
         elif isinstance(d, list):
             return [round_dict(v, decimals) for v in d]
-        elif isinstance(d, (float, np.floating)):  # Handle both Python float and numpy float
+        # Handle numpy/python floats
+        elif isinstance(d, (float, np.floating)):
             return round(float(d), decimals)
-        elif isinstance(d, (int, np.integer)):  # Handle numpy integers
+        # Handle numpy/python integers
+        elif isinstance(d, (int, np.integer)):
             return int(d)
-        elif isinstance(d, (bool, np.bool_)):  # Handle numpy booleans
+        # Handle numpy/python booleans
+        elif isinstance(d, (bool, np.bool_)):
             return bool(d)
+        # Handle strings and other JSON-safe types
         return d
     
     dna = {
