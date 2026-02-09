@@ -472,10 +472,15 @@ class GenesisAgent:
         """1.3 Landauer Metric: Shannon entropy of the brain's weight distribution."""
         with torch.no_grad():
             all_weights = torch.cat([p.view(-1) for p in self.brain.parameters()])
+            # Guard against NaNs or Infs in weights
+            if not torch.isfinite(all_weights).all():
+                return 0.0
+            
             hist = torch.histc(all_weights, bins=20, min=-2, max=2)
             prob = hist / (hist.sum() + 1e-8)
             entropy = -torch.sum(prob * torch.log2(prob + 1e-8))
-            return entropy.item()
+            val = entropy.item()
+            return val if np.isfinite(val) else 0.0
 
     def generate_zahavi_proof(self, vector, difficulty=1):
         """
@@ -783,15 +788,10 @@ class GenesisAgent:
         
         # Backprop (Online Learning)
         self.optimizer.zero_grad()
-        # Retain graph only if we are doing meta-learning that requires second derivatives
-        # But here we don't need it. However, the error is likely due to the PREVIOUS step's
-        # in-place modification or the 'last_vector' being modified.
-        
-        # FIX: Ensure we don't modify the graph in place before backward
-        # The error "modified by an inplace operation" typically refers to the weights themselves
-        # or the hidden state.
-        
         total_loss.backward()
+        
+        # 🔧 AUDIT FIX: Gradient Clipping to prevent IQ/Gradient Explosion
+        torch.nn.utils.clip_grad_norm_(self.brain.parameters(), max_norm=1.0)
         
         # --- 5.7 COGNITIVE COMPRESSION (Meta-Gradient) ---
         # 1.10 AUDIT FIX: Track Gradient Norm & Backprop Depth for Dashboard
