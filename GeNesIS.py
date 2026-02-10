@@ -964,6 +964,10 @@ def collect_full_simulation_dna():
             _l10['self_accs'] = [round(getattr(a, 'self_model_accuracy', 0.0), 4) for a in all_agents]
         if 'struct_count_10' not in _l10:
             _l10['struct_count_10'] = len(world.structures)
+        # Save genealogy data for perfect Plot 10.4 sync
+        if 'agent_ids' not in _l10:
+            _l10['agent_ids'] = [str(a.id) for a in all_agents]
+            _l10['parent_ids'] = [str(getattr(a, 'parent_id', 'World')) for a in all_agents]
     except Exception:
         pass
     
@@ -2452,6 +2456,28 @@ with tab_meta:
         _viewing_dna = st.session_state.get('viewing_loaded_dna', False)
         
         # ============================================================
+        # 📦 LOAD ALL CACHES FROM DNA (Perfect Sync)
+        # ============================================================
+        if _viewing_dna and st.session_state.get('loaded_dna'):
+            try:
+                _meta = st.session_state.loaded_dna.get('metacognition', {})
+                
+                # Load all level caches from DNA
+                if 'l5_cache' not in st.session_state:
+                    st.session_state.l5_cache = _meta.get('level_5', {})
+                if 'l6_cache' not in st.session_state:
+                    st.session_state.l6_cache = _meta.get('level_6', {})
+                if 'l7_cache' not in st.session_state:
+                    st.session_state.l7_cache = _meta.get('level_7', {})
+                if 'l8_cache' not in st.session_state:
+                    st.session_state.l8_cache = _meta.get('level_8', {})
+                if 'l9_cache' not in st.session_state:
+                    st.session_state.l9_cache = _meta.get('level_9', {})
+                if 'l10_cache' not in st.session_state:
+                    st.session_state.l10_cache = _meta.get('level_10', {})
+            except Exception as e:
+                pass  # Silently fail if DNA structure is unexpected
+        
         # 🧠 LEVEL 5: META-LEARNING DASHBOARD
         # ============================================================
         with st.expander("🧠 Level 5: Meta-Learning & Architecture", expanded=True):
@@ -3611,8 +3637,8 @@ with tab_meta:
                 with c10_1:
                     # Fig 10.1: Simulation Recursion Stack (REAL)
                     # Simple sunburst showing World -> Agents -> Brains
-                    _n_agents = len(all_agents) if all_agents else c10.get('scratch_len', 0)
-                    _n_structs = len(world.structures) if all_agents else c10.get('struct_count_10', 0)
+                    _n_agents = len(all_agents) if (all_agents and not _viewing_dna) else c10.get('scratch_len', 0)
+                    _n_structs = len(world.structures) if not _viewing_dna else c10.get('struct_count_10', 0)
                     data = dict(
                         character=["World", "Agents", "Structures", "Brains"],
                         parent=["", "World", "World", "Agents"],
@@ -3681,30 +3707,43 @@ with tab_meta:
     
                 with c10_4:
                     # Fig 10.4: Emergent Agent Genealogy (Real Tree)
-                    if c10['emergent_count'] > 0 and all_agents:
-                        # Build genealogy tree data
-                        names = [str(a.id) for a in all_agents]
-                        parents = [str(getattr(a, 'parent_id', 'World')) for a in all_agents]
-                        # Root nodes need empty parent in Plotly sunburst/treemap
-                        # We must ensure parents actually exist in 'names' or is 'World', otherwise set to "" (root)
+                    _agent_ids = []
+                    _parent_ids = []
+                    
+                    # Load from DNA first (perfect sync!)
+                    if _viewing_dna and st.session_state.get('loaded_dna'):
+                        try:
+                            _l10_gen = st.session_state.loaded_dna['metacognition']['level_10']
+                            _agent_ids = _l10_gen.get('agent_ids', [])
+                            _parent_ids = _l10_gen.get('parent_ids', [])
+                        except (KeyError, TypeError):
+                            pass
+                    
+                    # Fallback to live agents
+                    if not _agent_ids and all_agents:
+                        _agent_ids = [str(a.id) for a in all_agents]
+                        _parent_ids = [str(getattr(a, 'parent_id', 'World')) for a in all_agents]
+                    
+                    # Display tree if we have data
+                    if _agent_ids and c10.get('emergent_count', 0) > 0:
+                        # Adjust parents for Plotly treemap
                         adjusted_parents = []
-                        for p in parents:
+                        for p in _parent_ids:
                             if p == 'World': 
                                 adjusted_parents.append("")
-                            elif p in names:
+                            elif p in _agent_ids:
                                 adjusted_parents.append(p)
                             else:
-                                adjusted_parents.append("") # Lost parent
-
+                                adjusted_parents.append("")
+                        
                         fig_10_4 = px.treemap(
-                            names=names, parents=adjusted_parents,
+                            names=_agent_ids, parents=adjusted_parents,
                             title="10.4 Emergent Agent Genealogy (Real)",
                             template='plotly_dark'
                         )
                         fig_10_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                         st.plotly_chart(fig_10_4, width='stretch', key="fig_10_4")
                     else:
-                        # If no reproduction yet, show placeholder or empty state
                         st.info("No emergent generations yet (All Gen 0).")
                 st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
     else:
