@@ -917,6 +917,56 @@ def collect_full_simulation_dna():
         ]
     }
     
+    # --- Supplement metacognition with fresh plot data (ensures all keys exist) ---
+    try:
+        _l5 = dna['metacognition']['level_5']
+        if 'brain_weights' not in _l5:
+            try:
+                if all_agents and hasattr(all_agents[0].brain, 'actor'):
+                    _w = all_agents[0].brain.actor.weight
+                    _l5['brain_weights'] = (_w.detach().cpu().numpy() if torch.is_tensor(_w) else _w)[:20, :].tolist()
+            except Exception: pass
+        if 'concept_points' not in _l5 or not _l5.get('concept_points'):
+            _cps = []
+            for _a in all_agents[:50]:
+                try:
+                    _cv = getattr(_a, 'last_concepts', None)
+                    if _cv is not None:
+                        _cv_np = (_cv.detach().cpu().numpy() if torch.is_tensor(_cv) else np.array(_cv)).flatten()
+                        if len(_cv_np) >= 2: _cps.append(_cv_np[:2].tolist())
+                except Exception: pass
+            if _cps: _l5['concept_points'] = _cps
+        if 'ages_list' not in _l5 or not _l5.get('ages_list'):
+            _l5['ages_list'] = [a.age for a in all_agents]
+        
+        _l9 = dna['metacognition']['level_9']
+        if 'discovery_log' not in _l9 or not _l9.get('discovery_log'):
+            try:
+                if hasattr(world, 'discovery_log') and world.discovery_log:
+                    _l9['discovery_log'] = [dict(d) for d in world.discovery_log]
+            except Exception: pass
+        if 'causal_data' not in _l9 or not _l9.get('causal_data'):
+            try:
+                if all_agents and hasattr(all_agents[0], 'causal_bayesian_network') and all_agents[0].causal_bayesian_network:
+                    _cd = []
+                    for _act, _res in all_agents[0].causal_bayesian_network.items():
+                        _cd.append({"Action": f"Act_{_act}", "Outcome": "Positive", "Count": _res.get("positive", 0)})
+                        _cd.append({"Action": f"Act_{_act}", "Outcome": "Negative", "Count": _res.get("negative", 0)})
+                    _l9['causal_data'] = _cd
+            except Exception: pass
+        
+        _l10 = dna['metacognition']['level_10']
+        if 'energies_10' not in _l10 or not _l10.get('energies_10'):
+            _l10['energies_10'] = [round(a.energy, 4) for a in all_agents]
+            _l10['ages_10'] = [a.age for a in all_agents]
+            _l10['confs_10'] = [round(getattr(a, 'confidence', 0.5), 4) for a in all_agents]
+        if 'self_accs' not in _l10 or not _l10.get('self_accs'):
+            _l10['self_accs'] = [round(getattr(a, 'self_model_accuracy', 0.0), 4) for a in all_agents]
+        if 'struct_count_10' not in _l10:
+            _l10['struct_count_10'] = len(world.structures)
+    except Exception:
+        pass
+    
     return round_dict(dna)
 
 
@@ -2474,6 +2524,26 @@ with tab_meta:
                 base_inf = 10 + (len(all_agents) * 0.05)
                 inference_time = f"{base_inf:.1f}ms (Est)"
                 
+                # --- Pre-compute plot data for DNA preservation ---
+                _brain_wt = None
+                try:
+                    if all_agents and hasattr(all_agents[0].brain, 'actor'):
+                        _w = all_agents[0].brain.actor.weight
+                        _brain_wt = (_w.detach().cpu().numpy() if torch.is_tensor(_w) else _w)[:20, :].tolist()
+                except Exception:
+                    pass
+                
+                _concept_pts = []
+                for _ca in all_agents[:50]:
+                    try:
+                        _cv = getattr(_ca, 'last_concepts', None)
+                        if _cv is not None:
+                            _cv_np = (_cv.detach().cpu().numpy() if torch.is_tensor(_cv) else np.array(_cv)).flatten()
+                            if len(_cv_np) >= 2:
+                                _concept_pts.append(_cv_np[:2].tolist())
+                    except Exception:
+                        pass
+                
                 st.session_state.l5_cache = {
                     'errors': errors,
                     'confidences': confidences,
@@ -2489,15 +2559,14 @@ with tab_meta:
                     'forget_rate': forget_rate,
                     'transfer_score': transfer_score,
                     'curiosity': curiosity,
-                    'curiosity': curiosity,
                     'grad_norm': grad_norm,
                     'weight_decay': weight_decay,
                     'loss_conv': loss_conv,
                     'model_complexity': model_complexity,
                     'inference_time': inference_time,
                     'mem_mean': np.mean(mem_sizes) if mem_sizes else 0,
-                    'brain_weights': (all_agents[0].brain.actor.weight.detach().cpu().numpy()[:20, :].tolist() if all_agents and hasattr(all_agents[0].brain, 'actor') else None),
-                    'concept_points': [((a.last_concepts.detach().cpu().numpy() if torch.is_tensor(a.last_concepts) else a.last_concepts).flatten()[:2].tolist()) for a in all_agents[:50] if hasattr(a, 'last_concepts') and a.last_concepts is not None and len((a.last_concepts.detach().cpu().numpy() if torch.is_tensor(a.last_concepts) else a.last_concepts).flatten()) >= 2],
+                    'brain_weights': _brain_wt,
+                    'concept_points': _concept_pts,
                     'ages_list': [a.age for a in all_agents]
                 }
 
@@ -2534,11 +2603,15 @@ with tab_meta:
                 
                 with c5_1:
                     # Fig 5.1: Prediction Error Landscape (REAL)
-                    if len(cache['errors']) > 0:
+                    _errs = cache.get('errors', [])
+                    _enrg = cache.get('energies_l5', [])
+                    _conf = cache.get('confidences', [])
+                    _min_len = min(len(_errs), len(_enrg), len(_conf)) if _errs else 0
+                    if _min_len > 0:
                         df_5_1 = pd.DataFrame({
-                            'Energy': cache['energies_l5'], 
-                            'Error': cache['errors'], 
-                            'Confidence': cache['confidences']
+                            'Energy': _enrg[:_min_len], 
+                            'Error': _errs[:_min_len], 
+                            'Confidence': _conf[:_min_len]
                         })
                         fig_5_1 = px.scatter(
                             df_5_1, x='Energy', y='Error', color='Confidence',
@@ -3243,14 +3316,32 @@ with tab_meta:
                 boltzmann = "Normal" if s_curr < 5.0 else "Inverted"
                 simulacra = f"Level {getattr(world, 'nested_simulation_depth_max', 1)}"
                 
+                # --- Pre-compute plot data for DNA preservation ---
+                _disc_log_save = []
+                try:
+                    if hasattr(world, 'discovery_log') and world.discovery_log:
+                        _disc_log_save = [dict(d) for d in world.discovery_log]
+                except Exception:
+                    pass
+                
+                _causal_save = []
+                try:
+                    if all_agents and hasattr(all_agents[0], 'causal_bayesian_network') and all_agents[0].causal_bayesian_network:
+                        for _ca_act, _ca_res in all_agents[0].causal_bayesian_network.items():
+                            _causal_save.append({"Action": f"Act_{_ca_act}", "Outcome": "Positive", "Count": _ca_res.get("positive", 0)})
+                            _causal_save.append({"Action": f"Act_{_ca_act}", "Outcome": "Negative", "Count": _ca_res.get("negative", 0)})
+                except Exception:
+                    pass
+                
                 st.session_state.l9_cache = {
                     'residuals': residuals,
+                    'causal_depths': causal_depths,
                     'found_patterns': found_patterns,
                     'avg_residual': avg_residual,
                     'max_depth': max_depth,
                     'exploits': exploits,
                     'glitch_x': glitch_x, 'glitch_y': glitch_y,
-                    'law_consistency': law_consistency, # Higher error = lower consistency
+                    'law_consistency': law_consistency,
                     'pred_horizon': pred_horizon,
                     'entropy_delta': entropy_delta,
                     'symm_break': symm_break,
@@ -3262,8 +3353,8 @@ with tab_meta:
                     'tachyon_flux': tachyon_flux,
                     'boltzmann': boltzmann,
                     'simulacra': simulacra,
-                    'discovery_log': ([dict(d) for d in world.discovery_log] if hasattr(world, 'discovery_log') and world.discovery_log else []),
-                    'causal_data': ([item for act, res in (all_agents[0].causal_bayesian_network.items() if all_agents and hasattr(all_agents[0], 'causal_bayesian_network') and all_agents[0].causal_bayesian_network else {}.items()) for item in [{"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)}, {"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)}]])
+                    'discovery_log': _disc_log_save,
+                    'causal_data': _causal_save
                 }
             
             c9 = st.session_state.l9_cache
