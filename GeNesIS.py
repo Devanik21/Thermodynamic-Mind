@@ -2665,38 +2665,41 @@ with tab_meta:
                 c5_3, c5_4 = st.columns(2)
                 
                 with c5_3:
-                    # Fig 5.3: Concept Graph (Real Concepts or Cached)
-                    _concepts = []
-                    if all_agents:
-                        for a in all_agents[:50]:
-                            if hasattr(a, 'last_concepts') and a.last_concepts is not None:
-                                val = a.last_concepts
-                                c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
-                                if len(c_vec) >= 2:
-                                    _concepts.append(c_vec[:2])
-                    if not _concepts and cache.get('concept_points'):
-                        _concepts = [np.array(p) for p in cache['concept_points']]
-                    if not _concepts and _viewing_dna:
-                        try:
-                            _dna_l5 = st.session_state.loaded_dna.get('metacognition', {}).get('level_5', {})
-                            _dna_cp = _dna_l5.get('concept_points', [])
-                            if _dna_cp:
-                                _concepts = [np.array(p) for p in _dna_cp]
-                        except Exception: pass
-                    
-                    if _concepts:
-                        c_arr = np.array(_concepts)
-                        df_5_3 = pd.DataFrame(c_arr, columns=['C1', 'C2'])
-                        fig_5_3 = px.scatter(
-                            df_5_3, x='C1', y='C2',
-                            title="5.3 Concept Latent Space (Real)",
-                            template='plotly_dark',
-                            color_discrete_sequence=['#AB63FA']
-                        )
-                        fig_5_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                        st.plotly_chart(fig_5_3, width='stretch', key="fig_5_3")
-                    else:
-                        st.info("No concept data available for Latent Space.")
+                    # Fig 5.3: Concept Latent Space
+                    try:
+                        _concepts = []
+                        
+                        # 1. DIRECT LOAD: Bypass cache if viewing DNA to ensure sync
+                        if st.session_state.get('viewing_loaded_dna', False):
+                            _concepts = st.session_state.loaded_dna.get('metacognition', {}).get('level_5', {}).get('concept_points', [])
+                        
+                        # 2. LIVE EXTRACTION: Only if not viewing DNA
+                        elif all_agents:
+                            for a in all_agents[:50]:
+                                if hasattr(a, 'last_concepts') and a.last_concepts is not None:
+                                    val = a.last_concepts
+                                    c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
+                                    if len(c_vec) >= 2:
+                                        _concepts.append(c_vec[:2].tolist())
+                                        
+                        # 3. Fallback to cache if still empty (rare edge case)
+                        if not _concepts:
+                            _concepts = cache.get('concept_points', [])
+
+                        if _concepts and len(_concepts) > 0:
+                            df_5_3 = pd.DataFrame(_concepts, columns=['C1', 'C2'])
+                            fig_5_3 = px.scatter(
+                                df_5_3, x='C1', y='C2',
+                                title="5.3 Concept Latent Space (Real)",
+                                template='plotly_dark',
+                                color_discrete_sequence=['#AB63FA']
+                            )
+                            fig_5_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                            st.plotly_chart(fig_5_3, use_container_width=True, key="fig_5_3")
+                        else:
+                            st.info("No concept data available for Latent Space.")
+                    except Exception as _e53:
+                        st.error(f"Plot 5.3 error: {_e53}")
 
                 with c5_4:
                     # Fig 5.4: Age Distribution (Real or Cached)
@@ -3688,6 +3691,7 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
 
