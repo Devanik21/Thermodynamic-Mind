@@ -2599,6 +2599,24 @@ with tab_meta:
 
             # 📈 PLOTS (REAL)
             if st.session_state.get('show_charts', False):
+                # 🔍 DIAGNOSTIC: Show cache contents for debugging
+                if _viewing_dna:
+                    with st.expander("🔍 DEBUG: Plot Data Availability", expanded=False):
+                        st.write(f"**L5 cache keys:** {list(cache.keys())}")
+                        st.write(f"**concept_points in cache:** {'concept_points' in cache}, len={len(cache.get('concept_points', []))}")
+                        st.write(f"**concept_points sample:** {cache.get('concept_points', [])[:3]}")
+                        _l9c = st.session_state.get('l9_cache', {})
+                        st.write(f"**L9 causal_data in cache:** {'causal_data' in _l9c}, len={len(_l9c.get('causal_data', []))}")
+                        st.write(f"**causal_data sample:** {_l9c.get('causal_data', [])[:2]}")
+                        _l10c = st.session_state.get('l10_cache', {})
+                        st.write(f"**L10 energies_10 in cache:** {'energies_10' in _l10c}, len={len(_l10c.get('energies_10', []))}")
+                        try:
+                            _ld_meta = st.session_state.loaded_dna.get('metacognition', {})
+                            st.write(f"**Direct DNA L5 concept_points:** {len(_ld_meta.get('level_5', {}).get('concept_points', []))}")
+                            st.write(f"**Direct DNA L9 causal_data:** {len(_ld_meta.get('level_9', {}).get('causal_data', []))}")
+                            st.write(f"**Direct DNA L10 energies_10:** {len(_ld_meta.get('level_10', {}).get('energies_10', []))}")
+                        except Exception as e:
+                            st.write(f"**DNA access error:** {e}")
                 c5_1, c5_2 = st.columns(2)
                 
                 with c5_1:
@@ -2656,8 +2674,15 @@ with tab_meta:
                                 c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
                                 if len(c_vec) >= 2:
                                     _concepts.append(c_vec[:2])
-                    elif cache.get('concept_points'):
+                    if not _concepts and cache.get('concept_points'):
                         _concepts = [np.array(p) for p in cache['concept_points']]
+                    if not _concepts and _viewing_dna:
+                        try:
+                            _dna_l5 = st.session_state.loaded_dna.get('metacognition', {}).get('level_5', {})
+                            _dna_cp = _dna_l5.get('concept_points', [])
+                            if _dna_cp:
+                                _concepts = [np.array(p) for p in _dna_cp]
+                        except Exception: pass
                     
                     if _concepts:
                         c_arr = np.array(_concepts)
@@ -3448,8 +3473,15 @@ with tab_meta:
                              for act, res in sample.causal_bayesian_network.items():
                                  _causal_data.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
                                  _causal_data.append({"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)})
-                    elif c9.get('causal_data'):
+                    if not _causal_data and c9.get('causal_data'):
                         _causal_data = c9['causal_data']
+                    if not _causal_data and _viewing_dna:
+                        try:
+                            _dna_l9 = st.session_state.loaded_dna.get('metacognition', {}).get('level_9', {})
+                            _dna_cd = _dna_l9.get('causal_data', [])
+                            if _dna_cd:
+                                _causal_data = _dna_cd
+                        except Exception: pass
                     if _causal_data:
                          df_9_4 = pd.DataFrame(_causal_data)
                          fig_9_4 = px.bar(
@@ -3602,6 +3634,13 @@ with tab_meta:
                     _x_dim = [a.energy for a in all_agents] if all_agents else c10.get('energies_10', [])
                     _y_dim = [a.age for a in all_agents] if all_agents else c10.get('ages_10', [])
                     _z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents] if all_agents else c10.get('confs_10', [])
+                    if not _x_dim and _viewing_dna:
+                        try:
+                            _dna_l10 = st.session_state.loaded_dna.get('metacognition', {}).get('level_10', {})
+                            _x_dim = _dna_l10.get('energies_10', [])
+                            _y_dim = _dna_l10.get('ages_10', [])
+                            _z_dim = _dna_l10.get('confs_10', [])
+                        except Exception: pass
                     if _x_dim and _y_dim and _z_dim:
                          fig_10_3 = px.scatter_3d(
                             x=_x_dim, y=_y_dim, z=_z_dim,
