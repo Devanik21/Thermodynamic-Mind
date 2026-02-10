@@ -2672,7 +2672,7 @@ with tab_meta:
                                 color_discrete_sequence=['#AB63FA']
                             )
                             fig_5_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                            st.plotly_chart(fig_5_3, use_container_width=True, key="fig_5_3")
+                            st.plotly_chart(fig_5_3, width='stretch', key="fig_5_3")
                         else:
                             st.info("No concept data available for Latent Space.")
                     except Exception as _e53:
@@ -3467,7 +3467,7 @@ with tab_meta:
                                 color_discrete_map={"Positive": "#00ffa3", "Negative": "#ff4b4b"}
                             )
                             fig_9_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                            st.plotly_chart(fig_9_4, use_container_width=True, key="fig_9_4")
+                            st.plotly_chart(fig_9_4, width='stretch', key="fig_9_4")
                         else:
                             st.info("Awaiting Causal Data (Requires Agent Interventions)")
                     except Exception as _e94:
@@ -3629,7 +3629,7 @@ with tab_meta:
                                 template='plotly_dark'
                             )
                             fig_10_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                            st.plotly_chart(fig_10_3, use_container_width=True, key="fig_10_3")
+                            st.plotly_chart(fig_10_3, width='stretch', key="fig_10_3")
                         else:
                             st.info("No dimensional data available.")
                     except Exception as _e103:
@@ -3669,6 +3669,7 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
 
