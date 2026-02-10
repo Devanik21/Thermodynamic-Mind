@@ -724,6 +724,7 @@ def collect_full_simulation_dna():
             "season": world.current_season,
             "gene_pool_size": len(st.session_state.gene_pool),
             "bonds_count": len(world.bonds) if hasattr(world, 'bonds') else 0,
+            "bonds": [[oid[:6] for oid in list(b)] for b in world.bonds] if hasattr(world, 'bonds') else [],
             "structures": [
                 {"x": s.x, "y": s.y, "type": getattr(s, 'structure_type', 'generic'), "hp": getattr(s, 'durability', 0)}
                 for s in world.structures.values()
@@ -1120,7 +1121,7 @@ with tab_macro:
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Season", obs.get('season', 'N/A'))
         col2.metric("Gene Pool Size", obs.get('gene_pool_size', 0))
-        col3.metric("Bonds Count", obs.get('bonds_count', 0))
+        col3.metric("Bonds Count", obs.get('bonds_count', len(obs.get('bonds', []))))
         col4.metric("Structures", len(obs.get('structures', [])))
         
         # Display stats history if charts enabled
@@ -1203,6 +1204,22 @@ with tab_macro:
                     marker=dict(symbol="x", color="red", size=10),
                     text=stext, hoverinfo='text', name="Structures"
                 ))
+            
+            # 4. Reconstruct Bonds from preserved ID pairs
+            bonds = obs.get('bonds', [])
+            if bonds and agents_pos:
+                pos_lookup = {a['id']: (a['x'], a['y']) for a in agents_pos}
+                for bond in bonds:
+                    if len(bond) == 2:
+                        id_a, id_b = bond
+                        if id_a in pos_lookup and id_b in pos_lookup:
+                            p1, p2 = pos_lookup[id_a], pos_lookup[id_b]
+                            fig_map.add_trace(go.Scatter(
+                                x=[p1[0], p2[0]], y=[p1[1], p2[1]],
+                                mode='lines',
+                                line=dict(color='rgba(0, 255, 163, 0.4)', width=1),
+                                showlegend=False, hoverinfo='skip'
+                            ))
 
             fig_map.update_layout(height=600, margin=dict(l=0,r=0,t=30,b=0))
             st.plotly_chart(fig_map, width='stretch')
