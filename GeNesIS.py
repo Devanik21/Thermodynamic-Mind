@@ -262,7 +262,7 @@ def update_simulation():
                      # Cost already checked/deducted in brain? No, brain checked > 80.
                      # But brain didn't deduct because it didn't know if build succeeded.
                      # Deduct cost now.
-                     cost = {"trap": 15.0, "barrier": 12.0, "battery": 20.0, "cultivator": 18.0, "generic": 10.0}
+                     cost = {"trap": 25.0, "barrier": 20.0, "battery": 10.0, "cultivator": 12.0, "generic": 15.0}
                      agent.energy -= cost.get(s_type, 10.0)
                      events_this_tick.append({
                         "Tick": world.time_step, "Agent": agent.id, 
@@ -3713,6 +3713,7 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
 
