@@ -1357,16 +1357,88 @@ Complete source code available at: [https://github.com/Devanik21/Thermodynamic-M
 
 ### System Screenshots
 
-*[This section reserved for Streamlit application screenshots showing:*
-- *Live simulation grid with agents*
-- *Real-time metric dashboards*
-- *Multi-level consciousness measurement panels*
-- *Genealogy trees and cultural evolution graphs*
-- *Neural architecture visualizations*
-- *Physics oracle dynamics*
-- *All plots, tables, and statistical outputs]*
+---
 
-**To be populated with comprehensive visual documentation of the running system.**
+![Screenshot_10-2-2026_16457_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/191503ea-6e59-4056-b647-c56140bcb67f)
+
+![Screenshot_10-2-2026_16543_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/3b8c4b1b-43dd-40ec-b939-d735d7624519)
+![Screenshot_10-2-2026_1665_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/37e822e4-4374-4909-8790-8ddb712d6725)
+
+![Screenshot_10-2-2026_16623_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/5d58807f-17d0-40dd-bf01-578f25241d81)
+
+
+![Screenshot_10-2-2026_16638_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/2cdd8cab-00a1-4f53-9f08-6a1f49b1573e)
+
+![Screenshot_10-2-2026_16648_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/190f7100-e8e6-407a-a538-0cc9e4e034cb)
+![Screenshot_10-2-2026_1675_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/aaa67903-cbca-4950-8e77-4486ffdbe7a7)
+
+![Screenshot_10-2-2026_16719_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/6c9d6fe2-ab04-4506-8640-85791fe7acfd)
+
+
+![Screenshot_10-2-2026_16749_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/adcf48d9-bf2f-43ae-b8ea-403989d22c1f)
+
+![Screenshot_10-2-2026_1686_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/cd698800-29a3-422f-9974-be847f758900)
+
+
+![Screenshot_10-2-2026_16833_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/bc01036f-e5ce-42dd-96a7-77a3433d4476)
+
+
+![Screenshot_10-2-2026_16851_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/5182284d-0336-43be-933f-420f44adec3a)
+
+![Screenshot_10-2-2026_16915_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/57627416-2cc8-4be4-8cd9-c56c1b35c076)
+
+![Screenshot_10-2-2026_16939_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/fcf324a5-8630-418a-ad01-2e2efd469401)
+
+![Screenshot_10-2-2026_16950_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/979ce758-d125-44b1-8d80-0d9ca00e92a2)
+
+
+![Screenshot_10-2-2026_16103_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/aad689b2-5742-4050-80d4-c89b6e1e3c01)
+
+
+![Screenshot_10-2-2026_161019_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/a09300be-90c2-403e-aa57-0b90ab7b1334)
+![Screenshot_10-2-2026_161032_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/7d18e69e-ae1d-4de1-af5f-b82d4a68719d)
+
+![Screenshot_10-2-2026_161044_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/a1f8f2c8-16a6-4faa-b56a-8c5a5963d987)
+
+
+![Screenshot_10-2-2026_161111_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/073bb58b-dac4-4f0b-9106-73c6208fc6f1)
+
+![Screenshot_10-2-2026_161122_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/1812d3a5-5a2d-4d55-94e1-8355aa33bb07)
+![Screenshot_10-2-2026_161142_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/d1b36e45-c139-4e7c-8aaa-f0b6263479a1)
+
+
+
+![Screenshot_10-2-2026_16125_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/8a00304a-e942-440b-9619-0381927df404)
+
+
+![Screenshot_10-2-2026_161216_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/c1b7c228-a749-461a-bfd0-ad2da31f59de)
+
+
+![Screenshot_10-2-2026_161237_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/15b3d9dd-1ad0-4fa0-a6af-6dd21b952812)
+
+
+![Screenshot_10-2-2026_161247_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/3e5adef1-cfa4-4d60-836e-607fca1f6720)
+
+
+![Screenshot_10-2-2026_16133_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/83889d71-5f37-4753-a40f-7ea6465dc610)
+
+
+![Screenshot_10-2-2026_161354_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/400efa46-745d-4809-8977-a3dd48b0adb6)
+
+![Screenshot_10-2-2026_16149_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/43b1d4f6-91bc-444b-b91a-9ecea5e8dd1c)
+
+![Screenshot_10-2-2026_161421_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/2cbcaddb-471e-4d2a-afc6-6010cb64bfee)
+
+
+
+![Screenshot_10-2-2026_161450_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/d9d0b171-a484-4ec8-aef5-6f98b3f717cd)
+
+
+
+![Screenshot_10-2-2026_161511_genesispy-eefi7iqcstrajbfkquhlbt streamlit app](https://github.com/user-attachments/assets/08dd0df5-1956-403e-9e0b-e28719310509)
+
+
+
 
 ---
 
