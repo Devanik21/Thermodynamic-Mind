@@ -2676,13 +2676,13 @@ with tab_meta:
                                     _concepts.append(c_vec[:2])
                     if not _concepts and cache.get('concept_points'):
                         _concepts = [np.array(p) for p in cache['concept_points']]
-                    if not _concepts and _viewing_dna:
+                    if _viewing_dna and st.session_state.get('loaded_dna'):
                         try:
-                            _dna_l5 = st.session_state.loaded_dna.get('metacognition', {}).get('level_5', {})
-                            _dna_cp = _dna_l5.get('concept_points', [])
-                            if _dna_cp:
-                                _concepts = [np.array(p) for p in _dna_cp]
-                        except Exception: pass
+                            _dna_cp = st.session_state.loaded_dna['metacognition']['level_5']['concept_points']
+                            _concepts = [np.array(p) for p in _dna_cp]
+                        except (KeyError, TypeError): pass
+                    elif not _concepts and cache.get('concept_points'):
+                        _concepts = [np.array(p) for p in cache['concept_points']]
                     
                     if _concepts:
                         c_arr = np.array(_concepts)
@@ -3634,13 +3634,14 @@ with tab_meta:
                     _x_dim = [a.energy for a in all_agents] if all_agents else c10.get('energies_10', [])
                     _y_dim = [a.age for a in all_agents] if all_agents else c10.get('ages_10', [])
                     _z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents] if all_agents else c10.get('confs_10', [])
-                    if not _x_dim and _viewing_dna:
+                    if _viewing_dna and st.session_state.get('loaded_dna'):
                         try:
-                            _dna_l10 = st.session_state.loaded_dna.get('metacognition', {}).get('level_10', {})
-                            _x_dim = _dna_l10.get('energies_10', [])
-                            _y_dim = _dna_l10.get('ages_10', [])
-                            _z_dim = _dna_l10.get('confs_10', [])
-                        except Exception: pass
+                            _l10_data = st.session_state.loaded_dna['metacognition']['level_10']
+                            _x_dim = _l10_data['energies_10']
+                            _y_dim = _l10_data['ages_10']
+                            _z_dim = _l10_data['confs_10']
+                        except (KeyError, TypeError): pass
+                            
                     if _x_dim and _y_dim and _z_dim:
                          fig_10_3 = px.scatter_3d(
                             x=_x_dim, y=_y_dim, z=_z_dim,
@@ -3688,6 +3689,7 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
 
