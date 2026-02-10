@@ -2599,24 +2599,6 @@ with tab_meta:
 
             # 📈 PLOTS (REAL)
             if st.session_state.get('show_charts', False):
-                # 🔍 DIAGNOSTIC: Show cache contents for debugging
-                if _viewing_dna:
-                    with st.expander("🔍 DEBUG: Plot Data Availability", expanded=False):
-                        st.write(f"**L5 cache keys:** {list(cache.keys())}")
-                        st.write(f"**concept_points in cache:** {'concept_points' in cache}, len={len(cache.get('concept_points', []))}")
-                        st.write(f"**concept_points sample:** {cache.get('concept_points', [])[:3]}")
-                        _l9c = st.session_state.get('l9_cache', {})
-                        st.write(f"**L9 causal_data in cache:** {'causal_data' in _l9c}, len={len(_l9c.get('causal_data', []))}")
-                        st.write(f"**causal_data sample:** {_l9c.get('causal_data', [])[:2]}")
-                        _l10c = st.session_state.get('l10_cache', {})
-                        st.write(f"**L10 energies_10 in cache:** {'energies_10' in _l10c}, len={len(_l10c.get('energies_10', []))}")
-                        try:
-                            _ld_meta = st.session_state.loaded_dna.get('metacognition', {})
-                            st.write(f"**Direct DNA L5 concept_points:** {len(_ld_meta.get('level_5', {}).get('concept_points', []))}")
-                            st.write(f"**Direct DNA L9 causal_data:** {len(_ld_meta.get('level_9', {}).get('causal_data', []))}")
-                            st.write(f"**Direct DNA L10 energies_10:** {len(_ld_meta.get('level_10', {}).get('energies_10', []))}")
-                        except Exception as e:
-                            st.write(f"**DNA access error:** {e}")
                 c5_1, c5_2 = st.columns(2)
                 
                 with c5_1:
@@ -2665,38 +2647,34 @@ with tab_meta:
                 c5_3, c5_4 = st.columns(2)
                 
                 with c5_3:
-                    # Fig 5.3: Concept Graph (Real Concepts or Cached)
-                    _concepts = []
-                    if all_agents:
-                        for a in all_agents[:50]:
-                            if hasattr(a, 'last_concepts') and a.last_concepts is not None:
-                                val = a.last_concepts
-                                c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
-                                if len(c_vec) >= 2:
-                                    _concepts.append(c_vec[:2])
-                    if not _concepts and cache.get('concept_points'):
-                        _concepts = [np.array(p) for p in cache['concept_points']]
-                    if not _concepts and _viewing_dna:
-                        try:
-                            _dna_l5 = st.session_state.loaded_dna.get('metacognition', {}).get('level_5', {})
-                            _dna_cp = _dna_l5.get('concept_points', [])
-                            if _dna_cp:
-                                _concepts = [np.array(p) for p in _dna_cp]
-                        except Exception: pass
-                    
-                    if _concepts:
-                        c_arr = np.array(_concepts)
-                        df_5_3 = pd.DataFrame(c_arr, columns=['C1', 'C2'])
-                        fig_5_3 = px.scatter(
-                            df_5_3, x='C1', y='C2',
-                            title="5.3 Concept Latent Space (Real)",
-                            template='plotly_dark',
-                            color_discrete_sequence=['#AB63FA']
-                        )
-                        fig_5_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                        st.plotly_chart(fig_5_3, width='stretch', key="fig_5_3")
-                    else:
-                        st.info("No concept data available for Latent Space.")
+                    # Fig 5.3: Concept Latent Space
+                    try:
+                        _concepts = []
+                        if all_agents:
+                            for a in all_agents[:50]:
+                                if hasattr(a, 'last_concepts') and a.last_concepts is not None:
+                                    val = a.last_concepts
+                                    c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
+                                    if len(c_vec) >= 2:
+                                        _concepts.append(c_vec[:2].tolist())
+                        if not _concepts:
+                            _concepts = cache.get('concept_points', [])
+                        if not _concepts and _viewing_dna:
+                            _concepts = st.session_state.loaded_dna.get('metacognition', {}).get('level_5', {}).get('concept_points', [])
+                        if _concepts and len(_concepts) > 0:
+                            df_5_3 = pd.DataFrame(_concepts, columns=['C1', 'C2'])
+                            fig_5_3 = px.scatter(
+                                df_5_3, x='C1', y='C2',
+                                title="5.3 Concept Latent Space (Real)",
+                                template='plotly_dark',
+                                color_discrete_sequence=['#AB63FA']
+                            )
+                            fig_5_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                            st.plotly_chart(fig_5_3, use_container_width=True, key="fig_5_3")
+                        else:
+                            st.info("No concept data available for Latent Space.")
+                    except Exception as _e53:
+                        st.error(f"Plot 5.3 error: {_e53}")
 
                 with c5_4:
                     # Fig 5.4: Age Distribution (Real or Cached)
@@ -3465,35 +3443,33 @@ with tab_meta:
                         st.success("No Reality Glitches (High Error) Detected.")
 
                 with c9_4:
-                    # Fig 9.4: Causal Calculus (Real or Cached)
-                    _causal_data = []
-                    if all_agents:
-                         sample = all_agents[0]
-                         if hasattr(sample, 'causal_bayesian_network') and sample.causal_bayesian_network:
-                             for act, res in sample.causal_bayesian_network.items():
-                                 _causal_data.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
-                                 _causal_data.append({"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)})
-                    if not _causal_data and c9.get('causal_data'):
-                        _causal_data = c9['causal_data']
-                    if not _causal_data and _viewing_dna:
-                        try:
-                            _dna_l9 = st.session_state.loaded_dna.get('metacognition', {}).get('level_9', {})
-                            _dna_cd = _dna_l9.get('causal_data', [])
-                            if _dna_cd:
-                                _causal_data = _dna_cd
-                        except Exception: pass
-                    if _causal_data:
-                         df_9_4 = pd.DataFrame(_causal_data)
-                         fig_9_4 = px.bar(
-                             df_9_4, x='Action', y='Count', color='Outcome',
-                             title="9.4 Causal Calculus: P(Outcome|Do(Action))",
-                             barmode='group', template='plotly_dark',
-                             color_discrete_map={"Positive": "#00ffa3", "Negative": "#ff4b4b"}
-                         )
-                         fig_9_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                         st.plotly_chart(fig_9_4, width='stretch', key="fig_9_4")
-                    else:
-                        st.info("Awaiting Causal Data (Requires Agent Interventions)")
+                    # Fig 9.4: Causal Calculus
+                    try:
+                        _causal_data = []
+                        if all_agents:
+                            sample = all_agents[0]
+                            if hasattr(sample, 'causal_bayesian_network') and sample.causal_bayesian_network:
+                                for act, res in sample.causal_bayesian_network.items():
+                                    _causal_data.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
+                                    _causal_data.append({"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)})
+                        if not _causal_data:
+                            _causal_data = c9.get('causal_data', [])
+                        if not _causal_data and _viewing_dna:
+                            _causal_data = st.session_state.loaded_dna.get('metacognition', {}).get('level_9', {}).get('causal_data', [])
+                        if _causal_data and len(_causal_data) > 0:
+                            df_9_4 = pd.DataFrame(_causal_data)
+                            fig_9_4 = px.bar(
+                                df_9_4, x='Action', y='Count', color='Outcome',
+                                title="9.4 Causal Calculus: P(Outcome|Do(Action))",
+                                barmode='group', template='plotly_dark',
+                                color_discrete_map={"Positive": "#00ffa3", "Negative": "#ff4b4b"}
+                            )
+                            fig_9_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                            st.plotly_chart(fig_9_4, use_container_width=True, key="fig_9_4")
+                        else:
+                            st.info("Awaiting Causal Data (Requires Agent Interventions)")
+                    except Exception as _e94:
+                        st.error(f"Plot 9.4 error: {_e94}")
 
 
         # ============================================================
@@ -3630,29 +3606,30 @@ with tab_meta:
                 c10_3, c10_4 = st.columns(2)
                 
                 with c10_3:
-                    # Fig 10.3: Hyper-Dimensional Projection (Real or Cached)
-                    _x_dim = [a.energy for a in all_agents] if all_agents else c10.get('energies_10', [])
-                    _y_dim = [a.age for a in all_agents] if all_agents else c10.get('ages_10', [])
-                    _z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents] if all_agents else c10.get('confs_10', [])
-                    if not _x_dim and _viewing_dna:
-                        try:
+                    # Fig 10.3: Hyper-Dimensional Projection
+                    try:
+                        _x_dim = [a.energy for a in all_agents] if all_agents else c10.get('energies_10', [])
+                        _y_dim = [a.age for a in all_agents] if all_agents else c10.get('ages_10', [])
+                        _z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents] if all_agents else c10.get('confs_10', [])
+                        if not _x_dim and _viewing_dna:
                             _dna_l10 = st.session_state.loaded_dna.get('metacognition', {}).get('level_10', {})
                             _x_dim = _dna_l10.get('energies_10', [])
                             _y_dim = _dna_l10.get('ages_10', [])
                             _z_dim = _dna_l10.get('confs_10', [])
-                        except Exception: pass
-                    if _x_dim and _y_dim and _z_dim:
-                         fig_10_3 = px.scatter_3d(
-                            x=_x_dim, y=_y_dim, z=_z_dim,
-                            color=_z_dim,
-                            title="10.3 Hyper-Dimensional State Projection (Real)",
-                            labels={'x':'Energy', 'y':'Age', 'z':'Confidence'},
-                            template='plotly_dark'
-                        )
-                         fig_10_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                         st.plotly_chart(fig_10_3, width='stretch', key="fig_10_3")
-                    else:
-                        st.info("No dimensional data available.")
+                        if _x_dim and _y_dim and _z_dim and len(_x_dim) > 0:
+                            fig_10_3 = px.scatter_3d(
+                                x=_x_dim, y=_y_dim, z=_z_dim,
+                                color=_z_dim,
+                                title="10.3 Hyper-Dimensional State Projection (Real)",
+                                labels={'x':'Energy', 'y':'Age', 'z':'Confidence'},
+                                template='plotly_dark'
+                            )
+                            fig_10_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                            st.plotly_chart(fig_10_3, use_container_width=True, key="fig_10_3")
+                        else:
+                            st.info("No dimensional data available.")
+                    except Exception as _e103:
+                        st.error(f"Plot 10.3 error: {_e103}")
     
                 with c10_4:
                     # Fig 10.4: Emergent Agent Genealogy (Real Tree)
