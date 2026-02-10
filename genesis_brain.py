@@ -150,7 +150,7 @@ class GenesisAgent:
         self.generation = generation
         self.age = 0
         self.dialect_id = 0 # Level 7.9 Protocol Cluster
-        self.energy = 120.0 # Increased starting energy (Survival Buffer)
+        self.energy = 200.0 # Increased starting energy (Survival Buffer)
         self.energy_stored = 0.0 # 1.5 Homeostasis
         self.inventory = [0, 0, 0] if parent_inventory is None else parent_inventory
         
@@ -2290,6 +2290,7 @@ class GenesisAgent:
         if hasattr(self, 'role_history'):
             self.role_history.append(self.role)
             if len(self.role_history) > 100: self.role_history.pop(0)
+
 
 
 
