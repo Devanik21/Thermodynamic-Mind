@@ -847,7 +847,7 @@ def collect_full_simulation_dna():
             "punish_count": sum([getattr(a, 'punish_count', 0) for a in all_agents]),
             "mating_succ": st.session_state.get('successful_births', 0),
             "average_iq": np.mean([float(torch.std(a.last_vector.detach()))*100 for a in all_agents if a.last_vector is not None]) if all_agents else 0,
-            "spatial_spar": len(world.grid) / (world.size**2),
+            "spatial_spar": len(world.grid) / max(1, world.size**2),
             "homeo_error": np.mean([abs(a.energy - 120) for a in all_agents]) if all_agents else 0,
             "bridge_dens": sum([len(a.neural_bridge_partners) for a in all_agents]) / max(1, n_pop),
             "substrate_ind": np.mean([a.brain.actor_mask.sparsity().item() for a in all_agents if hasattr(a.brain, 'actor_mask')]) if all_agents else 0,
@@ -2269,7 +2269,7 @@ with tab_omega:
 | **📉 Mean Confid** | `{np.mean([a.confidence for a in all_agents]):.3f}` | **📡 Meme Divers** | `{len(set([m.get('id', 'unk') for a in all_agents for m in a.meme_pool])) if any([a.meme_pool for a in all_agents]) else 0}` |
 | **🤝 Trade Volume** | `{sum([getattr(a, 'trade_count', 0) for a in all_agents])}` | **⚖️ Punish Count** | `{sum([getattr(a, 'punish_count', 0) for a in all_agents])}` |
 | **🍼 Mating Succ** | `{st.session_state.get('successful_births', 0)}` | **🧠 Average IQ** | `{np.mean([float(torch.std(a.last_vector.detach()))*100 for a in all_agents if a.last_vector is not None]):.1f}` |
-| **🛰️ Spatial Spar** | `{len(st.session_state.world.grid) / (st.session_state.world.size**2):.4f}` | **🔋 Homeo Error** | `{np.mean([abs(a.energy - 120) for a in all_agents]):.1f}` |
+| **🛰️ Spatial Spar** | `{len(st.session_state.world.grid) / max(1, st.session_state.world.size**2):.4f}` | **🔋 Homeo Error** | `{np.mean([abs(a.energy - 120) for a in all_agents]):.1f}` |
 | **🔗 Bridge Dens** | `{sum([len(a.neural_bridge_partners) for a in all_agents]) / max(1, n_pop):.2f}` | **🧠 Substrate Ind** | `{np.mean([a.brain.actor_mask.sparsity().item() for a in all_agents if hasattr(a.brain, 'actor_mask')]):.3f}` |
 | **📈 Mean Phase** | `{np.mean([a.internal_phase for a in all_agents]):.3f}` | **📊 Metabolic Eff** | `{np.mean([a.energy / max(1, a.age) for a in all_agents]):.2f}` |
 | **🔗 Connect Index** | `{len(st.session_state.world.bonds) / 202:.4f}` | **♾️ Max Recursion** | `{max([a.simulation_depth for a in all_agents]):.0f}` |
@@ -3371,7 +3371,9 @@ with tab_meta:
                 vac_decay = f"{vac_decay_prob:.1%}" if hasattr(world, 'vacuum_decay_prob') else "0.0%"
                 
                 # Dark Energy ~ Inverse Energy Density
-                energy_den_val = int(sum([getattr(s, 'stored_energy', 0.0) for s in world.structures.values()]) / max(1, getattr(world, 'size', 40)**2))
+                _sum_stored = sum([getattr(s, 'stored_energy', 0.0) for s in world.structures.values()])
+                _world_size_sq = max(1, getattr(world, 'size', 40)**2)
+                energy_den_val = int(_sum_stored / _world_size_sq)
                 dark_energy = f"{1000.0 / max(0.1, energy_den_val + 1.0):.2f}"
                 
                 tachyon_flux = getattr(world, 'quantum_tunneling_events', 0)
