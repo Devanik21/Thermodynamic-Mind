@@ -701,9 +701,9 @@ class GenesisAgent:
         current_entropy = self.calculate_weight_entropy()
         entropy_diff = current_entropy - self.last_weight_entropy
         # k_B * T at room temperature ~26 meV in normalized units
-        k_B_T = 0.026
+        k_B_T = 0.01
         # ENFORCED Landauer cost - thermodynamic minimum for information erasure
-        landauer_cost = max(0.05, k_B_T * abs(entropy_diff) * 10.0)  # 10x for visibility
+        landauer_cost = max(0.05, k_B_T * abs(entropy_diff) * 2)  # 10x for visibility
         self.energy -= landauer_cost
         self.last_weight_entropy = current_entropy
 
@@ -2290,6 +2290,7 @@ class GenesisAgent:
         if hasattr(self, 'role_history'):
             self.role_history.append(self.role)
             if len(self.role_history) > 100: self.role_history.pop(0)
+
 
 
 
