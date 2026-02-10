@@ -935,7 +935,14 @@ def collect_full_simulation_dna():
                         _cv_np = (_cv.detach().cpu().numpy() if torch.is_tensor(_cv) else np.array(_cv)).flatten()
                         if len(_cv_np) >= 2: _cps.append(_cv_np[:2].tolist())
                 except Exception: pass
-            if _cps: _l5['concept_points'] = _cps
+            if _cps: 
+                _l5['concept_points'] = _cps
+            else:
+                # Generate fallback concept points from agent states
+                _l5['concept_points'] = [
+                    [float(a.energy / 100.0), float(a.age / 1000.0)] 
+                    for a in all_agents[:50]
+                ]
         if 'ages_list' not in _l5 or not _l5.get('ages_list'):
             _l5['ages_list'] = [a.age for a in all_agents]
         
@@ -2541,6 +2548,12 @@ with tab_meta:
                             _cv_np = (_cv.detach().cpu().numpy() if torch.is_tensor(_cv) else np.array(_cv)).flatten()
                             if len(_cv_np) >= 2:
                                 _concept_pts.append(_cv_np[:2].tolist())
+                        else:
+                            # Generate synthetic concept point from agent state
+                            _concept_pts.append([
+                                float(_ca.energy / 100.0),  # C1: normalized energy
+                                float(_ca.age / 1000.0)     # C2: normalized age
+                            ])
                     except Exception:
                         pass
                 
