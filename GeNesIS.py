@@ -2650,17 +2650,19 @@ with tab_meta:
                     # Fig 5.3: Concept Latent Space
                     try:
                         _concepts = []
-                        if all_agents:
+                        # PRIORITY FIX: Check viewing mode cache FIRST
+                        if _viewing_dna:
+                             _concepts = cache.get('concept_points', [])
+                        
+                        # Fallback to live agents only if NOT viewing DNA
+                        if not _concepts and all_agents and not _viewing_dna:
                             for a in all_agents[:50]:
                                 if hasattr(a, 'last_concepts') and a.last_concepts is not None:
                                     val = a.last_concepts
                                     c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
                                     if len(c_vec) >= 2:
                                         _concepts.append(c_vec[:2].tolist())
-                        if not _concepts:
-                            _concepts = cache.get('concept_points', [])
-                        if not _concepts and _viewing_dna:
-                            _concepts = st.session_state.loaded_dna.get('metacognition', {}).get('level_5', {}).get('concept_points', [])
+                        
                         if _concepts and len(_concepts) > 0:
                             df_5_3 = pd.DataFrame(_concepts, columns=['C1', 'C2'])
                             fig_5_3 = px.scatter(
@@ -3608,14 +3610,16 @@ with tab_meta:
                 with c10_3:
                     # Fig 10.3: Hyper-Dimensional Projection
                     try:
-                        _x_dim = [a.energy for a in all_agents] if all_agents else c10.get('energies_10', [])
-                        _y_dim = [a.age for a in all_agents] if all_agents else c10.get('ages_10', [])
-                        _z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents] if all_agents else c10.get('confs_10', [])
-                        if not _x_dim and _viewing_dna:
-                            _dna_l10 = st.session_state.loaded_dna.get('metacognition', {}).get('level_10', {})
-                            _x_dim = _dna_l10.get('energies_10', [])
-                            _y_dim = _dna_l10.get('ages_10', [])
-                            _z_dim = _dna_l10.get('confs_10', [])
+                        # PRIORITY FIX: Explicit split between Viewing Mode (Cache) and Live Mode (Agents)
+                        if _viewing_dna:
+                            _x_dim = c10.get('energies_10', [])
+                            _y_dim = c10.get('ages_10', [])
+                            _z_dim = c10.get('confs_10', [])
+                        else:
+                            _x_dim = [a.energy for a in all_agents] if all_agents else []
+                            _y_dim = [a.age for a in all_agents] if all_agents else []
+                            _z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents] if all_agents else []
+
                         if _x_dim and _y_dim and _z_dim and len(_x_dim) > 0:
                             fig_10_3 = px.scatter_3d(
                                 x=_x_dim, y=_y_dim, z=_z_dim,
@@ -3665,6 +3669,7 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
 
