@@ -603,9 +603,9 @@ class GenesisAgent:
             # But let's just use raw value thresholds
             
             if struct_type_val < -0.5: s_type = "barrier" # Negative value
-            elif struct_type_val < 0.1: s_type = "trap"
-            elif struct_type_val < 0.5: s_type = "battery"
-            elif struct_type_val < 1.0: s_type = "cultivator"
+            elif struct_type_val < 0.02: s_type = "trap"
+            elif struct_type_val < 0.6: s_type = "battery"
+            elif struct_type_val < 1.2: s_type = "cultivator"
             else: s_type = "generic"
             
             special_intent['construct'] = s_type
@@ -625,7 +625,7 @@ class GenesisAgent:
             self.simulate_forward(vector, steps=5)
             
         # 8.8 Strange Loops
-        if self.age % 50 == 0:
+        if self.age % 25 == 0:
             self.strange_loop_check()
             
         # 9.0 Physics Probing
@@ -659,7 +659,7 @@ class GenesisAgent:
                     pass
 
         # 9.9 Simulation Awareness (Rare check)
-        if self.age % 50 == 0:
+        if self.age % 20 == 0:
             self.detect_simulation_artifacts()
 
         # 8.10 Verify Consciousness (Every tick to ensure metric updates)
@@ -2290,6 +2290,7 @@ class GenesisAgent:
         if hasattr(self, 'role_history'):
             self.role_history.append(self.role)
             if len(self.role_history) > 100: self.role_history.pop(0)
+
 
 
 
