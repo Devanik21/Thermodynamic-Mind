@@ -12,7 +12,7 @@ GRID_SIZE = 40
 SIGNAL_DIM = 16
 MAX_ENERGY = 100000.0 # Effectively Infinite (Type II Civilization Potential)
 # "Easy mode" - metabolic cost is low, but stupidity kills
-METABOLIC_COST = 0.02 
+METABOLIC_COST = 0.01 
 SEASON_LENGTH = 20 # Shortened winter (Nobel Optimization)
 
 # ============================================================
@@ -319,9 +319,9 @@ class GenesisWorld:
         self.bonds = set() # Set of tuples (frozenset of agent IDs)
         
         # 1.4 Scarcity Scaling
-        self.scarcity_lambda = 0.005
+        self.scarcity_lambda = 0.001
         self.discovered_physics_exploits = [] # 9.2 Collective Exploit Tracking
-        self.base_spawn_rate = 25.0 # GOLDEN ERA: Increased from 15 to 25
+        self.base_spawn_rate = 35.0 # GOLDEN ERA: Increased from 15 to 25
         self.code_mutations = 0 # 1.10 AUDIT FIX: Track total mutations
         
         # 1.10 Entropy Tracking
@@ -715,7 +715,7 @@ class GenesisWorld:
         
         # 1.4 Scarcity: Exponential decay of spawn rate
         # Nobel-Level Fix: floor at 0.7 (Always 70% abundance) to prevent extinction
-        current_spawn_prob = max(0.7, np.exp(-self.scarcity_lambda * self.time_step))
+        current_spawn_prob = max(0.8, np.exp(-self.scarcity_lambda * self.time_step))
         
         # 1.6 Circadian Rhythms: Environment Phase
         self.env_phase = (self.time_step / SEASON_LENGTH) * 2 * np.pi
@@ -1655,6 +1655,7 @@ class GenesisWorld:
                 "Event": f"💀 DEATH BROADCAST → {len(neighbors)} receivers",
                 "Vector": [0]*21
             })
+
 
 
 
