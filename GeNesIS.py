@@ -935,14 +935,7 @@ def collect_full_simulation_dna():
                         _cv_np = (_cv.detach().cpu().numpy() if torch.is_tensor(_cv) else np.array(_cv)).flatten()
                         if len(_cv_np) >= 2: _cps.append(_cv_np[:2].tolist())
                 except Exception: pass
-            if _cps: 
-                _l5['concept_points'] = _cps
-            else:
-                # Generate fallback concept points from agent states
-                _l5['concept_points'] = [
-                    [float(a.energy / 100.0), float(a.age / 1000.0)] 
-                    for a in all_agents[:50]
-                ]
+            if _cps: _l5['concept_points'] = _cps
         if 'ages_list' not in _l5 or not _l5.get('ages_list'):
             _l5['ages_list'] = [a.age for a in all_agents]
         
@@ -2548,12 +2541,6 @@ with tab_meta:
                             _cv_np = (_cv.detach().cpu().numpy() if torch.is_tensor(_cv) else np.array(_cv)).flatten()
                             if len(_cv_np) >= 2:
                                 _concept_pts.append(_cv_np[:2].tolist())
-                        else:
-                            # Generate synthetic concept point from agent state
-                            _concept_pts.append([
-                                float(_ca.energy / 100.0),  # C1: normalized energy
-                                float(_ca.age / 1000.0)     # C2: normalized age
-                            ])
                     except Exception:
                         pass
                 
@@ -2685,22 +2672,20 @@ with tab_meta:
                 with c5_3:
                     # Fig 5.3: Concept Graph (Real Concepts or Cached)
                     _concepts = []
+                    if all_agents:
+                        for a in all_agents[:50]:
+                            if hasattr(a, 'last_concepts') and a.last_concepts is not None:
+                                val = a.last_concepts
+                                c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
+                                if len(c_vec) >= 2:
+                                    _concepts.append(c_vec[:2])
                     if _viewing_dna and st.session_state.get('loaded_dna'):
                         try:
                             _dna_cp = st.session_state.loaded_dna['metacognition']['level_5']['concept_points']
                             _concepts = [np.array(p) for p in _dna_cp]
-                        except (KeyError, TypeError): 
-                            pass
-                    if not _concepts:
-                        if all_agents:
-                            for a in all_agents[:50]:
-                                if hasattr(a, 'last_concepts') and a.last_concepts is not None:
-                                    val = a.last_concepts
-                                    c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
-                                    if len(c_vec) >= 2:
-                                        _concepts.append(c_vec[:2])
-                        if not _concepts and cache.get('concept_points'):
-                            _concepts = [np.array(p) for p in cache['concept_points']]
+                        except (KeyError, TypeError): pass
+                    elif not _concepts and cache.get('concept_points'):
+                        _concepts = [np.array(p) for p in cache['concept_points']]
                     
                     if _concepts:
                         c_arr = np.array(_concepts)
