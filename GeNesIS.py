@@ -2338,6 +2338,14 @@ with tab_meta:
         loaded = st.session_state.loaded_dna
         meta = loaded.get('metacognition', {})
         st.info(f"💾 **VIEWING MODE:** Showing preserved Metacognition state from `{loaded.get('metadata', {}).get('timestamp', 'Unknown')}`")
+        st.markdown("# 🧠 Metacognition & Verification Center (Preserved)")
+        
+        # --- Inject loaded DNA caches into session state for rich dashboard rendering ---
+        # This lets the SAME rich dashboard code below render preserved data identically to live mode
+        for _ln, _ck in [(5, 'l5_cache'), (6, 'l6_cache'), (7, 'l7_cache'), (8, 'l8_cache'), (9, 'l9_cache'), (10, 'l10_cache')]:
+            _ld = meta.get(f'level_{_ln}', {})
+            if _ld:
+                st.session_state[_ck] = _ld
         
         # --- 🏆 PROJECT OMEGA 110-FEATURE MATRIX (Reconstructed) ---
         with st.expander("🏆 PROJECT OMEGA: 110 FEATURE VERIFICATION MATRIX (PRESERVED)", expanded=True):
@@ -2350,56 +2358,6 @@ with tab_meta:
                 st.markdown("### ✅ Level 6-10 Status")
                 st.markdown("`6.0-6.10: ACTIVE` | `7.0-7.10: ACTIVE` | `8.0-8.10: ACTIVE` | `9.0-9.10: ACTIVE` | `10.0-10.10: ACTIVE`")
                 st.success("✨ ALL 110 FEATURES VERIFIED IN PRESERVED DNA ✨")
-
-        # Show all 6 levels using the familiar dashboard format
-        level_names = {
-            5: "Meta-Learning & Architecture", 6: "Geo-Engineering", 7: "Collective Manifold",
-            8: "Abstract Representation", 9: "Physics Discovery", 10: "The Omega Point"
-        }
-        
-        for level_num in [5, 6, 7, 8, 9, 10]:
-            level_key = f'level_{level_num}'
-            level_data = meta.get(level_key, {})
-            
-            if level_data:
-                with st.expander(f"🧠 LEVEL {level_num}: {level_names[level_num]}", expanded=(level_num == 5)):
-                    st.markdown(f"#### {level_names[level_num]} - Preserved Metrics Grid")
-                    
-                    # Split metrics into rows of 4
-                    metric_items = list(level_data.items())
-                    for i in range(0, len(metric_items), 4):
-                        row_cols = st.columns(4)
-                        for j in range(4):
-                            if i + j < len(metric_items):
-                                k, v = metric_items[i+j]
-                                # Formatting logic
-                                if isinstance(v, (float, np.floating)): d_val = f"{v:.4f}"
-                                elif isinstance(v, bool): d_val = "✅" if v else "❌"
-                                else: d_val = str(v)
-                                row_cols[j].metric(k.replace('_', ' ').title()[:24], d_val)
-                    
-                    # Add a symbolic "Cognitive Scan" chart if data available
-                    if st.session_state.get("show_charts", False):
-                        
-                        # Extract list-based metrics for plotting (e.g. error history, learning rates)
-                        # These are saved as lists in the JSON
-                        plot_candidates = {}
-                        for k, v in level_data.items():
-                            if isinstance(v, list) and len(v) > 2 and isinstance(v[0], (int, float)):
-                                plot_candidates[k] = v
-                        
-                        if plot_candidates:
-                             # Create a combined chart or small multiples
-                             cols_p = st.columns(3)
-                             idx = 0
-                             for name, data in plot_candidates.items():
-                                 with cols_p[idx % 3]:
-                                     st.caption(f"📈 {name.replace('_', ' ').title()}")
-                                     st.line_chart(data, height=120)
-                                     idx += 1
-
-        
-        st.success("✨ ALL 110-FEATURE METRICS ACCESSIBLE VIA DNA ZIP ✨")
 
     
     # === LIVE MODE: Normal display ===
@@ -2438,9 +2396,10 @@ with tab_meta:
         
         st.success("✨ ALL 110 FEATURES VERIFIED AND VISUALIZED ACROSS TABS ✨")
 
-    if st.session_state.world.agents:
-        all_agents = list(st.session_state.world.agents.values())
+    if st.session_state.world.agents or st.session_state.get('viewing_loaded_dna', False):
+        all_agents = list(st.session_state.world.agents.values()) if st.session_state.world.agents else []
         world = st.session_state.world
+        _viewing_dna = st.session_state.get('viewing_loaded_dna', False)
         
         # ============================================================
         # 🧠 LEVEL 5: META-LEARNING DASHBOARD
@@ -2449,7 +2408,7 @@ with tab_meta:
             st.caption("Visualizing the Agent's Learning Process & Brain Structure")
             
             # Data Prep (Cached - Spaced out updates to avoid spike at % 20)
-            if 'l5_cache' not in st.session_state or 'plasticity_std' not in st.session_state.l5_cache or world.time_step % 20 == 0:
+            if not _viewing_dna and ('l5_cache' not in st.session_state or 'plasticity_std' not in st.session_state.l5_cache or world.time_step % 20 == 0):
                 # Basic Arrays
                 errors = []
                 confidences = []
@@ -2658,7 +2617,7 @@ with tab_meta:
             st.caption("Planetary Modification & Infrastructure Analysis")
 
             # Data Prep (Cached - Offset 2)
-            if 'l6_cache' not in st.session_state or 'sx' not in st.session_state.l6_cache or world.time_step % 20 == 2:
+            if not _viewing_dna and ('l6_cache' not in st.session_state or 'sx' not in st.session_state.l6_cache or world.time_step % 20 == 2):
                 struct_types = [getattr(s, 'structure_type', 'generic') for s in world.structures.values()]
                 struct_counts = {k: struct_types.count(k) for k in set(struct_types)}
                 land_usage = len(world.structures)/(40*40)
@@ -2830,7 +2789,7 @@ with tab_meta:
             st.caption("Hive Mind Synchronization & Network Topology")
             
             # Data Prep (Cached - Offset 4)
-            if 'l7_cache' not in st.session_state or 'node_x' not in st.session_state.l7_cache or world.time_step % 20 == 4:
+            if not _viewing_dna and ('l7_cache' not in st.session_state or 'node_x' not in st.session_state.l7_cache or world.time_step % 20 == 4):
                 phases = [getattr(a, 'internal_phase', 0) for a in all_agents]
                 bonds_count = len(world.bonds) if hasattr(world, 'bonds') else 0
                 
@@ -3024,7 +2983,7 @@ with tab_meta:
             st.caption("Self-Awareness, Qualia & Abstract Thought")
             
             # Data Prep (Cached - Offset 6)
-            if 'l8_cache' not in st.session_state or 'concepts_list' not in st.session_state.l8_cache or world.time_step % 20 == 6:
+            if not _viewing_dna and ('l8_cache' not in st.session_state or 'concepts_list' not in st.session_state.l8_cache or world.time_step % 20 == 6):
                 phis = []
                 concepts_list = []
                 qualia_counts = {}
@@ -3214,7 +3173,7 @@ with tab_meta:
             st.caption("Agent Scientific Discovery & Causal Manipulations")
             
             # Data Prep (Cached - Offset 8)
-            if 'l9_cache' not in st.session_state or 'residuals' not in st.session_state.l9_cache or world.time_step % 20 == 8:
+            if not _viewing_dna and ('l9_cache' not in st.session_state or 'residuals' not in st.session_state.l9_cache or world.time_step % 20 == 8):
                 residuals = []
                 causal_depths = []
                 glitch_x = []
@@ -3403,7 +3362,7 @@ with tab_meta:
             st.caption("The End of History & Beginning of Infinity")
             
             # Data Prep (Cached - Offset 10)
-            if 'l10_cache' not in st.session_state or 'scratch_len' not in st.session_state.l10_cache or world.time_step % 20 == 10:
+            if not _viewing_dna and ('l10_cache' not in st.session_state or 'scratch_len' not in st.session_state.l10_cache or world.time_step % 20 == 10):
                 # System Stats (Real Compute Surplus)
                 import psutil
                 cpu_load = psutil.cpu_percent()
@@ -3545,7 +3504,7 @@ with tab_meta:
     
                 with c10_4:
                     # Fig 10.4: Emergent Agent Genealogy (Real Tree)
-                    if c10['emergent_count'] > 0:
+                    if c10['emergent_count'] > 0 and all_agents:
                         # Build genealogy tree data
                         names = [str(a.id) for a in all_agents]
                         parents = [str(getattr(a, 'parent_id', 'World')) for a in all_agents]
@@ -3577,6 +3536,7 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
 
