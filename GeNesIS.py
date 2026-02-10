@@ -2643,7 +2643,12 @@ with tab_meta:
                 with c5_2:
                     # Fig 5.2: Cognitive Neural Sparsity (Real Weights if avail, else from cache)
                     _w_data = None
-                    if all_agents and hasattr(all_agents[0].brain, 'actor'):
+                    if _viewing_dna and st.session_state.get('loaded_dna'):
+                        try:
+                            _bw = st.session_state.loaded_dna['metacognition']['level_5']['brain_weights']
+                            _w_data = np.array(_bw) if _bw else None
+                        except (KeyError, TypeError): pass
+                    elif all_agents and hasattr(all_agents[0].brain, 'actor'):
                         w_raw = all_agents[0].brain.actor.weight
                         _w_data = w_raw.detach().cpu().numpy() if torch.is_tensor(w_raw) else w_raw
                         _w_data = _w_data[:20, :]
@@ -2667,22 +2672,22 @@ with tab_meta:
                 with c5_3:
                     # Fig 5.3: Concept Graph (Real Concepts or Cached)
                     _concepts = []
-                    if all_agents:
-                        for a in all_agents[:50]:
-                            if hasattr(a, 'last_concepts') and a.last_concepts is not None:
-                                val = a.last_concepts
-                                c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
-                                if len(c_vec) >= 2:
-                                    _concepts.append(c_vec[:2])
-                    if not _concepts and cache.get('concept_points'):
-                        _concepts = [np.array(p) for p in cache['concept_points']]
                     if _viewing_dna and st.session_state.get('loaded_dna'):
                         try:
                             _dna_cp = st.session_state.loaded_dna['metacognition']['level_5']['concept_points']
                             _concepts = [np.array(p) for p in _dna_cp]
-                        except (KeyError, TypeError): pass
-                    elif not _concepts and cache.get('concept_points'):
-                        _concepts = [np.array(p) for p in cache['concept_points']]
+                        except (KeyError, TypeError): 
+                            pass
+                    if not _concepts:
+                        if all_agents:
+                            for a in all_agents[:50]:
+                                if hasattr(a, 'last_concepts') and a.last_concepts is not None:
+                                    val = a.last_concepts
+                                    c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
+                                    if len(c_vec) >= 2:
+                                        _concepts.append(c_vec[:2])
+                        if not _concepts and cache.get('concept_points'):
+                            _concepts = [np.array(p) for p in cache['concept_points']]
                     
                     if _concepts:
                         c_arr = np.array(_concepts)
@@ -2700,7 +2705,13 @@ with tab_meta:
 
                 with c5_4:
                     # Fig 5.4: Age Distribution (Real or Cached)
-                    _ages_plot = [a.age for a in all_agents] if all_agents else cache.get('ages_list', [])
+                    _ages_plot = []
+                    if _viewing_dna and st.session_state.get('loaded_dna'):
+                        try:
+                            _ages_plot = st.session_state.loaded_dna['metacognition']['level_5']['ages_list']
+                        except (KeyError, TypeError): pass
+                    if not _ages_plot:
+                        _ages_plot = [a.age for a in all_agents] if all_agents else cache.get('ages_list', [])
                     if _ages_plot:
                         fig_5_4 = px.histogram(
                             x=_ages_plot, nbins=20,
@@ -3430,10 +3441,15 @@ with tab_meta:
                 with c9_2:
                     # Fig 9.2: Pattern Discovery Timeline (Real or Cached)
                     _disc_log = None
-                    if hasattr(world, 'discovery_log') and world.discovery_log:
-                        _disc_log = world.discovery_log
-                    elif c9.get('discovery_log'):
-                        _disc_log = c9['discovery_log']
+                    if _viewing_dna and st.session_state.get('loaded_dna'):
+                        try:
+                            _disc_log = st.session_state.loaded_dna['metacognition']['level_9']['discovery_log']
+                        except (KeyError, TypeError): pass
+                    if not _disc_log:
+                        if hasattr(world, 'discovery_log') and world.discovery_log:
+                            _disc_log = world.discovery_log
+                        elif c9.get('discovery_log'):
+                            _disc_log = c9['discovery_log']
                     if _disc_log:
                          df_9_2 = pd.DataFrame(_disc_log)
                          if 'Time' in df_9_2.columns and 'Pattern' in df_9_2.columns:
@@ -3467,21 +3483,19 @@ with tab_meta:
                 with c9_4:
                     # Fig 9.4: Causal Calculus (Real or Cached)
                     _causal_data = []
-                    if all_agents:
-                         sample = all_agents[0]
-                         if hasattr(sample, 'causal_bayesian_network') and sample.causal_bayesian_network:
-                             for act, res in sample.causal_bayesian_network.items():
-                                 _causal_data.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
-                                 _causal_data.append({"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)})
-                    if not _causal_data and c9.get('causal_data'):
-                        _causal_data = c9['causal_data']
-                    if not _causal_data and _viewing_dna:
+                    if _viewing_dna and st.session_state.get('loaded_dna'):
                         try:
-                            _dna_l9 = st.session_state.loaded_dna.get('metacognition', {}).get('level_9', {})
-                            _dna_cd = _dna_l9.get('causal_data', [])
-                            if _dna_cd:
-                                _causal_data = _dna_cd
-                        except Exception: pass
+                            _causal_data = st.session_state.loaded_dna['metacognition']['level_9']['causal_data']
+                        except (KeyError, TypeError): pass
+                    if not _causal_data:
+                        if all_agents:
+                             sample = all_agents[0]
+                             if hasattr(sample, 'causal_bayesian_network') and sample.causal_bayesian_network:
+                                 for act, res in sample.causal_bayesian_network.items():
+                                     _causal_data.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
+                                     _causal_data.append({"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)})
+                        if not _causal_data and c9.get('causal_data'):
+                            _causal_data = c9['causal_data']
                     if _causal_data:
                          df_9_4 = pd.DataFrame(_causal_data)
                          fig_9_4 = px.bar(
@@ -3613,7 +3627,13 @@ with tab_meta:
                     st.plotly_chart(fig_10_1, width='stretch', key="fig_10_1")
 
                     # Fig 10.2: Ouroboros Self-Correction (Real or Cached)
-                    _self_accs = [getattr(a, 'self_model_accuracy', 0.0) for a in all_agents] if all_agents else c10.get('self_accs', [])
+                    _self_accs = []
+                    if _viewing_dna and st.session_state.get('loaded_dna'):
+                        try:
+                            _self_accs = st.session_state.loaded_dna['metacognition']['level_10']['self_accs']
+                        except (KeyError, TypeError): pass
+                    if not _self_accs:
+                        _self_accs = [getattr(a, 'self_model_accuracy', 0.0) for a in all_agents] if all_agents else c10.get('self_accs', [])
                     if _self_accs:
                         fig_10_2 = px.histogram(
                             x=_self_accs, nbins=20,
@@ -3631,9 +3651,9 @@ with tab_meta:
                 
                 with c10_3:
                     # Fig 10.3: Hyper-Dimensional Projection (Real or Cached)
-                    _x_dim = [a.energy for a in all_agents] if all_agents else c10.get('energies_10', [])
-                    _y_dim = [a.age for a in all_agents] if all_agents else c10.get('ages_10', [])
-                    _z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents] if all_agents else c10.get('confs_10', [])
+                    _x_dim = []
+                    _y_dim = []
+                    _z_dim = []
                     if _viewing_dna and st.session_state.get('loaded_dna'):
                         try:
                             _l10_data = st.session_state.loaded_dna['metacognition']['level_10']
@@ -3641,6 +3661,10 @@ with tab_meta:
                             _y_dim = _l10_data['ages_10']
                             _z_dim = _l10_data['confs_10']
                         except (KeyError, TypeError): pass
+                    if not _x_dim:
+                        _x_dim = [a.energy for a in all_agents] if all_agents else c10.get('energies_10', [])
+                        _y_dim = [a.age for a in all_agents] if all_agents else c10.get('ages_10', [])
+                        _z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents] if all_agents else c10.get('confs_10', [])
                             
                     if _x_dim and _y_dim and _z_dim:
                          fig_10_3 = px.scatter_3d(
@@ -3689,6 +3713,7 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
 
