@@ -2495,7 +2495,10 @@ with tab_meta:
                     'loss_conv': loss_conv,
                     'model_complexity': model_complexity,
                     'inference_time': inference_time,
-                    'mem_mean': np.mean(mem_sizes) if mem_sizes else 0
+                    'mem_mean': np.mean(mem_sizes) if mem_sizes else 0,
+                    'brain_weights': (all_agents[0].brain.actor.weight.detach().cpu().numpy()[:20, :].tolist() if all_agents and hasattr(all_agents[0].brain, 'actor') else None),
+                    'concept_points': [((a.last_concepts.detach().cpu().numpy() if torch.is_tensor(a.last_concepts) else a.last_concepts).flatten()[:2].tolist()) for a in all_agents[:50] if hasattr(a, 'last_concepts') and a.last_concepts is not None and len((a.last_concepts.detach().cpu().numpy() if torch.is_tensor(a.last_concepts) else a.last_concepts).flatten()) >= 2],
+                    'ages_list': [a.age for a in all_agents]
                 }
 
             cache = st.session_state.l5_cache
@@ -2547,58 +2550,62 @@ with tab_meta:
                         st.plotly_chart(fig_5_1, width='stretch', key="fig_5_1")
                 
                 with c5_2:
-                    # Fig 5.2: Cognitive Neural Sparsity (Real Weights if avail, else placeholder)
-                    if all_agents:
-                        sample_agent = all_agents[0]
-                        if hasattr(sample_agent.brain, 'actor'):
-                            w_raw = sample_agent.brain.actor.weight
-                            weights = w_raw.detach().cpu().numpy() if torch.is_tensor(w_raw) else w_raw
-                            fig_5_2 = px.imshow(
-                                weights[:20, :], 
-                                title="5.2 Cognitive Sparse Matrix (Real Weights)",
-                                color_continuous_scale='Viridis',
-                                template='plotly_dark'
-                            )
-                            fig_5_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                            st.plotly_chart(fig_5_2, width='stretch', key="fig_5_2")
+                    # Fig 5.2: Cognitive Neural Sparsity (Real Weights if avail, else from cache)
+                    _w_data = None
+                    if all_agents and hasattr(all_agents[0].brain, 'actor'):
+                        w_raw = all_agents[0].brain.actor.weight
+                        _w_data = w_raw.detach().cpu().numpy() if torch.is_tensor(w_raw) else w_raw
+                        _w_data = _w_data[:20, :]
+                    elif cache.get('brain_weights') is not None:
+                        _w_data = np.array(cache['brain_weights'])
+                    if _w_data is not None:
+                        fig_5_2 = px.imshow(
+                            _w_data, 
+                            title="5.2 Cognitive Sparse Matrix (Real Weights)",
+                            color_continuous_scale='Viridis',
+                            template='plotly_dark'
+                        )
+                        fig_5_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_5_2, width='stretch', key="fig_5_2")
+                    else:
+                        st.info("No weight data available.")
 
                 # Row 2
                 c5_3, c5_4 = st.columns(2)
                 
                 with c5_3:
-                    # Fig 5.3: Concept Graph (Real Concepts)
-                    # We map concepts to 2D space PCA-style if possible, or just plot raw concepts of top agents
+                    # Fig 5.3: Concept Graph (Real Concepts or Cached)
+                    _concepts = []
                     if all_agents:
-                        concepts = []
                         for a in all_agents[:50]:
-                            if hasattr(a, 'last_concepts'):
+                            if hasattr(a, 'last_concepts') and a.last_concepts is not None:
                                 val = a.last_concepts
                                 c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
                                 if len(c_vec) >= 2:
-                                    concepts.append(c_vec[:2])
-                        
-                        if concepts:
-                            c_arr = np.array(concepts)
-                            df_5_3 = pd.DataFrame(c_arr, columns=['C1', 'C2'])
-                            fig_5_3 = px.scatter(
-                                df_5_3, x='C1', y='C2',
-                                title="5.3 Concept Latent Space (Real)",
-                                template='plotly_dark',
-                                color_discrete_sequence=['#AB63FA']
-                            )
-                            fig_5_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                            st.plotly_chart(fig_5_3, width='stretch', key="fig_5_3")
-                        else:
-                            st.info("No concept data available for Latent Space.")
+                                    _concepts.append(c_vec[:2])
+                    elif cache.get('concept_points'):
+                        _concepts = [np.array(p) for p in cache['concept_points']]
+                    
+                    if _concepts:
+                        c_arr = np.array(_concepts)
+                        df_5_3 = pd.DataFrame(c_arr, columns=['C1', 'C2'])
+                        fig_5_3 = px.scatter(
+                            df_5_3, x='C1', y='C2',
+                            title="5.3 Concept Latent Space (Real)",
+                            template='plotly_dark',
+                            color_discrete_sequence=['#AB63FA']
+                        )
+                        fig_5_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                        st.plotly_chart(fig_5_3, width='stretch', key="fig_5_3")
                     else:
-                        st.info("No agents for Concept Graph.")
+                        st.info("No concept data available for Latent Space.")
 
                 with c5_4:
-                    # Fig 5.4: Age Distribution (Real Proxy for Learning Flow)
-                    if all_agents:
-                        ages = [a.age for a in all_agents]
+                    # Fig 5.4: Age Distribution (Real or Cached)
+                    _ages_plot = [a.age for a in all_agents] if all_agents else cache.get('ages_list', [])
+                    if _ages_plot:
                         fig_5_4 = px.histogram(
-                            x=ages, nbins=20,
+                            x=_ages_plot, nbins=20,
                             title="5.4 Agent Generational Maturity (Real)",
                             labels={'x': 'Age (Ticks)'},
                             template='plotly_dark',
@@ -2606,6 +2613,8 @@ with tab_meta:
                         )
                         fig_5_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                         st.plotly_chart(fig_5_4, width='stretch', key="fig_5_4")
+                    else:
+                        st.info("No age data available.")
             else:
                 st.info("Enable 'Show Live Charts' in the top header to view advanced visualizations.")
 
@@ -3252,7 +3261,9 @@ with tab_meta:
                     'dark_energy': dark_energy,
                     'tachyon_flux': tachyon_flux,
                     'boltzmann': boltzmann,
-                    'simulacra': simulacra
+                    'simulacra': simulacra,
+                    'discovery_log': ([dict(d) for d in world.discovery_log] if hasattr(world, 'discovery_log') and world.discovery_log else []),
+                    'causal_data': ([item for act, res in (all_agents[0].causal_bayesian_network.items() if all_agents and hasattr(all_agents[0], 'causal_bayesian_network') and all_agents[0].causal_bayesian_network else {}.items()) for item in [{"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)}, {"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)}]])
                 }
             
             c9 = st.session_state.l9_cache
@@ -3301,16 +3312,23 @@ with tab_meta:
                         st.info("No residuals to plot.")
 
                 with c9_2:
-                    # Fig 9.2: Pattern Discovery Timeline (Real List)
+                    # Fig 9.2: Pattern Discovery Timeline (Real or Cached)
+                    _disc_log = None
                     if hasattr(world, 'discovery_log') and world.discovery_log:
-                         df_9_2 = pd.DataFrame(world.discovery_log)
-                         # Assuming log has 'Time', 'Pattern'
-                         fig_9_2 = px.scatter(
-                            df_9_2, x='Time', y='Pattern',
-                            title="9.2 Pattern Discovery Timeline (Real)",
-                            template='plotly_dark'
-                        )
-                         st.plotly_chart(fig_9_2, width='stretch', key="fig_9_2")
+                        _disc_log = world.discovery_log
+                    elif c9.get('discovery_log'):
+                        _disc_log = c9['discovery_log']
+                    if _disc_log:
+                         df_9_2 = pd.DataFrame(_disc_log)
+                         if 'Time' in df_9_2.columns and 'Pattern' in df_9_2.columns:
+                             fig_9_2 = px.scatter(
+                                df_9_2, x='Time', y='Pattern',
+                                title="9.2 Pattern Discovery Timeline (Real)",
+                                template='plotly_dark'
+                            )
+                             st.plotly_chart(fig_9_2, width='stretch', key="fig_9_2")
+                         else:
+                             st.info("Discovery log format not recognized.")
                     else:
                          st.info("No patterns discovered yet.")
 
@@ -3331,28 +3349,28 @@ with tab_meta:
                         st.success("No Reality Glitches (High Error) Detected.")
 
                 with c9_4:
-                            # Fig 9.4: Causal Calculus (REAL)
+                    # Fig 9.4: Causal Calculus (Real or Cached)
+                    _causal_data = []
                     if all_agents:
                          sample = all_agents[0]
                          if hasattr(sample, 'causal_bayesian_network') and sample.causal_bayesian_network:
-                             data_9_4 = []
                              for act, res in sample.causal_bayesian_network.items():
-                                 data_9_4.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
-                                 data_9_4.append({"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)})
-                             
-                             df_9_4 = pd.DataFrame(data_9_4)
-                             fig_9_4 = px.bar(
-                                 df_9_4, x='Action', y='Count', color='Outcome',
-                                 title="9.4 Causal Calculus: P(Outcome|Do(Action))",
-                                 barmode='group', template='plotly_dark',
-                                 color_discrete_map={"Positive": "#00ffa3", "Negative": "#ff4b4b"}
-                             )
-                             fig_9_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
-                             st.plotly_chart(fig_9_4, width='stretch', key="fig_9_4")
-                         else:
-                             st.info("Awaiting Causal Data (Requires Agent Interventions)")
+                                 _causal_data.append({"Action": f"Act_{act}", "Outcome": "Positive", "Count": res.get("positive", 0)})
+                                 _causal_data.append({"Action": f"Act_{act}", "Outcome": "Negative", "Count": res.get("negative", 0)})
+                    elif c9.get('causal_data'):
+                        _causal_data = c9['causal_data']
+                    if _causal_data:
+                         df_9_4 = pd.DataFrame(_causal_data)
+                         fig_9_4 = px.bar(
+                             df_9_4, x='Action', y='Count', color='Outcome',
+                             title="9.4 Causal Calculus: P(Outcome|Do(Action))",
+                             barmode='group', template='plotly_dark',
+                             color_discrete_map={"Positive": "#00ffa3", "Negative": "#ff4b4b"}
+                         )
+                         fig_9_4.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
+                         st.plotly_chart(fig_9_4, width='stretch', key="fig_9_4")
                     else:
-                        st.info("No Agents Found.")
+                        st.info("Awaiting Causal Data (Requires Agent Interventions)")
 
 
         # ============================================================
@@ -3414,7 +3432,12 @@ with tab_meta:
                     'acausal_trd': acausal_trd,
                     'basilisk': basilisk,
                     'escaped': escaped,
-                    'scratch_len': len(all_agents)
+                    'scratch_len': len(all_agents),
+                    'struct_count_10': len(world.structures),
+                    'self_accs': [getattr(a, 'self_model_accuracy', 0.0) for a in all_agents],
+                    'energies_10': [a.energy for a in all_agents],
+                    'ages_10': [a.age for a in all_agents],
+                    'confs_10': [getattr(a, 'confidence', 0.5) for a in all_agents]
                 }
             
             c10 = st.session_state.l10_cache
@@ -3451,10 +3474,12 @@ with tab_meta:
                 with c10_1:
                     # Fig 10.1: Simulation Recursion Stack (REAL)
                     # Simple sunburst showing World -> Agents -> Brains
+                    _n_agents = len(all_agents) if all_agents else c10.get('scratch_len', 0)
+                    _n_structs = len(world.structures) if all_agents else c10.get('struct_count_10', 0)
                     data = dict(
                         character=["World", "Agents", "Structures", "Brains"],
                         parent=["", "World", "World", "Agents"],
-                        value=[100, len(all_agents), len(world.structures), len(all_agents)]
+                        value=[max(1, _n_agents + _n_structs + 1), max(1, _n_agents), max(1, _n_structs), max(1, _n_agents)]
                     )
                     fig_10_1 = px.sunburst(
                         data, names='character', parents='parent', values='value',
@@ -3464,12 +3489,11 @@ with tab_meta:
                     fig_10_1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                     st.plotly_chart(fig_10_1, width='stretch', key="fig_10_1")
 
-                    # Fig 10.2: Ouroboros Self-Correction (REAL)
-                    # Use real agent self-modeling accuracy scores
-                    if all_agents:
-                        self_accs = [getattr(a, 'self_model_accuracy', 0.0) for a in all_agents]
+                    # Fig 10.2: Ouroboros Self-Correction (Real or Cached)
+                    _self_accs = [getattr(a, 'self_model_accuracy', 0.0) for a in all_agents] if all_agents else c10.get('self_accs', [])
+                    if _self_accs:
                         fig_10_2 = px.histogram(
-                            x=self_accs, nbins=20,
+                            x=_self_accs, nbins=20,
                             title="10.2 Ouroboros: Self-Modeling Accuracy",
                             labels={'x': 'Accuracy Score (0-1)'},
                             template='plotly_dark',
@@ -3478,21 +3502,19 @@ with tab_meta:
                         fig_10_2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                         st.plotly_chart(fig_10_2, width='stretch', key="fig_10_2")
                     else:
-                        st.info("No agents for self-correction plot.")
+                        st.info("No self-model data available.")
 
                 c10_3, c10_4 = st.columns(2)
                 
                 with c10_3:
-                    # Fig 10.3: Hyper-Dimensional Projection (Real Agent State Space)
-                    # We project 3 core dimensions: Energy, Age, and Complexity (calc via simple proxy)
-                    if all_agents:
-                         x_dim = [a.energy for a in all_agents]
-                         y_dim = [a.age for a in all_agents]
-                         z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents]
-                         
+                    # Fig 10.3: Hyper-Dimensional Projection (Real or Cached)
+                    _x_dim = [a.energy for a in all_agents] if all_agents else c10.get('energies_10', [])
+                    _y_dim = [a.age for a in all_agents] if all_agents else c10.get('ages_10', [])
+                    _z_dim = [getattr(a, 'confidence', 0.5) for a in all_agents] if all_agents else c10.get('confs_10', [])
+                    if _x_dim and _y_dim and _z_dim:
                          fig_10_3 = px.scatter_3d(
-                            x=x_dim, y=y_dim, z=z_dim,
-                            color=z_dim,
+                            x=_x_dim, y=_y_dim, z=_z_dim,
+                            color=_z_dim,
                             title="10.3 Hyper-Dimensional State Projection (Real)",
                             labels={'x':'Energy', 'y':'Age', 'z':'Confidence'},
                             template='plotly_dark'
@@ -3500,7 +3522,7 @@ with tab_meta:
                          fig_10_3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(l=0,r=0,t=40,b=0))
                          st.plotly_chart(fig_10_3, width='stretch', key="fig_10_3")
                     else:
-                        st.info("No agents for hyper-dimensional projection.")
+                        st.info("No dimensional data available.")
     
                 with c10_4:
                     # Fig 10.4: Emergent Agent Genealogy (Real Tree)
