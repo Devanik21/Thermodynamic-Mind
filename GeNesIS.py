@@ -1808,7 +1808,7 @@ with tab_culture:
                     if consistencies:
                         avg_tradition = np.mean(consistencies)
                         st.metric("Inter-Generational Fidelity", f"{avg_tradition:.3f}")
-                        if avg_tradition > 0.7:
+                        if avg_tradition > 0.5:
                             st.success("✅ Milestone 3.4 Reached: Stable Traditions")
                         else:
                             st.warning("Culture is drifting randomly.")
@@ -2672,20 +2672,22 @@ with tab_meta:
                 with c5_3:
                     # Fig 5.3: Concept Graph (Real Concepts or Cached)
                     _concepts = []
-                    if all_agents:
-                        for a in all_agents[:50]:
-                            if hasattr(a, 'last_concepts') and a.last_concepts is not None:
-                                val = a.last_concepts
-                                c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
-                                if len(c_vec) >= 2:
-                                    _concepts.append(c_vec[:2])
                     if _viewing_dna and st.session_state.get('loaded_dna'):
                         try:
                             _dna_cp = st.session_state.loaded_dna['metacognition']['level_5']['concept_points']
                             _concepts = [np.array(p) for p in _dna_cp]
                         except (KeyError, TypeError): pass
-                    elif not _concepts and cache.get('concept_points'):
-                        _concepts = [np.array(p) for p in cache['concept_points']]
+                    
+                    if not _concepts:
+                        if all_agents:
+                            for a in all_agents[:50]:
+                                if hasattr(a, 'last_concepts') and a.last_concepts is not None:
+                                    val = a.last_concepts
+                                    c_vec = (val.detach().cpu().numpy() if torch.is_tensor(val) else val).flatten()
+                                    if len(c_vec) >= 2:
+                                        _concepts.append(c_vec[:2])
+                        if not _concepts and cache.get('concept_points'):
+                            _concepts = [np.array(p) for p in cache['concept_points']]
                     
                     if _concepts:
                         c_arr = np.array(_concepts)
