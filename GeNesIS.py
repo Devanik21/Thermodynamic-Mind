@@ -3366,13 +3366,13 @@ with tab_meta:
                 symm_break = "Broken" if len(all_agents) % 2 != 0 else "None"
                 gauge_inv = "Stable" if world.dissipated_energy < 5000 else "Flux"
                 renorm_group = "Active" if len(all_agents) > 50 else "Inactive"
-                planck_scale = f"{1.0/world.size:.3f}" # Real spatial resolution (1/GridSize)
+                planck_scale = f"{1.0/max(1, getattr(world, 'size', 40)):.3f}" # Real spatial resolution (1/GridSize)
                 vac_decay_prob = getattr(world, 'vacuum_decay_prob', 0.0)
                 vac_decay = f"{vac_decay_prob:.1%}" if hasattr(world, 'vacuum_decay_prob') else "0.0%"
                 
                 # Dark Energy ~ Inverse Energy Density
-                energy_den_val = int(sum([getattr(s, 'stored_energy', 0.0) for s in world.structures.values()]) / (40*40))
-                dark_energy = f"{1000.0 / (energy_den_val + 1):.2f}"
+                energy_den_val = int(sum([getattr(s, 'stored_energy', 0.0) for s in world.structures.values()]) / max(1, getattr(world, 'size', 40)**2))
+                dark_energy = f"{1000.0 / max(0.1, energy_den_val + 1.0):.2f}"
                 
                 tachyon_flux = getattr(world, 'quantum_tunneling_events', 0)
                 boltzmann = "Normal" if s_curr < 5.0 else "Inverted"
@@ -3752,7 +3752,6 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
 
 
 
