@@ -887,7 +887,7 @@ The Streamlit interface provides real-time monitoring across ten tabbed panels (
 
 ---
 
-## 5. Experimental Results
+## 5. Experimental Results (Beta)
 
 ### 5.1 Consciousness Emergence Timeline
 
