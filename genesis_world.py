@@ -418,31 +418,6 @@ class GenesisWorld:
         self.symbol_grounding_r2 = 0.0
         self.symbol_grounding_verified = False
 
-    def get_spatial_neighbors(self, agent, radius=2):
-        """O(1) approximation for getting local neighbors to prevent O(N^2) lag."""
-        # Simple spatial hash map rebuilt per tick if needed, or just bounding box
-        # For a truly tiny fix that avoids breaking anything else, just do a fast generator
-        # but to fix O(N^2) we really need a spatial index.
-        if not hasattr(self, '_spatial_map_tick') or getattr(self, '_spatial_map_tick') != self.time_step:
-            self._spatial_map = {}
-            for o_id, a in self.agents.items():
-                cx, cy = int(a.x), int(a.y)
-                if (cx, cy) not in self._spatial_map:
-                    self._spatial_map[(cx, cy)] = []
-                self._spatial_map[(cx, cy)].append(a)
-            self._spatial_map_tick = self.time_step
-            
-        neighbors = []
-        cx, cy = int(agent.x), int(agent.y)
-        for dx in range(-radius, radius + 1):
-            for dy in range(-radius, radius + 1):
-                nx, ny = (cx + dx) % self.size, (cy + dy) % self.size
-                if (nx, ny) in self._spatial_map:
-                    for n in self._spatial_map[(nx, ny)]:
-                        if n.id != agent.id and abs(n.x - agent.x) <= radius and abs(n.y - agent.y) <= radius:
-                            neighbors.append(n)
-        return neighbors
-
     def collective_memory_retrieval(self):
         """4.9 Collective Memory: Agents with low confidence query the hive."""
         # Only run occasionally to save compute
@@ -454,7 +429,10 @@ class GenesisWorld:
                  best_mentor = None
                  max_conf = 0.5
                  
-                 neighbors = self.get_spatial_neighbors(agent, radius=2)
+                 neighbors = [
+                     self.agents[oid] for oid in list(self.agents.keys()) 
+                     if oid != agent.id and abs(self.agents[oid].x - agent.x) <= 2 and abs(self.agents[oid].y - agent.y) <= 2
+                 ]
                  
                  for n in neighbors:
                      if n.confidence > max_conf:
@@ -601,12 +579,16 @@ class GenesisWorld:
 
         # 2. 2.4 Coalition & 2.5 Resource Sharing: BOND LOGIC
         if adhesion > 0.5:
-            neighbors = self.get_spatial_neighbors(agent, radius=1)
-            for other in neighbors:
-                bond_cost = 0.5 + np.linalg.norm(agent.tag - other.tag) * 2.0
-                if agent.energy > bond_cost:
-                    agent.energy -= bond_cost
-                    self.bonds.add(frozenset([agent.id, other.id]))
+            for other_id, other in list(self.agents.items()):
+                if other_id != agent.id:
+                    dist = math.sqrt((agent.x - other.x)**2 + (agent.y - other.y)**2)
+                    if dist < 1.5:
+                        # Bonding with different tribes is costly (2.4)
+                        tag_dist = np.linalg.norm(agent.tag - other.tag)
+                        bond_cost = 0.5 + tag_dist * 2.0
+                        if agent.energy > bond_cost:
+                            agent.energy -= bond_cost
+                            self.bonds.add(frozenset([agent.id, other_id]))
         elif adhesion < 0.2:
             to_remove = [b for b in self.bonds if agent.id in b]
             for b in to_remove:
@@ -617,18 +599,20 @@ class GenesisWorld:
         outcome_log = "✨ IDLE"
         if punish > 0.7:
              # Find a neighbor to punish
-             neighbors = self.get_spatial_neighbors(agent, radius=1)
-             if neighbors:
-                 other = neighbors[0] # Just punish the first one found
-                 cost = 5.0
-                 damage = 15.0
-                 if agent.energy > cost:
-                     agent.energy -= cost
-                     other.energy -= damage
-                     other.social_memory[agent.id] = other.social_memory.get(agent.id, 0) - 1.0 # Trust loss
-                     # 1.10 AUDIT FIX: Track Punish Count
-                     if hasattr(agent, 'punish_count'): agent.punish_count += 1
-                     outcome_log = f"⚔️ PUNISHED {other.id[:4]}"
+             for other_id, other in list(self.agents.items()):
+                if other_id != agent.id:
+                    dist = math.sqrt((agent.x - other.x)**2 + (agent.y - other.y)**2)
+                    if dist < 1.5:
+                        cost = 5.0
+                        damage = 15.0
+                        if agent.energy > cost:
+                            agent.energy -= cost
+                            other.energy -= damage
+                            other.social_memory[agent.id] = other.social_memory.get(agent.id, 0) - 1.0 # Trust loss
+                            # 1.10 AUDIT FIX: Track Punish Count
+                            if hasattr(agent, 'punish_count'): agent.punish_count += 1
+                            outcome_log = f"⚔️ PUNISHED {other_id[:4]}"
+                            break
 
         # 4. 2.8 Trade
         if trade > 0.7:
@@ -778,7 +762,10 @@ class GenesisWorld:
                     # Create virus packet
                     packet = agent.create_weight_packet()
                     # Broadcast to neighbors
-                    neighbors = self.get_spatial_neighbors(agent, radius=2)
+                    neighbors = [
+                        a for a in list(self.agents.values()) 
+                        if a.id != agent.id and abs(a.x - agent.x) <= 2 and abs(a.y - agent.y) <= 2
+                    ]
                     for n in neighbors:
                          n.receive_infection(packet)
                          # Log the infection event sparingly
@@ -1668,7 +1655,6 @@ class GenesisWorld:
                 "Event": f"💀 DEATH BROADCAST → {len(neighbors)} receivers",
                 "Vector": [0]*21
             })
-
 
 
 
