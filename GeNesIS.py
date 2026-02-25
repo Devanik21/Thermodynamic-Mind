@@ -780,6 +780,7 @@ def collect_full_simulation_dna():
             "current_population": n_pop,
             "average_age": np.mean([a.age for a in all_agents]) if all_agents else 0,
             "peak_population": st.session_state.get('max_pop', n_pop),
+            "max_energy": max([a.energy for a in all_agents]) if all_agents else 0,
             "oldest_elder": max([a.age for a in all_agents]) if all_agents else 0,
             "total_biomass": sum([a.energy for a in all_agents]),
             "average_energy": np.mean([a.energy for a in all_agents]) if all_agents else 0,
@@ -1568,6 +1569,7 @@ with tab_micro:
                     n_clusters = min(len(X_comm), 4) 
                     kmeans = KMeans(n_clusters=n_clusters, random_state=42).fit(X_comm)
                     sil = silhouette_score(X_comm, kmeans.labels_)
+                    st.session_state['last_silhouette_score'] = float(sil) # Cache for DNA
                     
                     # PCA for 2D Projection
                     pca = PCA(n_components=2)
@@ -2048,16 +2050,19 @@ with tab_omega:
             # Preserve scale if not saved directly
             n_pop = omega.get('current_population', 0)
             max_age = omega.get('oldest_elder', 0)
-            max_energy = omega.get('average_energy', 0) # proxy
+            max_energy = omega.get('max_energy', omega.get('average_energy', 0))
             
             milestones = []
             if max_age > 100: milestones.append("💀 Conquered Death")
             if max_energy > 200: milestones.append("🔋 Singularity Energy")
+            if omega.get('max_generation', 0) > 50: milestones.append("🧬 Deep Evolution")
+            if omega.get('gene_pool_size', 0) > 40: milestones.append("📚 Genetic Library Full")
             
             civ_type = "Type 0: Scavengers"
             if "Conquered Death" in str(milestones): civ_type = "Type I: Alchemists"
             if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
             if n_pop > 500: civ_type = "Type III: Galactic Swarm"
+            if n_pop > 2000: civ_type = "Type IV: Universal Mind"
             
             st.metric("Preserved Scale", civ_type)
             st.metric("State Space Explored", f"10^-{omega.get('explorer_val', 202)}%") 
