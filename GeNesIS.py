@@ -347,9 +347,9 @@ def update_simulation():
         n_pop = len(world.agents)
         
         # SMOOTHED FORMULA (No more Tiers/Cliffs)
-        # Cost scales from 10.0 to 40.0 as pop goes 0 -> 421
-        # Formula: 10 + 30 * (pop/421)^2
-        scale_factor = (n_pop / 421.0) ** 2
+        # Cost scales from 10.0 to 40.0 as pop goes 0 -> 500
+        # Formula: 10 + 30 * (pop/500)^2
+        scale_factor = (n_pop / 500.0) ** 2
         repro_cost = 10.0 + (30.0 * scale_factor)
         
         # Threshold is Cost + Safety Buffer (40) - "Parental Responsibility"
@@ -358,7 +358,7 @@ def update_simulation():
         
         # Only fertile agents (Queens) reproduce. Others must support them (feed).
         can_reproduce = agent.is_fertile and agent.energy > repro_thresh
-        if mate_desire > 0.5 and can_reproduce and n_pop < 421:
+        if mate_desire > 0.5 and can_reproduce and n_pop < 512:
             # Look for partner
             partners = [
                 other for other in agents 
@@ -458,8 +458,8 @@ def update_simulation():
             
         # 📉 Malthusian Decay (Crowding Penalty)
         # 1.4 Environmental Pressure: Scarcity scaling
-        # ELASTIC: Only apply overcrowding penalty if population is healthy (> 400)
-        if len(world.agents) >= 400:
+        # ELASTIC: Only apply overcrowding penalty if population is healthy (> 450)
+        if len(world.agents) >= 480:
             # MIDDLE PATH FIX: Balanced decay for Darwinian Selection
             # Was: 0.1 + log/10.0 (~0.7 cost) -> Now: 0.1 + log/4.0 (~1.6 cost)
             malthusian_cost = 0.1 + (np.log1p(len(world.agents)) / 4.0)
@@ -469,16 +469,16 @@ def update_simulation():
             
             agent.energy -= malthusian_cost 
         
-        # 🧬 MITOSIS (Hard Cap: 421 per user request)
-        # Nobel Safeguard: Panic Mitosis if pop < 360 (Cheaper cost, lower threshold)
-        if len(world.agents) < 360:
+        # 🧬 MITOSIS (Hard Cap: 512 per user request)
+        # Nobel Safeguard: Panic Mitosis if pop < 300 (Cheaper cost, lower threshold)
+        if len(world.agents) < 300:
             mitosis_threshold = 30.0
             mitosis_cost = 10.0
         else:
             mitosis_threshold = 90.0
             mitosis_cost = 40.0
         
-        if agent.energy > mitosis_threshold and len(world.agents) < 421:
+        if agent.energy > mitosis_threshold and len(world.agents) < 512:
             agent.energy -= mitosis_cost 
             off_x = (agent.x + np.random.randint(-1, 2)) % 40
             off_y = (agent.y + np.random.randint(-1, 2)) % 40
@@ -1450,7 +1450,7 @@ with tab_hive:
                 # For now, we assume it's part of the requested "fix".
                 if edge_count > 0:
                     try:
-                         # Use greedy modularity
+                        # Use greedy modularity
                          c = list(nx.community.greedy_modularity_communities(G))
                          modularity = nx.community.modularity(G, c)
                          st.metric("Modularity Q", f"{modularity:.3f}")
@@ -2061,7 +2061,7 @@ with tab_omega:
             civ_type = "Type 0: Scavengers"
             if "Conquered Death" in str(milestones): civ_type = "Type I: Alchemists"
             if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
-            if n_pop > 400: civ_type = "Type III: Galactic Swarm"
+            if n_pop > 500: civ_type = "Type III: Galactic Swarm"
             if n_pop > 2000: civ_type = "Type IV: Universal Mind"
             
             st.metric("Preserved Scale", civ_type)
@@ -2212,7 +2212,7 @@ with tab_omega:
         civ_type = "Type 0: Scavengers"
         if "Conquered Death" in str(milestones): civ_type = "Type I: Alchemists"
         if "Singularity Energy" in str(milestones): civ_type = "Type II: Gods"
-        if len(st.session_state.world.agents) > 400: civ_type = "Type III: Galactic Swarm"
+        if len(st.session_state.world.agents) > 500: civ_type = "Type III: Galactic Swarm"
         if len(st.session_state.world.agents) > 2000: civ_type = "Type IV: Universal Mind"
         
         st.metric("Civilization Scale", civ_type)
@@ -3776,7 +3776,6 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
-
 
 
 
