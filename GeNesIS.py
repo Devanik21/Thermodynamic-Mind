@@ -197,7 +197,7 @@ def update_simulation():
         
         # 2.6 Reciprocal Altruism: Social Trust Context
         # Mean trust for visible neighbors
-        neighbors = world.get_spatial_neighbors(agent, radius=2)
+        neighbors = [world.agents[oid] for oid in list(world.agents.keys()) if oid != agent.id and abs(world.agents[oid].x - agent.x) <= 2 and abs(world.agents[oid].y - agent.y) <= 2]
         social_trust = 0.0
         if neighbors:
             trust_values = [agent.social_memory.get(n.id, 0.5) for n in neighbors]
@@ -1450,7 +1450,7 @@ with tab_hive:
                 # For now, we assume it's part of the requested "fix".
                 if edge_count > 0:
                     try:
-                        # Use greedy modularity
+                         # Use greedy modularity
                          c = list(nx.community.greedy_modularity_communities(G))
                          modularity = nx.community.modularity(G, c)
                          st.metric("Modularity Q", f"{modularity:.3f}")
