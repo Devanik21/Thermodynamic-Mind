@@ -1088,7 +1088,7 @@ if st.session_state.get('viewing_loaded_dna', False):
                 st.markdown("### Ω Omega Telemetry - 86+ Metrics")
                 # Display as formatted table
                 metrics_df = pd.DataFrame([
-                    {"Metric": k, "Value": v} for k, v in omega.items()
+                    {"Metric": k, "Value": str(v)} for k, v in omega.items()
                 ])
                 st.dataframe(metrics_df, width='stretch', height=600)
 
@@ -1106,7 +1106,11 @@ if st.session_state.get('viewing_loaded_dna', False):
             grid = loaded.get('agent_grid', [])
             if grid:
                 st.markdown(f"### 👥 Agent Grid - Top {len(grid)} Agents (25 Columns)")
-                st.dataframe(pd.DataFrame(grid), width='stretch', height=600)
+                df_grid = pd.DataFrame(grid)
+                # Prevent PyArrow crash by casting mixed object columns to strings
+                for col in df_grid.select_dtypes(include=['object']).columns:
+                    df_grid[col] = df_grid[col].astype(str)
+                st.dataframe(df_grid, width='stretch', height=600)
 
 
 
@@ -2122,10 +2126,15 @@ with tab_omega:
             st.markdown(stats_md)
             
             # Agent Grid
+            # Agent Grid
             agent_grid = loaded.get('agent_grid', [])
             if agent_grid:
                 st.markdown(f"#### 👥 Agent Grid - Top {len(agent_grid)} Agents (Preserved Metrics)")
-                st.dataframe(pd.DataFrame(agent_grid), width='stretch', height=400)
+                df_agent_grid = pd.DataFrame(agent_grid)
+                # Prevent PyArrow crash by casting mixed object columns to strings
+                for col in df_agent_grid.select_dtypes(include=['object']).columns:
+                    df_agent_grid[col] = df_agent_grid[col].astype(str)
+                st.dataframe(df_agent_grid, width='stretch', height=400)
 
             # ♾️ INFINITE STIGMERGY GARDEN (PRESERVED)
             st.markdown("---")
@@ -3776,6 +3785,7 @@ with tab_meta:
 if st.session_state.running:
     time.sleep(0.02) 
     st.rerun()
+
 
 
 
