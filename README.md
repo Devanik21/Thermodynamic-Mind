@@ -1,8 +1,9 @@
-# GeNesIS-I: Generative Neural System for Information-theoretic Self-awareness (A2C)
+# ⬡ GeNesIS-I: Generative Neural System for Information-theoretic Self-awareness (A2C)
 
 **A Computational Framework for Empirically Testable Machine Consciousness via Causal Emergence**
 
 ---
+
 
 **Author:** Devanik  
 **Affiliation:** B.Tech ECE '26, National Institute of Technology Agartala  
@@ -14,7 +15,7 @@
 [![Twitter](https://img.shields.io/badge/Twitter-@devanik2005-1DA1F2?style=flat&logo=twitter)](https://x.com/devanik2005)
 [![arXiv](https://img.shields.io/badge/arXiv-2402.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2402.xxxxx)
 
----
+<img width="1536" height="1024" alt="a5143ba4-63b9-469d-938e-2927e72f5316" src="https://github.com/user-attachments/assets/c30fbd2d-10e5-43d5-a894-d5817ae577ef" />
 
 ## About the Researcher
 
