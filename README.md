@@ -15,7 +15,8 @@
 [![Twitter](https://img.shields.io/badge/Twitter-@devanik2005-1DA1F2?style=flat&logo=twitter)](https://x.com/devanik2005)
 [![arXiv](https://img.shields.io/badge/arXiv-2402.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2402.xxxxx)
 
-<img width="1536" height="1024" alt="a5143ba4-63b9-469d-938e-2927e72f5316" src="https://github.com/user-attachments/assets/c30fbd2d-10e5-43d5-a894-d5817ae577ef" />
+<img width="1536" height="1024" alt="ae976d59-0141-4b3c-a8b6-4918e854ebdd" src="https://github.com/user-attachments/assets/a7954abf-d28c-4c9f-b028-1f1f7f58fd73" />
+
 
 ## About the Researcher
 
